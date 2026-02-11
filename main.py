@@ -98,7 +98,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not caption:
-        await message.reply_text("⚠️ **خطأ:** لم تقم بكتابة رقمك التدريبي! الرجاء إعادة إرسال العذر وكتابة رقمك في الوصف.")
+        await message.reply_text("⚠️ **خطأ:** لم تقم بكتابة رقمك التدريبي! الرجاء إعادة إرسال العذر وكتابة رقمك في الوصف*** في حد اقى ثلاث ايام.")
         return
 
     student_id = caption.strip()
