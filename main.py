@@ -1,9 +1,13 @@
 import os
+import json 
 import pandas as pd
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
 
 # --- 1. سيرفر ويب سريع (لإبقاء البوت متيقظاً على Render) ---
 class SimpleHandler(BaseHTTPRequestHandler):
@@ -13,14 +17,34 @@ class SimpleHandler(BaseHTTPRequestHandler):
         self.wfile.write(b"Bot is alive and running!")
     
     def log_message(self, format, *args):
-        pass 
+        pass
 
 def run_web_server():
     port = int(os.environ.get("PORT", 10000))
     server = HTTPServer(("0.0.0.0", port), SimpleHandler)
     server.serve_forever()
 
-# --- 2. كود البوت ---
+# --- 2. إعدادات جوجل درايف ---
+SCOPES = ['https://www.googleapis.com/auth/drive.file']
+FOLDER_ID = '1kGXVJboQ5eKYt6UcsL6QT_fLiPjxdlux' # تم إضافة أيدي المجلد بنجاح ✅
+
+def upload_to_drive(file_path, file_name):
+    google_creds_json = os.environ.get("GOOGLE_CREDENTIALS")
+    
+    if not google_creds_json:
+        raise Exception("لم يتم العثور على مفتاح جوجل في إعدادات Render!")
+        
+    creds_dict = json.loads(google_creds_json)
+    
+    creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+    service = build('drive', 'v3', credentials=creds)
+    
+    file_metadata = {'name': file_name, 'parents': [FOLDER_ID]}
+    media = MediaFileUpload(file_path, resumable=True)
+    file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+    return file.get('id')
+
+# --- 3. كود البوت ---
 TOKEN = os.environ.get("TOKEN") 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -34,10 +58,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
         "مرحباً بك في البوت الرسمي للقسم! 🏢✨\n\n"
         "نحن هنا لخدمتك وتسهيل وصولك للمعلومات.\n"
-        "الرجاء اختيار الخدمة المطلوبة من القائمة بالأسفل 👇\n\n"
-        "*(للاستعلام عن الغياب مباشرة، فقط أرسل رقمك التدريبي/الجامعي)*"
+        "الرجاء اختيار الخدمة المطلوبة من القائمة بالأسفل 👇"
     )
-    
     await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='Markdown')
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -57,7 +79,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     elif text == "📝 رفع الغياب والأعذار":
-        await update.message.reply_text("📝 **لرفع الأعذار الطبية والرسمية:**\n(سيتم إضافة الرابط قريباً)")
+        await update.message.reply_text(
+            "📝 **لرفع العذر الطبي أو الرسمي:**\n\n"
+            "الرجاء إرسال ملف العذر (صورة أو PDF)، **ومن الضروري جداً كتابة رقمك التدريبي في خانة الوصف (Caption)** قبل الضغط على زر الإرسال، ليتم حفظه باسمك."
+        )
         return
     elif text == "👨‍🏫 تواصل مع رئيس القسم":
         await update.message.reply_text("👨‍🏫 **للتواصل مع رئيس القسم:**\n\n📧 البريد الإلكتروني: aalmoshegh@tvtc.gov.sa")
@@ -66,10 +91,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("الرجاء إرسال **رقم التعريف (ID)** الخاص بك الآن للبحث في سجلات الغياب:")
         return
 
-    # --- البحث في ملف البيانات بالرقم ---
+    # --- البحث في الإكسل ---
     try:
         df = pd.read_csv('data.csv', sep=';', encoding='utf-8-sig')
-        df.columns = df.columns.str.strip() # تنظيف المسافات المخفية
+        df.columns = df.columns.str.strip() 
         
         col_id = 'id'    
         col_name = 'name' 
@@ -93,17 +118,49 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         else:
             reply_message = "❌ عذراً، لم أتمكن من العثور على هذا الرقم. تأكد من صحة الرقم وحاول مجدداً."
-            
-    except FileNotFoundError:
-        reply_message = "⚠️ النظام تحت الصيانة: ملف البيانات غير موجود."
-    except KeyError as e:
-        # 💡 الخدعة هنا: البوت سيخبرنا بالأسماء التي يراها بالضبط لكي نكشف الخلل
-        cols_seen_by_bot = " | ".join(df.columns)
-        reply_message = f"⚠️ خطأ: العمود {e} غير موجود.\n\n🔍 **الأعمدة التي يراها البوت حالياً هي:**\n[ {cols_seen_by_bot} ]"
     except Exception as e:
-        reply_message = f"⚠️ حدث خطأ أثناء البحث.\nالتفاصيل الفنية: {e}"
+        reply_message = f"⚠️ حدث خطأ أثناء البحث. التفاصيل: {e}"
 
     await update.message.reply_text(reply_message)
+
+# --- 4. دالة استقبال الملفات ورفعها لدرايف ---
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = update.message
+    caption = message.caption
+
+    # التحقق من وجود رقم المتدرب في الوصف
+    if not caption:
+        await message.reply_text("⚠️ **خطأ:** لم تقم بكتابة رقمك التدريبي! الرجاء إعادة إرسال الملف أو الصورة وكتابة رقمك في خانة الوصف (Caption).")
+        return
+
+    student_id = caption.strip()
+    
+    # رسالة انتظار
+    await message.reply_text("⏳ جاري رفع العذر إلى نظام القسم، يرجى الانتظار...")
+
+    try:
+        if message.document:
+            file_obj = await message.document.get_file()
+            extension = message.document.file_name.split('.')[-1]
+            file_name = f"{student_id}_excuse.{extension}"
+        elif message.photo:
+            file_obj = await message.photo[-1].get_file()
+            file_name = f"{student_id}_excuse.jpg"
+        else:
+            return
+
+        local_path = file_name
+        await file_obj.download_to_drive(local_path)
+
+        # رفعه إلى جوجل درايف
+        upload_to_drive(local_path, file_name)
+        
+        # حذف الملف من السيرفر
+        os.remove(local_path)
+        
+        await message.reply_text("✅ **تم رفع العذر بنجاح!**\nتم تحويله إلى إدارة القسم للمراجعة.")
+    except Exception as e:
+        await message.reply_text(f"❌ حدث خطأ أثناء الرفع: {e}")
 
 def main():
     t = Thread(target=run_web_server)
@@ -112,7 +169,9 @@ def main():
 
     application = Application.builder().token(TOKEN).build()
     application.add_handler(CommandHandler("start", start))
+    
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, handle_document))
     
     print("🤖 Bot is starting...")
     application.run_polling()
