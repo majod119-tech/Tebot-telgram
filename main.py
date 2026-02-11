@@ -80,8 +80,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # --- البحث في ملف البيانات بالرقم ---
     try:
-        # قراءة الملف
-        df = pd.read_csv('data.csv', encoding='utf-8-sig')
+        # ⚠️ تم إضافة sep=';' هنا لكي يقرأ ملفك بشكل صحيح
+        df = pd.read_csv('data.csv', sep=';', encoding='utf-8-sig')
         
         # أسماء الأعمدة 
         col_id = 'id'    
