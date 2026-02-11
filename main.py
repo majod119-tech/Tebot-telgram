@@ -21,8 +21,8 @@ def run_web_server():
 
 # --- 2. كود البوت ---
 TOKEN = os.environ.get("TOKEN") 
-# سنضع رقم المجموعة هنا لاحقاً، اتركه فارغاً الآن
-GROUP_CHAT_ID = "" 
+# ✅ تم إضافة رقم مجموعة القسم بنجاح!
+GROUP_CHAT_ID = "-5193577198" 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
@@ -38,7 +38,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='Markdown')
 
-# --- أمر سري للحصول على رقم المجموعة ---
 async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.message.chat_id
     await update.message.reply_text(f"رقم هذه المجموعة (Chat ID) هو:\n`{chat_id}`")
@@ -94,7 +93,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     caption = message.caption
 
-    # إذا كان الملف مرسل داخل مجموعة (لا تفعل شيئاً)
+    # إذا كان الملف مرسل داخل مجموعة (نتجاهله لتجنب التكرار)
     if message.chat.type != "private":
         return
 
@@ -106,11 +105,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await message.reply_text("⏳ جاري رفع العذر إلى نظام القسم...")
 
     try:
-        if not GROUP_CHAT_ID:
-            await message.reply_text("⚠️ لم يتم إعداد مجموعة الإدارة بعد.")
-            return
-
-        # رسالة تذهب للإدارة
+        # رسالة تذهب للإدارة (مجموعة الأرشيف)
         admin_text = f"📄 **عذر جديد!**\n👤 رقم المتدرب: {student_id}"
 
         # إرسال العذر للمجموعة
@@ -121,7 +116,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await message.reply_text("✅ **تم رفع العذر بنجاح!**\nتم تحويله إلى إدارة القسم للمراجعة.")
     except Exception as e:
-        await message.reply_text("❌ عذراً، لم أتمكن من رفع الملف، يرجى المحاولة لاحقاً.")
+        await message.reply_text("❌ عذراً، لم أتمكن من رفع الملف، يرجى التأكد من إعدادات البوت في المجموعة.")
 
 def main():
     t = Thread(target=run_web_server)
@@ -130,7 +125,7 @@ def main():
 
     application = Application.builder().token(TOKEN).build()
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("id", get_id)) # أمر جلب رقم المجموعة
+    application.add_handler(CommandHandler("id", get_id))
     
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, handle_document))
