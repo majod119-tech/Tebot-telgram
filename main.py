@@ -21,19 +21,20 @@ def run_web_server():
 
 # --- 2. كود البوت ---
 TOKEN = os.environ.get("TOKEN") 
-# ✅ تم إضافة رقم مجموعة القسم بنجاح!
-GROUP_CHAT_ID = "-5193577198" 
+GROUP_CHAT_ID = "-5193577198" # ✅ رقم مجموعة الأرشيف
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ✅ تم إضافة زر "التقويم التدريبي" في صف جديد
     keyboard = [
         ["📊 استعلام الغياب", "📍 موقع القسم"],
         ["📚 الحقائب التدريبية", "🔗 منصة تقني ورايات"],
-        ["📝 رفع الغياب والأعذار", "👨‍🏫 تواصل مع رئيس القسم"]
+        ["📝 رفع الغياب والأعذار", "👨‍🏫 تواصل مع رئيس القسم"],
+        ["📅 التقويم التدريبي"]
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
     welcome_text = (
-        "مرحباً بك في البوت الرسمي لقسم الحاسب الالي في المعهد الثانوي الصناعي ببريده! 🏢✨\n\n"
+        "مرحباً بك في البوت الرسمي للقسم! 🏢✨\n\n"
         "الرجاء اختيار الخدمة المطلوبة من القائمة بالأسفل 👇"
     )
     await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='Markdown')
@@ -46,16 +47,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     
     if text == "📍 موقع القسم":
-        await update.message.reply_text("📍 **موقع قسم الحاسب مبنى 19 على خرائط جوجل:**\nhttps://maps.app.goo.gl/Y8nQKrovHCfbukVh6?g_st=ic")
+        await update.message.reply_text("📍 **موقع القسم على خرائط جوجل:**\nhttps://maps.app.goo.gl/Y8nQKrovHCfbukVh6?g_st=ic")
         return
     elif text == "📚 الحقائب التدريبية":
-        await update.message.reply_text("📚 **الحقائب التدريبية:**\n(https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL)")
+        await update.message.reply_text("📚 **الحقائب التدريبية:**\n(سيتم إضافة الرابط قريباً)")
         return
     elif text == "🔗 منصة تقني ورايات":
         await update.message.reply_text(
             "🔗 **الروابط الهامة للمتدربين:**\n\n"
             "🌐 **منصة تقني:**\nhttps://tvtclms.edu.sa/?lang=ar\n\n"
             "🌐 **بوابة رايات:**\nhttps://tvtc.gov.sa/ar/Departments/tvtcdepartments/Rayat/pages/E-Services.aspx"
+        )
+        return
+    elif text == "📅 التقويم التدريبي":
+        # ✅ برمجة الرد الخاص بالتقويم
+        await update.message.reply_text(
+            "📅 **التقويم التدريبي:**\n\n"
+            "يمكنك الاطلاع على التقويم التدريبي من خلال الرابط التالي:\n"
+            "https://drive.google.com/file/d/1-Mc_IXwVLaye4BlNyCWdrd7twWSsAMez/view?usp=drivesdk"
         )
         return
     elif text == "📝 رفع الغياب والأعذار":
@@ -93,22 +102,19 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     caption = message.caption
 
-    # إذا كان الملف مرسل داخل مجموعة (نتجاهله لتجنب التكرار)
     if message.chat.type != "private":
         return
 
     if not caption:
-        await message.reply_text("⚠️ **خطأ:** لم تقم بكتابة رقمك التدريبي! الرجاء إعادة إرسال العذر وكتابة رقمك في الوصف*** في حد اقى ثلاث ايام.")
+        await message.reply_text("⚠️ **خطأ:** لم تقم بكتابة رقمك التدريبي! الرجاء إعادة إرسال العذر وكتابة رقمك في الوصف.")
         return
 
     student_id = caption.strip()
     await message.reply_text("⏳ جاري رفع العذر إلى نظام القسم...")
 
     try:
-        # رسالة تذهب للإدارة (مجموعة الأرشيف)
         admin_text = f"📄 **عذر جديد!**\n👤 رقم المتدرب: {student_id}"
 
-        # إرسال العذر للمجموعة
         if message.document:
             await context.bot.send_document(chat_id=GROUP_CHAT_ID, document=message.document.file_id, caption=admin_text)
         elif message.photo:
@@ -116,7 +122,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await message.reply_text("✅ **تم رفع العذر بنجاح!**\nتم تحويله إلى إدارة القسم للمراجعة.")
     except Exception as e:
-        await message.reply_text("❌ عذراً، لم أتمكن من رفع الملف، يرجى التأكد من إعدادات البوت في المجموعة.")
+        await message.reply_text("❌ عذراً، لم أتمكن من رفع الملف، يرجى التأكد من إعدادات البوت.")
 
 def main():
     t = Thread(target=run_web_server)
