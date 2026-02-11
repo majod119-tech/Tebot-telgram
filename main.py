@@ -46,7 +46,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     
     if text == "📍 موقع القسم":
-        await update.message.reply_text("📍 **موقع القسم على خرائط جوجل:**\nhttps://maps.app.goo.gl/Y8nQKrovHCfbukVh6?g_st=ic")
+        await update.message.reply_text("📍 **موقع قسم الحاسب مبنى 19 على خرائط جوجل:**\nhttps://maps.app.goo.gl/Y8nQKrovHCfbukVh6?g_st=ic")
         return
     elif text == "📚 الحقائب التدريبية":
         await update.message.reply_text("📚 **الحقائب التدريبية:**\n(https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL)")
