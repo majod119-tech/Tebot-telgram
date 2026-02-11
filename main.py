@@ -49,7 +49,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📍 **موقع القسم على خرائط جوجل:**\nhttps://maps.app.goo.gl/Y8nQKrovHCfbukVh6?g_st=ic")
         return
     elif text == "📚 الحقائب التدريبية":
-        await update.message.reply_text("📚 **الحقائب التدريبية:**\n(سيتم إضافة الرابط قريباً)")
+        await update.message.reply_text("📚 **الحقائب التدريبية:**\n(https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL)")
         return
     elif text == "🔗 منصة تقني ورايات":
         await update.message.reply_text(
