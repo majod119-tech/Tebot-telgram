@@ -57,7 +57,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         df = pd.read_csv('data.csv', encoding='utf-8-sig')
         
         col_id = 'id'    
-        col_absence = 'إجمالي نسبة الغياب ' 
+        col_absence = 'إجمالي نسبة الغياب ' # تنبيه: يوجد مسافة في نهاية الاسم هنا، تأكد أنها موجودة في ملف الإكسل
         col_name = 'name' 
         col_subject = 'اسم المقرر'
         
