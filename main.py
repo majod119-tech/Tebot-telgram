@@ -5,7 +5,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-# --- 1. سيرفر ويب سريع جداً (لإبقاء البوت متيقظاً على Render) ---
+# --- 1. سيرفر ويب سريع (لإبقاء البوت متيقظاً على Render) ---
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -24,37 +24,66 @@ def run_web_server():
 TOKEN = os.environ.get("TOKEN") 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # إنشاء قائمة الأزرار
+    # إنشاء قائمة الأزرار الجديدة (زرين في كل سطر لشكل أنيق)
     keyboard = [
-        ["📍 موقع المعهد"],
-        ["📊 استعلام عن نسبة الغياب"]
+        ["📊 استعلام الغياب", "📍 موقع القسم"],
+        ["📚 الحقائب التدريبية", "🔗 منصة تقني ورايات"],
+        ["📝 رفع الغياب والأعذار", "👨‍🏫 تواصل مع رئيس القسم"]
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
-    await update.message.reply_text(
-        "مرحباً بك! 🏢\nاختر من القائمة أدناه، أو أرسل **رقم التعريف (ID)** مباشرة للبحث:",
-        reply_markup=reply_markup
+    # رسالة الترحيب الجديدة بالقسم
+    welcome_text = (
+        "مرحباً بك في البوت الرسمي للقسم! 🏢✨\n\n"
+        "نحن هنا لخدمتك وتسهيل وصولك للمعلومات.\n"
+        "الرجاء اختيار الخدمة المطلوبة من القائمة بالأسفل 👇\n\n"
+        "*(للاستعلام عن الغياب مباشرة، فقط أرسل رقمك التدريبي/الجامعي)*"
     )
+    
+    await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='Markdown')
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     
-    if text == "📍 موقع المعهد":
+    # --- التعامل مع الأزرار ---
+    
+    if text == "📍 موقع القسم":
+        await update.message.reply_text("📍 **موقع القسم على خرائط جوجل:**\nhttps://maps.app.goo.gl/Y8nQKrovHCfbukVh6?g_st=ic")
+        return
+        
+    elif text == "📚 الحقائب التدريبية":
+        await update.message.reply_text("📚 **الحقائب التدريبية:**\n(سيتم إضافة الرابط قريباً)")
+        return
+        
+    elif text == "🔗 منصة تقني ورايات":
+        # تم تنسيق الروابط لتكون واضحة وقابلة للضغط بسهولة
         await update.message.reply_text(
-            "📍 **موقع المعهد على خرائط جوجل:**\nhttps://maps.app.goo.gl/SgBNPgmNHKXager36"
+            "🔗 **الروابط الهامة للمتدربين:**\n\n"
+            "🌐 **منصة تقني:**\n"
+            "https://tvtclms.edu.sa/?lang=ar\n\n"
+            "🌐 **بوابة رايات:**\n"
+            "https://tvtc.gov.sa/ar/Departments/tvtcdepartments/Rayat/pages/E-Services.aspx"
         )
         return
         
-    elif text == "📊 استعلام عن نسبة الغياب":
-        await update.message.reply_text("الرجاء إرسال **رقم التعريف (ID)** الآن للبحث:")
+    elif text == "📝 رفع الغياب والأعذار":
+        await update.message.reply_text("📝 **لرفع الأعذار الطبية والرسمية:**\n(سيتم إضافة الرابط قريباً)")
+        return
+        
+    elif text == "👨‍🏫 تواصل مع رئيس القسم":
+        await update.message.reply_text("👨‍🏫 **للتواصل مع رئيس القسم:**\n\n📧 البريد الإلكتروني: aalmoshegh@tvtc.gov.sa")
         return
 
-    # عملية البحث في الملف
+    elif text == "📊 استعلام الغياب":
+        await update.message.reply_text("الرجاء إرسال **رقم التعريف (ID)** الخاص بك الآن للبحث في سجلات الغياب:")
+        return
+
+    # --- البحث في ملف البيانات بالرقم ---
     try:
-        # ملاحظة: إذا كان ملفك بصيغة إكسل، قم بتغيير read_csv إلى read_excel وتغيير اسم الملف إلى data.xlsx
+        # قراءة الملف
         df = pd.read_csv('data.csv', encoding='utf-8-sig')
         
-        # أسماء الأعمدة كما طلبتها بالضبط
+        # أسماء الأعمدة 
         col_id = 'id'    
         col_name = 'name' 
         col_subject = 'c_nam'
@@ -71,7 +100,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             subject_num = result.iloc[0][col_subject_num]
             absence_rate = result.iloc[0][col_absence]
             
-            # ترتيب الرسالة التي ستصل للطالب
+            # ترتيب الرسالة التي ستصل للمتدرب
             reply_message = (
                 f"👤 **الاسم:** {person_name}\n"
                 f"📚 **المادة:** {subject_name} (رقم: {subject_num})\n"
@@ -83,7 +112,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except FileNotFoundError:
         reply_message = "⚠️ النظام تحت الصيانة: ملف البيانات غير موجود."
     except KeyError as e:
-        # هذا الخطأ سيظهر في حال كان هناك اختلاف بسيط في تهجئة أسماء الأعمدة داخل الملف
         reply_message = f"⚠️ خطأ في قراءة الملف: العمود {e} غير موجود. يرجى مراجعة الإدارة."
     except Exception as e:
         reply_message = f"⚠️ حدث خطأ أثناء البحث.\nالتفاصيل الفنية: {e}"
