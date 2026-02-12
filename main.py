@@ -24,7 +24,6 @@ TOKEN = os.environ.get("TOKEN")
 GROUP_CHAT_ID = "-5193577198" # ✅ رقم مجموعة الأرشيف
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ✅ تم إضافة زر "التقويم التدريبي" في صف جديد
     keyboard = [
         ["📊 استعلام الغياب", "📍 موقع القسم"],
         ["📚 الحقائب التدريبية", "🔗 منصة تقني ورايات"],
@@ -34,7 +33,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
     welcome_text = (
-        "مرحباً بك في البوت الرسمي للقسم! 🏢✨\n\n"
+        "مرحباً بك في البوت الرسمي للقسم الحاسب في المعهد الصناعي الثانوي ببريدة! 🏢✨\n\n"
         "الرجاء اختيار الخدمة المطلوبة من القائمة بالأسفل 👇"
     )
     await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='Markdown')
@@ -60,7 +59,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     elif text == "📅 التقويم التدريبي":
-        # ✅ برمجة الرد الخاص بالتقويم
         await update.message.reply_text(
             "📅 **التقويم التدريبي:**\n\n"
             "يمكنك الاطلاع على التقويم التدريبي من خلال الرابط التالي:\n"
@@ -80,18 +78,40 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("الرجاء إرسال **رقم التعريف (ID)** الخاص بك الآن للبحث في سجلات الغياب:")
         return
 
-    # --- البحث في الإكسل ---
+    # --- البحث في الإكسل (تم التحديث لعرض كل المواد) ---
     try:
         df = pd.read_csv('data.csv', sep=';', encoding='utf-8-sig')
         df.columns = df.columns.str.strip() 
         col_id, col_name, col_subject, col_subject_num, col_absence = 'id', 'name', 'c_nam', 'c_number', 'apsent'
+        
+        # تحويل الرقم لنص للبحث الدقيق
         df[col_id] = df[col_id].astype(str).str.strip()
+        
+        # جلب كل الصفوف التي تطابق رقم الطالب
         result = df[df[col_id] == text]
         
         if not result.empty:
-            reply_message = (f"👤 **الاسم:** {result.iloc[0][col_name]}\n📚 **المادة:** {result.iloc[0][col_subject]} (رقم: {result.iloc[0][col_subject_num]})\n📊 **نسبة الغياب:** {result.iloc[0][col_absence]}%")
+            # 1. جلب اسم الطالب (من أول صف لأنه لا يتغير)
+            student_name = result.iloc[0][col_name]
+            
+            # 2. تجهيز مقدمة الرسالة
+            reply_message = f"👤 **الاسم:** {student_name}\n\n👇 **تفاصيل الغياب للمواد المسجلة:**\n━━━━━━━━━━━━\n"
+            
+            # 3. حلقة تكرار لجمع كل المواد
+            for index, row in result.iterrows():
+                sub_name = row[col_subject]
+                sub_num = row[col_subject_num]
+                abs_percent = row[col_absence]
+                
+                # تنسيق كل مادة في سطرين
+                reply_message += (
+                    f"📚 **{sub_name}** (رقم: {sub_num})\n"
+                    f"⚠️ نسبة الغياب: {abs_percent}%\n"
+                    f"───────────────\n"
+                )
         else:
             reply_message = "❌ عذراً، لم أتمكن من العثور على هذا الرقم. تأكد من صحة الرقم وحاول مجدداً."
+            
     except Exception as e:
         reply_message = "⚠️ حدث خطأ أثناء البحث، يرجى المحاولة لاحقاً."
 
@@ -122,7 +142,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await message.reply_text("✅ **تم رفع العذر بنجاح!**\nتم تحويله إلى إدارة القسم للمراجعة.")
     except Exception as e:
-        await message.reply_text("❌ عذراً، لم أتمكن من رفع الملف، يرجى التأكد من إعدادات البوت.")
+        await message.reply_text("❌ عذراً، لم أتمكن من رفع الملف.")
 
 def main():
     t = Thread(target=run_web_server)
