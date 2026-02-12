@@ -33,7 +33,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
     welcome_text = (
-        "مرحباً بك في البوت الرسمي للقسم الحاسب في المعهد الصناعي الثانوي ببريدة! 🏢✨\n\n"
+        "مرحباً بك في البوت (التجريبي)  للقسم الحاسب في المعهد الصناعي الثانوي ببريدة! 🏢✨\n\n"
         "الرجاء اختيار الخدمة المطلوبة من القائمة بالأسفل 👇"
     )
     await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='Markdown')
