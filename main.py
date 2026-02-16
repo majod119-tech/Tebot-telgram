@@ -5,7 +5,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-# --- 1. سيرفر ويب وهمي (Keep-Alive لـ Render) ---
+# --- 1. سيرفر ويب وهمي (لإبقاء البوت يعمل على Render) ---
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -22,7 +22,7 @@ def run_web_server():
 TOKEN = os.environ.get("TOKEN", "ضع_التوكن_هنا") 
 GROUP_ID = "-5193577198" 
 
-# --- 3. لوحات المفاتيح (Keyboards) ---
+# --- 3. لوحات المفاتيح (أزرار التحكم) ---
 def get_main_menu():
     return ReplyKeyboardMarkup([
         ["📊 استعلام الغياب", "📍 موقع القسم"],
@@ -34,72 +34,80 @@ def get_main_menu():
 def get_back_menu():
     return ReplyKeyboardMarkup([["🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
 
-# --- 4. المهام المنطقية ---
+# --- 4. معالجة الرسائل والمنطق ---
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = update.effective_user.first_name
     await update.message.reply_text(
-        f"مرحباً بك يا {name} في بوت قسم الحاسب 💻✨\n\n"
-        "يسعدنا خدمتك، اختر من القائمة أدناه 👇",
+        f"مرحباً بك يا {name} في بوت قسم الحاسب الآلي 🤖💻\n\n"
+        "نسعد بخدمتك، فضلاً اختر من القائمة أدناه 👇",
         reply_markup=get_main_menu()
     )
 
 async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
 
-    # التنقل بين القوائم
+    # زر الرجوع
     if text == "🔙 الرجوع للقائمة الرئيسية":
         await update.message.reply_text("🏠 القائمة الرئيسية:", reply_markup=get_main_menu())
         return
 
-    # الأقسام الثابتة
-    responses = {
-        "📍 موقع القسم": "📍 **موقع قسم الحاسب:**\n[اضغط هنا للوصول](http://maps.google.com/?q=Buraydah)",
-        "🔗 منصة تقني ورايات": "🌐 **أهم الروابط:**\n\n🔹 [منصة تقني](https://tvtclms.edu.sa)\n🔹 [بوابة رايات](https://rayat.tvtc.gov.sa)",
-        "📅 التقويم التدريبي": "📅 **التقويم التدريبي:**\n[تحميل التقويم من هنا](https://drive.google.com/file/d/1-Mc_IXwVLaye4BlNyCWdrd7twWSsAMez/view)",
-        "📊 استعلام الغياب": "🔎 فضلاً أرسل **رقمك التدريبي** الآن للبحث..",
-        "📝 رفع الغياب والأعذار": "📝 **تعليمات:** أرسل صورة العذر مع كتابة رقمك التدريبي في الوصف.",
-        "👨‍🏫 تواصل مع رئيس القسم": "👨‍🏫 **رئيس القسم:**\n✉️ `aalmoshegh@tvtc.gov.sa`"
-    }
+    # الأقسام الثابتة والروابط
+    if text == "📍 موقع القسم":
+        await update.message.reply_text("📍 **موقع قسم الحاسب:**\n[اضغط هنا للوصول عبر الخرائط](http://maps.google.com/?q=Buraydah)", reply_markup=get_back_menu(), parse_mode='Markdown')
+    
+    elif text == "🔗 منصة تقني ورايات":
+        await update.message.reply_text("🌐 **أهم الروابط التدريبية:**\n\n🔹 [منصة تقني (Blackboard)](https://tvtclms.edu.sa)\n🔹 [بوابة رايات](https://rayat.tvtc.gov.sa)", reply_markup=get_back_menu(), parse_mode='Markdown')
+    
+    elif text == "📅 التقويم التدريبي":
+        # قراءة الصورة بالاسم الجديد calendar.jpg
+        photo_path = 'calendar.jpg' 
+        if os.path.exists(photo_path):
+            await update.message.reply_photo(
+                photo=open(photo_path, 'rb'),
+                caption="📅 **التقويم التدريبي المعتمد للفصل الحالي**",
+                reply_markup=get_back_menu()
+            )
+        else:
+            await update.message.reply_text("⚠️ عذراً، لم يتم العثور على ملف الصورة باسم `calendar.jpg` على السيرفر.", reply_markup=get_back_menu())
+    
+    elif text == "📊 استعلام الغياب":
+        await update.message.reply_text("🔎 فضلاً أرسل **رقمك التدريبي** الآن وسأقوم بالبحث في السجلات..", reply_markup=get_back_menu())
+    
+    elif text == "📝 رفع الغياب والأعذار":
+        await update.message.reply_text("📝 **تعليمات رفع العذر:**\nقم بإرفاق صورة العذر الطبي أو الرسمي، واكتب (رقمك التدريبي) في خانة الوصف (Caption).", reply_markup=get_back_menu())
+    
+    elif text == "👨‍🏫 تواصل مع رئيس القسم":
+        await update.message.reply_text("👨‍🏫 **للتواصل مع رئيس قسم الحاسب:**\n\n✉️ البريد الإلكتروني: `aalmoshegh@tvtc.gov.sa`", reply_markup=get_back_menu(), parse_mode='Markdown')
 
-    if text in responses:
-        await update.message.reply_text(responses[text], reply_markup=get_back_menu(), parse_mode='Markdown', disable_web_page_preview=True)
-        return
-
-    # --- معالجة البحث الرقمي (استعلام الغياب) ---
-    if text.isdigit():
-        status_msg = await update.message.reply_text("⏳ جاري فحص السجلات، لحظات...")
+    # --- منطق البحث في الإكسل ---
+    elif text.isdigit():
+        status_msg = await update.message.reply_text("⏳ جاري فحص السجلات، فضلاً انتظر...")
         try:
             if not os.path.exists('data.xlsx'):
-                await status_msg.edit_text("⚠️ ملف البيانات `data.xlsx` غير متوفر حالياً.")
+                await status_msg.edit_text("⚠️ خطأ: ملف البيانات `data.xlsx` غير موجود.")
                 return
 
             df = pd.read_excel('data.xlsx')
             df.columns = df.columns.astype(str).str.strip()
             
-            # الأعمدة المعتمدة من ملفك (stu_num, stu_nam, c_nam, parsnt)
+            # الأعمدة المعتمدة
             c_id, c_name, c_sub, c_abs = 'stu_num', 'stu_nam', 'c_nam', 'parsnt'
             
             df[c_id] = df[c_id].astype(str).str.strip()
             result = df[df[c_id] == text]
 
-            # حذف رسالة الانتظار
-            await status_msg.delete()
+            await status_msg.delete() # حذف رسالة الانتظار
 
             if not result.empty:
                 s_name = result.iloc[0][c_name]
-                msg = f"✅ **تم استرجاع البيانات بنجاح:**\n\n"
-                msg += f"👤 **المتدرب:** `{s_name}`\n"
-                msg += f"🆔 **الرقم:** `{text}`\n"
+                msg = f"✅ **تم العثور على البيانات لـ:** `{s_name}`\n"
+                msg += f"🆔 **الرقم التدريبي:** `{text}`\n"
                 msg += "━━━━━━━━━━━━━━\n"
                 
                 for _, row in result.iterrows():
-                    try:
-                        val = float(row[c_abs])
-                    except:
-                        val = 0.0
-
-                    # --- منطق الحرمان الجديد ---
+                    val = float(row[c_abs])
+                    # توزيع الألوان حسب النسب المطلوبة
                     if val >= 20:
                         icon = "🔴 حرمان"
                     elif 15 <= val < 20:
@@ -113,36 +121,32 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 await update.message.reply_text(msg, parse_mode='Markdown', reply_markup=get_back_menu())
             else:
-                await update.message.reply_text("❌ لم يتم العثور على هذا الرقم التدريبي في سجلاتنا.", reply_markup=get_back_menu())
+                await update.message.reply_text("❌ عذراً، الرقم التدريبي غير مسجل في النظام.", reply_markup=get_back_menu())
         
         except Exception as e:
             if 'status_msg' in locals(): await status_msg.delete()
-            await update.message.reply_text(f"⚠️ حدث خطأ أثناء المعالجة. تأكد من سلامة ملف الإكسل.", reply_markup=get_back_menu())
-            print(f"Error: {e}")
+            await update.message.reply_text(f"⚠️ حدث خطأ فني أثناء قراءة البيانات.", reply_markup=get_back_menu())
 
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة ملفات الأعذار المرفوعة"""
     if not update.message.caption:
-        await update.message.reply_text("⚠️ خطأ: يجب كتابة الرقم التدريبي في 'وصف الصورة' لضمان توجيه العذر.")
+        await update.message.reply_text("⚠️ يرجى كتابة الرقم التدريبي في وصف الصورة لضمان أرشفة العذر.")
         return
     
-    await context.bot.send_message(chat_id=GROUP_ID, text=f"📥 **عذر جديد مستلم:**\n📝 البيانات المرفقة: {update.message.caption}")
+    await context.bot.send_message(chat_id=GROUP_ID, text=f"📥 **عذر جديد مستلم:**\n🆔 البيانات: {update.message.caption}")
     await update.message.copy(chat_id=GROUP_ID)
-    await update.message.reply_text("✅ تم استلام عذرك بنجاح وتوجيهه للمسؤول المختص.", reply_markup=get_main_menu())
+    await update.message.reply_text("✅ تم استلام عذرك بنجاح وتوجيهه للجنة المختصة.", reply_markup=get_main_menu())
 
-# --- 5. التشغيل النهائي ---
+# --- 5. تشغيل البوت ---
 def main():
-    # تشغيل السيرفر في الخلفية
     Thread(target=run_web_server, daemon=True).start()
-    
-    # بناء التطبيق
     app = Application.builder().token(TOKEN).build()
     
-    # المعالجات
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_logic))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
 
-    print("🚀 البوت يعمل الآن بكفاءة عالية...")
+    print("🚀 البوت يعمل الآن باسم الملف calendar.jpg...")
     app.run_polling()
 
 if __name__ == '__main__':
