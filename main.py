@@ -5,7 +5,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-# --- 1. سيرفر ويب وهمي لـ Render (لمنع إغلاق البوت) ---
+# --- 1. سيرفر الويب (يمنع توقف البوت) ---
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -19,11 +19,11 @@ def run_web_server():
     server.serve_forever()
 
 # --- 2. الإعدادات ---
-TOKEN = os.environ.get("TOKEN") # يتم جلبه من إعدادات Render
+TOKEN = os.environ.get("TOKEN") # يجلب التوكن من Render
 GROUP_ID = "-5193577198"
 TELEGRAM_CONTACT_LINK = "https://t.me/majod119"
 
-# --- 3. تصميم القوائم (لوحات المفاتيح) ---
+# --- 3. تصميم القوائم ---
 def get_main_menu():
     keyboard = [
         ["📊 استعلام الغياب", "📍 موقع القسم"],
@@ -54,6 +54,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
 
+    # --- 1. أزرار التنقل ---
     if text == "🔙 الرجوع للقائمة الرئيسية":
         await update.message.reply_text("🏠 تم العودة للقائمة الرئيسية:", reply_markup=get_main_menu())
         return
@@ -62,62 +63,99 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📄 قسم الخطط:\nاختر التخصص المطلوب 👇", reply_markup=get_plans_menu())
         return
 
-    # الروابط والأقسام الأخرى
+    # --- 2. الخطط الفرعية ---
+    plans = {
+        "🖥️ خطة الدعم الفني": "📍 [رابط خطة الدعم الفني هنا]",
+        "🌐 خطة الشبكات": "📍 [رابط خطة الشبكات هنا]",
+        "💻 خطة البرمجيات": "📍 [رابط خطة البرمجيات هنا]"
+    }
+    if text in plans:
+        await update.message.reply_text(f"✅ **{text}:**\n\n{plans[text]}", parse_mode='Markdown')
+        return
+
+    # --- 3. الروابط والأقسام الثابتة (التي كانت مفقودة) ---
+    if text == "🔗 منصة تقني ورايات":
+        msg = "🌐 **أهم الروابط التدريبية:**\n\n🔹 منصة تقني:\nhttps://tvtclms.edu.sa\n\n🔹 بوابة رايات:\nhttps://rayat.tvtc.gov.sa"
+        await update.message.reply_text(msg, reply_markup=get_back_menu(), parse_mode='Markdown', disable_web_page_preview=True)
+        return
+
     if text == "📍 موقع القسم":
-        await update.message.reply_text("📍 [موقع القسم](http://maps.google.com/?q=Buraydah)", reply_markup=get_back_menu(), parse_mode='Markdown')
-    elif text == "📚 الحقائب التدريبية":
-        await update.message.reply_text("📚 [الحقائب التدريبية](https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL)", reply_markup=get_back_menu())
-    elif text == "📅 التقويم التدريبي":
+        await update.message.reply_text("📍 [موقع القسم على الخريطة](http://maps.google.com/?q=Buraydah)", reply_markup=get_back_menu(), parse_mode='Markdown')
+        return
+    
+    if text == "📚 الحقائب التدريبية":
+        await update.message.reply_text("📚 [رابط الحقائب التدريبية المعتمدة](https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL)", reply_markup=get_back_menu(), parse_mode='Markdown')
+        return
+    
+    if text == "📅 التقويم التدريبي":
         if os.path.exists('calendar.jpg'):
             await update.message.reply_photo(photo=open('calendar.jpg', 'rb'), caption="📅 التقويم المعتمد", reply_markup=get_back_menu())
         else:
-            await update.message.reply_text("⚠️ ملف التقويم مفقود.", reply_markup=get_back_menu())
-    elif text == "👨‍🏫 تواصل مع رئيس القسم":
-        await update.message.reply_text(f"👨‍🏫 للتواصل المباشر:\n🔗 {TELEGRAM_CONTACT_LINK}", reply_markup=get_back_menu())
+            await update.message.reply_text("⚠️ ملف التقويم `calendar.jpg` مفقود من السيرفر.", reply_markup=get_back_menu())
+        return
+    
+    if text == "👨‍🏫 تواصل مع رئيس القسم":
+        await update.message.reply_text(f"👨‍🏫 للتواصل المباشر والخاص:\n🔗 {TELEGRAM_CONTACT_LINK}", reply_markup=get_back_menu())
+        return
 
-    # استعلام الغياب (20% حرمان / 15% تنبيه)
-    elif text.isdigit():
+    # --- 4. خدمات الغياب والأعذار ---
+    if text == "📊 استعلام الغياب":
+        await update.message.reply_text("🔎 أرسل **رقمك التدريبي** الآن للبحث في السجلات..", reply_markup=get_back_menu())
+        return
+
+    if text == "📝 رفع الغياب والأعذار":
+        await update.message.reply_text("📝 **تعليمات هامة:**\nأرسل صورة العذر واكتب رقمك التدريبي في خانة (الوصف / Caption).", reply_markup=get_back_menu())
+        return
+
+    # --- 5. منطق البحث في الإكسل (20% حرمان) ---
+    if text.isdigit():
+        status_msg = await update.message.reply_text("⏳ جاري البحث...")
         try:
             df = pd.read_excel('data.xlsx')
             df.columns = df.columns.astype(str).str.strip()
             result = df[df['stu_num'].astype(str).str.strip() == text]
+            await status_msg.delete()
+            
             if not result.empty:
                 name = result.iloc[0]['stu_nam']
-                msg = f"✅ النتائج لـ: `{name}`\n━━━━━━━━━━━━━━\n"
+                msg = f"✅ <b>النتائج لـ:</b> <code>{name}</code>\n━━━━━━━━━━━━━━\n"
                 for _, row in result.iterrows():
                     val = float(row['parsnt'])
                     icon = "🔴 حرمان" if val >= 20 else ("⚠️ تنبيه" if val >= 15 else "🟢 منتظم")
                     msg += f"📖 {row['c_nam']}: %{val} {icon}\n"
-                await update.message.reply_text(msg, parse_mode='Markdown', reply_markup=get_back_menu())
+                await update.message.reply_text(msg, parse_mode='HTML', reply_markup=get_back_menu())
             else:
-                await update.message.reply_text("❌ الرقم غير موجود في السجلات.", reply_markup=get_back_menu())
+                await update.message.reply_text("❌ عذراً، الرقم التدريبي غير مسجل لدينا.", reply_markup=get_back_menu())
         except Exception as e:
-            print(f"Error reading excel: {e}")
-            await update.message.reply_text("⚠️ خطأ في قراءة ملف السجلات `data.xlsx`.")
+            if 'status_msg' in locals(): await status_msg.delete()
+            print(f"Excel Error: {e}")
+            await update.message.reply_text("⚠️ حدث خطأ أثناء قراءة ملف `data.xlsx`. تأكد من سلامة الملف.", reply_markup=get_back_menu())
+        return
 
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """استقبال صور الأعذار وتوجيهها للمجموعة"""
     if not update.message.caption:
-        await update.message.reply_text("⚠️ الرجاء كتابة الرقم التدريبي في الوصف (Caption) عند إرفاق الصورة.")
+        await update.message.reply_text("⚠️ عذراً، يجب كتابة (رقمك التدريبي) في وصف الصورة قبل الإرسال.", reply_markup=get_back_menu())
         return
-    await context.bot.send_message(chat_id=GROUP_ID, text=f"📥 عذر جديد من: {update.message.caption}")
-    await update.message.copy(chat_id=GROUP_ID)
-    await update.message.reply_text("✅ تم استلام العذر.", reply_markup=get_main_menu())
-
-# --- 5. التشغيل القياسي الآمن ---
-def main():
-    # 1. تشغيل السيرفر الوهمي في مسار جانبي
-    Thread(target=run_web_server, daemon=True).start()
     
-    # 2. بناء التطبيق
+    try:
+        await context.bot.send_message(chat_id=GROUP_ID, text=f"📥 عذر جديد:\nالبيانات: {update.message.caption}")
+        await update.message.copy(chat_id=GROUP_ID)
+        await update.message.reply_text("✅ تم استلام عذرك بنجاح وتوجيهه للمسؤول.", reply_markup=get_main_menu())
+    except Exception as e:
+        print(f"Group Error: {e}")
+        await update.message.reply_text("⚠️ حدث خطأ. تأكد أن البوت مضاف كمشرف (Admin) في مجموعة الأرشيف.", reply_markup=get_main_menu())
+
+# --- 5. التشغيل النهائي والآمن ---
+def main():
+    Thread(target=run_web_server, daemon=True).start()
     app = Application.builder().token(TOKEN).build()
     
-    # 3. ربط المهام
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_logic))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     
-    # 4. تشغيل البوت مع طرد أي تحديثات قديمة
-    print("🚀 جاري بدء تشغيل البوت...")
+    print("🚀 تم تشغيل البوت بكل ميزاته بنجاح...")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
