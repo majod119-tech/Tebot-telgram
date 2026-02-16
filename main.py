@@ -22,7 +22,7 @@ def run_web_server():
 TOKEN = os.environ.get("TOKEN", "ضع_التوكن_هنا") 
 GROUP_ID = "-5193577198" 
 
-# --- 3. لوحات المفاتيح (الجماليات) ---
+# --- 3. لوحات المفاتيح (Keyboards) ---
 def get_main_menu():
     return ReplyKeyboardMarkup([
         ["📊 استعلام الغياب", "📍 موقع القسم"],
@@ -71,19 +71,19 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         status_msg = await update.message.reply_text("⏳ جاري فحص السجلات، لحظات...")
         try:
             if not os.path.exists('data.xlsx'):
-                await status_msg.edit_text("⚠️ ملف البيانات غير متوفر حالياً.")
+                await status_msg.edit_text("⚠️ ملف البيانات `data.xlsx` غير متوفر حالياً.")
                 return
 
             df = pd.read_excel('data.xlsx')
             df.columns = df.columns.astype(str).str.strip()
             
-            # الأعمدة المعتمدة من ملفك
+            # الأعمدة المعتمدة من ملفك (stu_num, stu_nam, c_nam, parsnt)
             c_id, c_name, c_sub, c_abs = 'stu_num', 'stu_nam', 'c_nam', 'parsnt'
             
             df[c_id] = df[c_id].astype(str).str.strip()
             result = df[df[c_id] == text]
 
-            # حذف رسالة الانتظار لإبقاء المحادثة نظيفة
+            # حذف رسالة الانتظار
             await status_msg.delete()
 
             if not result.empty:
@@ -94,39 +94,55 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 msg += "━━━━━━━━━━━━━━\n"
                 
                 for _, row in result.iterrows():
-                    val = float(row[c_abs])
-                    icon = "🔴 حرمان" if val >= 15 else "🟢 منتظم"
+                    try:
+                        val = float(row[c_abs])
+                    except:
+                        val = 0.0
+
+                    # --- منطق الحرمان الجديد ---
+                    if val >= 20:
+                        icon = "🔴 حرمان"
+                    elif 15 <= val < 20:
+                        icon = "⚠️ قريب جداً من الحرمان"
+                    else:
+                        icon = "🟢 منتظم"
+
                     msg += f"📖 **{row[c_sub]}**\n"
                     msg += f"  └ نسبة الغياب: %{val} ⇦ {icon}\n"
                     msg += "───────────────\n"
                 
                 await update.message.reply_text(msg, parse_mode='Markdown', reply_markup=get_back_menu())
             else:
-                await update.message.reply_text("❌ لم يتم العثور على هذا الرقم التدريبي.", reply_markup=get_back_menu())
+                await update.message.reply_text("❌ لم يتم العثور على هذا الرقم التدريبي في سجلاتنا.", reply_markup=get_back_menu())
         
         except Exception as e:
             if 'status_msg' in locals(): await status_msg.delete()
-            await update.message.reply_text(f"⚠️ خطأ فني: تأكد من مسميات أعمدة ملف الإكسل.", reply_markup=get_back_menu())
+            await update.message.reply_text(f"⚠️ حدث خطأ أثناء المعالجة. تأكد من سلامة ملف الإكسل.", reply_markup=get_back_menu())
+            print(f"Error: {e}")
 
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.caption:
-        await update.message.reply_text("⚠️ خطأ: يجب كتابة الرقم التدريبي في وصف الملف.")
+        await update.message.reply_text("⚠️ خطأ: يجب كتابة الرقم التدريبي في 'وصف الصورة' لضمان توجيه العذر.")
         return
     
-    await context.bot.send_message(chat_id=GROUP_ID, text=f"📥 **عذر جديد:**\n📝 البيانات: {update.message.caption}")
+    await context.bot.send_message(chat_id=GROUP_ID, text=f"📥 **عذر جديد مستلم:**\n📝 البيانات المرفقة: {update.message.caption}")
     await update.message.copy(chat_id=GROUP_ID)
-    await update.message.reply_text("✅ تم استلام عذرك بنجاح وتوجيهه للمسؤول.", reply_markup=get_main_menu())
+    await update.message.reply_text("✅ تم استلام عذرك بنجاح وتوجيهه للمسؤول المختص.", reply_markup=get_main_menu())
 
 # --- 5. التشغيل النهائي ---
 def main():
+    # تشغيل السيرفر في الخلفية
     Thread(target=run_web_server, daemon=True).start()
+    
+    # بناء التطبيق
     app = Application.builder().token(TOKEN).build()
     
+    # المعالجات
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_logic))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
 
-    print("🚀 البوت يعمل الآن بكفاءة...")
+    print("🚀 البوت يعمل الآن بكفاءة عالية...")
     app.run_polling()
 
 if __name__ == '__main__':
