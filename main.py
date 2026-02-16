@@ -5,24 +5,25 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-# --- 1. سيرفر ويب سريع ---
+# --- 1. سيرفر ويب وهمي (لإبقاء تطبيق Render يعمل) ---
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
         self.wfile.write(b"Bot is alive and running!")
     def log_message(self, format, *args):
-        pass
+        pass # إخفاء سجلات السيرفر لتنظيف واجهة Render
 
 def run_web_server():
     port = int(os.environ.get("PORT", 10000))
     server = HTTPServer(("0.0.0.0", port), SimpleHandler)
     server.serve_forever()
 
-# --- 2. كود البوت ---
-TOKEN = os.environ.get("TOKEN") 
+# --- 2. إعدادات البوت الأساسية ---
+TOKEN = os.environ.get("TOKEN", "ضع_التوكن_هنا") 
 GROUP_CHAT_ID = "-5193577198" # ✅ رقم مجموعة الأرشيف
 
+# --- 3. دوال البوت ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         ["📊 استعلام الغياب", "📍 موقع القسم"],
@@ -33,55 +34,61 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
     welcome_text = (
-        "مرحباً بك في البوت (التجريبي)  للقسم الحاسب في المعهد الصناعي الثانوي ببريدة! 🏢✨\n\n"
+        "مرحباً بك في البوت (التجريبي) للقسم الحاسب في المعهد الصناعي الثانوي ببريدة! 🏢✨\n\n"
         "الرجاء اختيار الخدمة المطلوبة من القائمة بالأسفل 👇"
     )
     await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='Markdown')
 
 async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.message.chat_id
-    await update.message.reply_text(f"رقم هذه المجموعة (Chat ID) هو:\n`{chat_id}`")
+    await update.message.reply_text(f"رقم هذه المجموعة (Chat ID) هو:\n`{chat_id}`", parse_mode='Markdown')
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     
     if text == "📍 موقع القسم":
-        await update.message.reply_text("📍 **موقع القسم على خرائط جوجل:**\nhttps://maps.app.goo.gl/Y8nQKrovHCfbukVh6?g_st=ic")
+        await update.message.reply_text("📍 **موقع القسم على خرائط جوجل:**\nhttps://maps.app.goo.gl/Y8nQKrovHCfbukVh6?g_st=ic", parse_mode='Markdown')
         return
     elif text == "📚 الحقائب التدريبية":
-        await update.message.reply_text("📚 **الحقائب التدريبية:**\n(سيتم إضافة الرابط قريباً)")
+        await update.message.reply_text("📚 **الحقائب التدريبية:**\n(سيتم إضافة الرابط قريباً)", parse_mode='Markdown')
         return
     elif text == "🔗 منصة تقني ورايات":
         await update.message.reply_text(
             "🔗 **الروابط الهامة للمتدربين:**\n\n"
             "🌐 **منصة تقني:**\nhttps://tvtclms.edu.sa/?lang=ar\n\n"
-            "🌐 **بوابة رايات:**\nhttps://tvtc.gov.sa/ar/Departments/tvtcdepartments/Rayat/pages/E-Services.aspx"
+            "🌐 **بوابة رايات:**\nhttps://tvtc.gov.sa/ar/Departments/tvtcdepartments/Rayat/pages/E-Services.aspx", 
+            parse_mode='Markdown'
         )
         return
     elif text == "📅 التقويم التدريبي":
         await update.message.reply_text(
             "📅 **التقويم التدريبي:**\n\n"
             "يمكنك الاطلاع على التقويم التدريبي من خلال الرابط التالي:\n"
-            "https://drive.google.com/file/d/1-Mc_IXwVLaye4BlNyCWdrd7twWSsAMez/view?usp=drivesdk"
+            "https://drive.google.com/file/d/1-Mc_IXwVLaye4BlNyCWdrd7twWSsAMez/view?usp=drivesdk", 
+            parse_mode='Markdown'
         )
         return
     elif text == "📝 رفع الغياب والأعذار":
         await update.message.reply_text(
             "📝 **لرفع العذر الطبي أو الرسمي:**\n\n"
-            "الرجاء إرسال ملف العذر (صورة أو PDF)، **ومن الضروري جداً كتابة رقمك التدريبي في خانة الوصف (Caption)** قبل الضغط على زر الإرسال."
+            "الرجاء إرسال ملف العذر (صورة أو PDF)، **ومن الضروري جداً كتابة رقمك التدريبي في خانة الوصف (Caption)** قبل الضغط على زر الإرسال.", 
+            parse_mode='Markdown'
         )
         return
     elif text == "👨‍🏫 تواصل مع رئيس القسم":
-        await update.message.reply_text("👨‍🏫 **للتواصل مع رئيس القسم:**\n\n📧 البريد الإلكتروني: aalmoshegh@tvtc.gov.sa")
+        await update.message.reply_text("👨‍🏫 **للتواصل مع رئيس القسم:**\n\n📧 البريد الإلكتروني: aalmoshegh@tvtc.gov.sa", parse_mode='Markdown')
         return
     elif text == "📊 استعلام الغياب":
-        await update.message.reply_text("الرجاء إرسال **رقم التعريف (ID)** الخاص بك الآن للبحث في سجلات الغياب:")
+        await update.message.reply_text("الرجاء إرسال **رقم التعريف (ID)** الخاص بك الآن للبحث في سجلات الغياب:", parse_mode='Markdown')
         return
 
-    # --- البحث في الإكسل (تم التحديث لعرض كل المواد) ---
+    # --- البحث في ملف الإكسل (تم التحديث لدعم data.xlsx) ---
     try:
-        df = pd.read_csv('data.csv', sep=';', encoding='utf-8-sig')
-        df.columns = df.columns.str.strip() 
+        # قراءة ملف الإكسل بدلاً من CSV
+        df = pd.read_excel('data.xlsx')
+        
+        # تنظيف أسماء الأعمدة لتجنب الأخطاء
+        df.columns = df.columns.astype(str).str.strip() 
         col_id, col_name, col_subject, col_subject_num, col_absence = 'id', 'name', 'c_nam', 'c_number', 'apsent'
         
         # تحويل الرقم لنص للبحث الدقيق
@@ -91,19 +98,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         result = df[df[col_id] == text]
         
         if not result.empty:
-            # 1. جلب اسم الطالب (من أول صف لأنه لا يتغير)
             student_name = result.iloc[0][col_name]
-            
-            # 2. تجهيز مقدمة الرسالة
             reply_message = f"👤 **الاسم:** {student_name}\n\n👇 **تفاصيل الغياب للمواد المسجلة:**\n━━━━━━━━━━━━\n"
             
-            # 3. حلقة تكرار لجمع كل المواد
             for index, row in result.iterrows():
                 sub_name = row[col_subject]
                 sub_num = row[col_subject_num]
                 abs_percent = row[col_absence]
                 
-                # تنسيق كل مادة في سطرين
                 reply_message += (
                     f"📚 **{sub_name}** (رقم: {sub_num})\n"
                     f"⚠️ نسبة الغياب: {abs_percent}%\n"
@@ -113,11 +115,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_message = "❌ عذراً، لم أتمكن من العثور على هذا الرقم. تأكد من صحة الرقم وحاول مجدداً."
             
     except Exception as e:
-        reply_message = "⚠️ حدث خطأ أثناء البحث، يرجى المحاولة لاحقاً."
+        reply_message = "⚠️ حدث خطأ أثناء البحث. تأكد من رفع ملف `data.xlsx` وأن الأعمدة مكتوبة بشكل صحيح."
+        print(f"Error reading Excel: {e}")
 
-    await update.message.reply_text(reply_message)
+    await update.message.reply_text(reply_message, parse_mode='Markdown')
 
-# --- دالة استقبال الملفات ورفعها للمجموعة ---
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     caption = message.caption
@@ -126,38 +128,4 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not caption:
-        await message.reply_text("⚠️ **خطأ:** لم تقم بكتابة رقمك التدريبي! الرجاء إعادة إرسال العذر وكتابة رقمك في الوصف.")
-        return
-
-    student_id = caption.strip()
-    await message.reply_text("⏳ جاري رفع العذر إلى نظام القسم...")
-
-    try:
-        admin_text = f"📄 **عذر جديد!**\n👤 رقم المتدرب: {student_id}"
-
-        if message.document:
-            await context.bot.send_document(chat_id=GROUP_CHAT_ID, document=message.document.file_id, caption=admin_text)
-        elif message.photo:
-            await context.bot.send_photo(chat_id=GROUP_CHAT_ID, photo=message.photo[-1].file_id, caption=admin_text)
-        
-        await message.reply_text("✅ **تم رفع العذر بنجاح!**\nتم تحويله إلى إدارة القسم للمراجعة.")
-    except Exception as e:
-        await message.reply_text("❌ عذراً، لم أتمكن من رفع الملف.")
-
-def main():
-    t = Thread(target=run_web_server)
-    t.daemon = True 
-    t.start()
-
-    application = Application.builder().token(TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("id", get_id))
-    
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, handle_document))
-    
-    print("🤖 Bot is starting...")
-    application.run_polling()
-
-if __name__ == '__main__':
-    main()
+        await message.reply_text("⚠️ **خطأ
