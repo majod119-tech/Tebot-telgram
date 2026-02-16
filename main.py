@@ -12,7 +12,7 @@ class SimpleHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"Bot is alive and running!")
     def log_message(self, format, *args):
-        pass # إخفاء سجلات السيرفر لتنظيف واجهة Render
+        pass 
 
 def run_web_server():
     port = int(os.environ.get("PORT", 10000))
@@ -20,8 +20,9 @@ def run_web_server():
     server.serve_forever()
 
 # --- 2. إعدادات البوت الأساسية ---
+# تأكد من وضع التوكن في إعدادات Render باسم TOKEN أو استبدله هنا مباشرة
 TOKEN = os.environ.get("TOKEN", "ضع_التوكن_هنا") 
-GROUP_CHAT_ID = "-5193577198" # ✅ رقم مجموعة الأرشيف
+GROUP_CHAT_ID = "-5193577198" 
 
 # --- 3. دوال البوت ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -32,100 +33,67 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ["📅 التقويم التدريبي"]
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    
-    welcome_text = (
-        "مرحباً بك في البوت (التجريبي) للقسم الحاسب في المعهد الصناعي الثانوي ببريدة! 🏢✨\n\n"
-        "الرجاء اختيار الخدمة المطلوبة من القائمة بالأسفل 👇"
-    )
-    await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='Markdown')
-
-async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.message.chat_id
-    await update.message.reply_text(f"رقم هذه المجموعة (Chat ID) هو:\n`{chat_id}`", parse_mode='Markdown')
+    welcome_text = "مرحباً بك في بوت قسم الحاسب! 🏢✨\nالرجاء اختيار الخدمة المطلوبة:"
+    await update.message.reply_text(welcome_text, reply_markup=reply_markup)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     
+    # الردود النصية الثابتة
     if text == "📍 موقع القسم":
-        await update.message.reply_text("📍 **موقع القسم على خرائط جوجل:**\nhttps://maps.app.goo.gl/Y8nQKrovHCfbukVh6?g_st=ic", parse_mode='Markdown')
-        return
-    elif text == "📚 الحقائب التدريبية":
-        await update.message.reply_text("📚 **الحقائب التدريبية:**\n(سيتم إضافة الرابط قريباً)", parse_mode='Markdown')
-        return
+        await update.message.reply_text("📍 موقع القسم: http://maps.google.com")
     elif text == "🔗 منصة تقني ورايات":
-        await update.message.reply_text(
-            "🔗 **الروابط الهامة للمتدربين:**\n\n"
-            "🌐 **منصة تقني:**\nhttps://tvtclms.edu.sa/?lang=ar\n\n"
-            "🌐 **بوابة رايات:**\nhttps://tvtc.gov.sa/ar/Departments/tvtcdepartments/Rayat/pages/E-Services.aspx", 
-            parse_mode='Markdown'
-        )
-        return
-    elif text == "📅 التقويم التدريبي":
-        await update.message.reply_text(
-            "📅 **التقويم التدريبي:**\n\n"
-            "يمكنك الاطلاع على التقويم التدريبي من خلال الرابط التالي:\n"
-            "https://drive.google.com/file/d/1-Mc_IXwVLaye4BlNyCWdrd7twWSsAMez/view?usp=drivesdk", 
-            parse_mode='Markdown'
-        )
-        return
-    elif text == "📝 رفع الغياب والأعذار":
-        await update.message.reply_text(
-            "📝 **لرفع العذر الطبي أو الرسمي:**\n\n"
-            "الرجاء إرسال ملف العذر (صورة أو PDF)، **ومن الضروري جداً كتابة رقمك التدريبي في خانة الوصف (Caption)** قبل الضغط على زر الإرسال.", 
-            parse_mode='Markdown'
-        )
-        return
-    elif text == "👨‍🏫 تواصل مع رئيس القسم":
-        await update.message.reply_text("👨‍🏫 **للتواصل مع رئيس القسم:**\n\n📧 البريد الإلكتروني: aalmoshegh@tvtc.gov.sa", parse_mode='Markdown')
-        return
+        await update.message.reply_text("🌐 منصة تقني: https://tvtclms.edu.sa\n🌐 بوابة رايات: https://tvtc.gov.sa")
     elif text == "📊 استعلام الغياب":
-        await update.message.reply_text("الرجاء إرسال **رقم التعريف (ID)** الخاص بك الآن للبحث في سجلات الغياب:", parse_mode='Markdown')
-        return
-
-    # --- البحث في ملف الإكسل (تم التحديث لدعم data.xlsx) ---
-    try:
-        # قراءة ملف الإكسل بدلاً من CSV
-        df = pd.read_excel('data.xlsx')
-        
-        # تنظيف أسماء الأعمدة لتجنب الأخطاء
-        df.columns = df.columns.astype(str).str.strip() 
-        col_id, col_name, col_subject, col_subject_num, col_absence = 'id', 'name', 'c_nam', 'c_number', 'apsent'
-        
-        # تحويل الرقم لنص للبحث الدقيق
-        df[col_id] = df[col_id].astype(str).str.strip()
-        
-        # جلب كل الصفوف التي تطابق رقم الطالب
-        result = df[df[col_id] == text]
-        
-        if not result.empty:
-            student_name = result.iloc[0][col_name]
-            reply_message = f"👤 **الاسم:** {student_name}\n\n👇 **تفاصيل الغياب للمواد المسجلة:**\n━━━━━━━━━━━━\n"
+        await update.message.reply_text("الرجاء إرسال **رقمك التدريبي** الآن للبحث:")
+    
+    # منطق البحث في الإكسل (إذا كان النص المدخل أرقاماً)
+    elif text.isdigit():
+        try:
+            df = pd.read_excel('data.xlsx')
+            df.columns = df.columns.astype(str).str.strip()
+            # البحث عن الرقم التدريبي في عمود id
+            result = df[df['id'].astype(str) == text]
             
-            for index, row in result.iterrows():
-                sub_name = row[col_subject]
-                sub_num = row[col_subject_num]
-                abs_percent = row[col_absence]
-                
-                reply_message += (
-                    f"📚 **{sub_name}** (رقم: {sub_num})\n"
-                    f"⚠️ نسبة الغياب: {abs_percent}%\n"
-                    f"───────────────\n"
-                )
-        else:
-            reply_message = "❌ عذراً، لم أتمكن من العثور على هذا الرقم. تأكد من صحة الرقم وحاول مجدداً."
-            
-    except Exception as e:
-        reply_message = "⚠️ حدث خطأ أثناء البحث. تأكد من رفع ملف `data.xlsx` وأن الأعمدة مكتوبة بشكل صحيح."
-        print(f"Error reading Excel: {e}")
+            if not result.empty:
+                student_name = result.iloc[0]['name']
+                msg = f"👤 **الاسم:** {student_name}\n\n"
+                for _, row in result.iterrows():
+                    msg += f"📚 {row['c_nam']}: غياب {row['apsent']}%\n"
+                await update.message.reply_text(msg, parse_mode='Markdown')
+            else:
+                await update.message.reply_text("❌ لم يتم العثور على هذا الرقم.")
+        except Exception as e:
+            await update.message.reply_text("⚠️ تأكد من وجود ملف data.xlsx وتطابق أسماء الأعمدة.")
+            print(f"Error: {e}")
 
-    await update.message.reply_text(reply_message, parse_mode='Markdown')
-
+# --- دالة معالجة الملفات (الأعذار) التي كانت مكسورة ---
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    message = update.message
-    caption = message.caption
-
-    if message.chat.type != "private":
-        return
-
+    caption = update.message.caption
     if not caption:
-        await message.reply_text("⚠️ **خطأ
+        await update.message.reply_text("⚠️ يرجى إعادة إرسال الملف مع كتابة **رقمك التدريبي** في الوصف (Caption).")
+        return
+    
+    # إعادة توجيه الملف لمجموعة الأرشيف
+    await context.bot.send_message(chat_id=GROUP_CHAT_ID, text=f"📥 عذر جديد من المتدرب: {caption}")
+    await update.message.copy(chat_id=GROUP_CHAT_ID)
+    await update.message.reply_text("✅ تم استلام عذرك بنجاح وتوجيهه للقسم المختص.")
+
+# --- 4. تشغيل البوت ---
+def main():
+    # تشغيل السيرفر في الخلفية
+    Thread(target=run_web_server, daemon=True).start()
+
+    # إعداد التطبيق
+    app = Application.builder().token(TOKEN).build()
+
+    # إضافة المعالجات
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_document))
+
+    print("Bot is starting...")
+    app.run_polling()
+
+if __name__ == '__main__':
+    main()
