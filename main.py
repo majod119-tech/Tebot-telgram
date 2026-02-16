@@ -5,7 +5,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-# --- 1. سيرفر ويب وهمي لـ Render (لضمان بقاء البوت متصلاً) ---
+# --- 1. سيرفر ويب وهمي (Keep-Alive لـ Render) ---
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -19,10 +19,10 @@ def run_web_server():
     server.serve_forever()
 
 # --- 2. الإعدادات الأساسية ---
-TOKEN = os.environ.get("TOKEN", "ضع_التوكن_هنا") # يفضل وضعه في إعدادات Render
-GROUP_ID = "-5193577198" # مجموعة أرشيف الأعذار
-# رابط التواصل الخاص بك عبر تليجرام لتعزيز الخصوصية
-TELEGRAM_CONTACT_LINK = "https://t.me/majod119" 
+# تأكد من وضع التوكن الجديد في إعدادات Render باسم TOKEN
+TOKEN = os.environ.get("TOKEN", "ضع_التوكن_هنا") 
+GROUP_ID = "-5193577198" 
+TELEGRAM_CONTACT_LINK = "https://t.me/majod119" # حسابك الشخصي للتواصل
 
 # --- 3. تصميم لوحات المفاتيح (القوائم) ---
 
@@ -67,18 +67,17 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # الدخول لقسم الخطط التدريبية
     if text == "📄 الخطط التدريبية":
         await update.message.reply_text(
-            "📄 **قسم الخطط التدريبية**\n\n"
-            "اختر التخصص المطلوب لعرض الخطة التدريبية الخاصة به 👇",
+            "📄 **قسم الخطط التدريبية**\n\nاختر التخصص المطلوب لعرض الخطة 👇",
             reply_markup=get_plans_menu(),
             parse_mode='Markdown'
         )
         return
 
-    # استجابات الخطط (ضع روابط الـ PDF هنا)
+    # استجابات الخطط (روابط افتراضية)
     plans = {
-        "🖥️ خطة الدعم الفني": "📍 [اضغط هنا لتحميل الخطة]",
-        "🌐 خطة الشبكات": "📍 [اضغط هنا لتحميل الخطة]",
-        "💻 خطة البرمجيات": "📍 [اضغط هنا لتحميل الخطة]"
+        "🖥️ خطة الدعم الفني": "📍 [رابط خطة الدعم الفني]",
+        "🌐 خطة الشبكات": "📍 [رابط خطة الشبكات]",
+        "💻 خطة البرمجيات": "📍 [رابط خطة البرمجيات]"
     }
     if text in plans:
         await update.message.reply_text(f"✅ **{text}:**\n\n{plans[text]}", parse_mode='Markdown')
@@ -91,36 +90,26 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📚 [رابط الحقائب التدريبية](https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL)", reply_markup=get_back_menu())
     elif text == "🔗 منصة تقني ورايات":
         await update.message.reply_text("🌐 [منصة تقني](https://tvtclms.edu.sa)\n🌐 [بوابة رايات](https://rayat.tvtc.gov.sa)", reply_markup=get_back_menu(), parse_mode='Markdown')
-    
     elif text == "📅 التقويم التدريبي":
-        photo_path = 'calendar.jpg' # تأكد من رفع ملف الصورة بهذا الاسم
+        photo_path = 'calendar.jpg' # الاسم الجديد للملف
         if os.path.exists(photo_path):
             await update.message.reply_photo(photo=open(photo_path, 'rb'), caption="📅 التقويم التدريبي المعتمد", reply_markup=get_back_menu())
         else:
-            await update.message.reply_text("⚠️ ملف التقويم `calendar.jpg` غير موجود على السيرفر.", reply_markup=get_back_menu())
-
+            await update.message.reply_text("⚠️ ملف التقويم `calendar.jpg` غير موجود.", reply_markup=get_back_menu())
     elif text == "📊 استعلام الغياب":
-        await update.message.reply_text("🔎 أرسل **رقمك التدريبي** الآن للبحث في سجلات الغياب..", reply_markup=get_back_menu())
-    
+        await update.message.reply_text("🔎 أرسل **رقمك التدريبي** الآن للبحث..", reply_markup=get_back_menu())
     elif text == "📝 رفع الغياب والأعذار":
-        await update.message.reply_text("📝 **تعليمات:** أرسل صورة العذر واكتب رقمك التدريبي في الوصف (Caption).", reply_markup=get_back_menu())
-    
+        await update.message.reply_text("📝 أرسل صورة العذر واكتب رقمك في الوصف.", reply_markup=get_back_menu())
     elif text == "👨‍🏫 تواصل مع رئيس القسم":
-        contact_text = (
-            "👨‍🏫 **للتواصل المباشر والخاص مع رئيس القسم:**\n\n"
-            "يمكنك إرسال استفسارك عبر الرابط التالي:\n"
-            f"🔗 {TELEGRAM_CONTACT_LINK}\n\n"
-            "💬 *فضلاً، وضح اسمك ورقمه التدريبي عند بدء المحادثة.*"
-        )
+        contact_text = f"👨‍🏫 **للتواصل المباشر والخاص:**\n\n🔗 {TELEGRAM_CONTACT_LINK}"
         await update.message.reply_text(contact_text, reply_markup=get_back_menu(), parse_mode='Markdown')
 
-    # البحث عن الغياب (رقم تدريبي) بناءً على معاييرك الجديدة
+    # البحث عن الغياب (رقم تدريبي)
     elif text.isdigit():
         status_msg = await update.message.reply_text("⏳ جاري فحص السجلات...")
         try:
             df = pd.read_excel('data.xlsx')
             df.columns = df.columns.astype(str).str.strip()
-            # الأعمدة: stu_num, stu_nam, c_nam, parsnt
             c_id, c_name, c_sub, c_abs = 'stu_num', 'stu_nam', 'c_nam', 'parsnt'
             df[c_id] = df[c_id].astype(str).str.strip()
             result = df[df[c_id] == text]
@@ -131,43 +120,40 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 msg = f"✅ **النتائج لـ:** `{s_name}`\n━━━━━━━━━━━━━━\n"
                 for _, row in result.iterrows():
                     val = float(row[c_abs])
-                    # توزيع الألوان حسب النسب المطلوبة
-                    if val >= 20:
-                        icon = "🔴 حرمان"
-                    elif 15 <= val < 20:
-                        icon = "⚠️ قريب من الحرمان"
-                    else:
-                        icon = "🟢 منتظم"
-
-                    msg += f"📖 **{row[c_sub]}**\n"
-                    msg += f"  └ نسبة الغياب: %{val} ⇦ {icon}\n"
-                    msg += "───────────────\n"
-                
+                    # توزيع الألوان حسب النسب الجديدة (20% حرمان)
+                    icon = "🔴 حرمان" if val >= 20 else ("⚠️ قريب من الحرمان" if val >= 15 else "🟢 منتظم")
+                    msg += f"📖 **{row[c_sub]}**\n  └ نسبة الغياب: %{val} ⇦ {icon}\n───────────────\n"
                 await update.message.reply_text(msg, parse_mode='Markdown', reply_markup=get_back_menu())
             else:
-                await update.message.reply_text("❌ عذراً، الرقم التدريبي غير مسجل لدينا.", reply_markup=get_back_menu())
+                await update.message.reply_text("❌ الرقم غير مسجل.", reply_markup=get_back_menu())
         except Exception as e:
             if 'status_msg' in locals(): await status_msg.delete()
-            await update.message.reply_text(f"⚠️ خطأ فني أثناء قراءة ملف البيانات.", reply_markup=get_back_menu())
+            await update.message.reply_text("⚠️ خطأ فني في قراءة البيانات.")
 
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تحويل الأعذار لمجموعة الأرشيف"""
     if not update.message.caption:
-        await update.message.reply_text("⚠️ أرسل الرقم التدريبي في وصف الصورة.")
+        await update.message.reply_text("⚠️ أرسل الرقم في الوصف.")
         return
     await context.bot.send_message(chat_id=GROUP_ID, text=f"📥 عذر جديد: {update.message.caption}")
     await update.message.copy(chat_id=GROUP_ID)
-    await update.message.reply_text("✅ تم استلام عذرك بنجاح وتوجيهه للمسؤول.", reply_markup=get_main_menu())
+    await update.message.reply_text("✅ تم الاستلام.", reply_markup=get_main_menu())
 
 # --- 5. التشغيل النهائي ---
 def main():
+    # تشغيل سيرفر الويب
     Thread(target=run_web_server, daemon=True).start()
+    
+    # بناء التطبيق
     app = Application.builder().token(TOKEN).build()
+    
+    # إضافة المعالجات
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_logic))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
-    print("🚀 البوت جاهز للاستخدام...")
-    app.run_polling()
+
+    print("🚀 جاري تشغيل البوت ومعالجة التضارب...")
+    # الحل السحري لمشكلة Conflict: حذف التحديثات المعلقة عند البدء
+    app.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
     main()
