@@ -9,13 +9,47 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-# --- 1. سيرفر الويب ---
+# --- 1. سيرفر الويب المطور (Web Dashboard) ---
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Bot is active and running perfectly!")
-    def log_message(self, format, *args): pass 
+        if self.path == "/stats":
+            self.send_response(200)
+            self.send_header("Content-type", "text/html; charset=utf-8")
+            self.end_headers()
+            stats = load_json(STATS_FILE)
+            scores = load_json(SCORES_FILE)
+            html = f"""
+            <html>
+            <head>
+                <title>لوحة قيادة قسم الحاسب</title>
+                <style>
+                    body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; direction: rtl; background-color: #f4f7f6; margin: 0; padding: 20px; text-align: center; }}
+                    .card-container {{ display: flex; justify-content: space-around; flex-wrap: wrap; margin-top: 30px; }}
+                    .card {{ background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); width: 200px; margin: 10px; }}
+                    .card h3 {{ color: #2c3e50; font-size: 16px; }}
+                    .card p {{ font-size: 28px; font-weight: bold; color: #27ae60; margin: 0; }}
+                    h1 {{ color: #2c3e50; border-bottom: 3px solid #27ae60; display: inline-block; padding-bottom: 10px; }}
+                    table {{ margin: 30px auto; border-collapse: collapse; width: 90%; background: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }}
+                    th, td {{ padding: 12px 15px; border-bottom: 1px solid #ddd; text-align: center; }}
+                    th {{ background-color: #27ae60; color: white; }}
+                </style>
+            </head>
+            <body>
+                <h1>📊 إحصائيات نظام قسم الحاسب الذكي</h1>
+                <div class="card-container">
+                    <div class="card"><h3>👥 إجمالي المتدربين</h3><p>{len(stats.get('users_list', []))}</p></div>
+                    <div class="card"><h3>🤖 أسئلة الذكاء</h3><p>{stats.get('ai_questions', 0)}</p></div>
+                    <div class="card"><h3>🎮 التحديات</h3><p>{stats.get('quiz_attempts', 0)}</p></div>
+                    <div class="card"><h3>📞 طلبات التواصل</h3><p>{stats.get('contact_clicks', 0)}</p></div>
+                </div>
+            </body>
+            </html>
+            """
+            self.wfile.write(html.encode("utf-8"))
+        else:
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"Bot is Live.")
 
 def run_web_server():
     port = int(os.environ.get("PORT", 10000))
@@ -28,358 +62,241 @@ GROUP_ID = "-5193577198"
 TELEGRAM_CONTACT_LINK = "https://t.me/majod119"
 DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
 
-# --- 🌟 إعداد الذكاء الاصطناعي (بنظام الاكتشاف التلقائي) ---
+# إعداد Gemini
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 ai_model = None
-
 if GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        selected_model_name = None
         for m in genai.list_models():
             if 'generateContent' in m.supported_generation_methods:
-                selected_model_name = m.name.replace('models/', '') 
-                if 'flash' in selected_model_name.lower():
-                    break
-                    
-        if selected_model_name:
-            ai_model = genai.GenerativeModel(selected_model_name)
-            print(f"✅ تم تفعيل المعلم الذكي بنجاح على موديل: {selected_model_name}")
-        else:
-            ai_model = genai.GenerativeModel('gemini-1.5-flash')
-    except Exception as e:
-        print(f"Gemini Init Error: {e}")
-        ai_model = genai.GenerativeModel('gemini-1.5-flash')
-
-ai_sessions = {}
-
-# --- 3. بنك الأسئلة والنقاط ---
-QUESTIONS = [
-    {
-        "q": "ما هو عنوان الـ IP الذي يُعرف بـ (Localhost) ويستخدم لاختبار كرت الشبكة؟",
-        "options": ["192.168.1.1", "127.0.0.1", "8.8.8.8", "255.255.255.0"],
-        "answer": 1 
-    },
-    {
-        "q": "أي من المكونات التالية يعتبر 'العقل المدبر' للحاسب الآلي؟",
-        "options": ["القرص الصلب (HDD)", "الذاكرة العشوائية (RAM)", "المعالج (CPU)", "اللوحة الأم"],
-        "answer": 2
-    },
-    {
-        "q": "في نظام لينكس (Linux)، ما هو الأمر المستخدم لعرض قائمة الملفات في المجلد الحالي؟",
-        "options": ["cd", "ls", "pwd", "mkdir"],
-        "answer": 1
-    },
-    {
-        "q": "أي من أنواع الكيابل التالية يوفر أعلى سرعة لنقل البيانات؟",
-        "options": ["الكيابل المحورية (Coaxial)", "الألياف الضوئية (Fiber Optic)", "المزدوجة المجدولة (UTP)", "خطوط الهاتف"],
-        "answer": 1
-    }
-]
+                ai_model = genai.GenerativeModel(m.name.replace('models/', ''))
+                break
+    except: ai_model = None
 
 SCORES_FILE = "scores.json"
-TIME_LIMIT = 15 
-active_challenges = {} 
+STATS_FILE = "stats.json"
 
-def load_scores():
-    if os.path.exists(SCORES_FILE):
-        with open(SCORES_FILE, "r") as f:
-            return json.load(f)
+def load_json(filename):
+    if os.path.exists(filename):
+        with open(filename, "r") as f: return json.load(f)
     return {}
 
-def save_scores(scores):
-    with open(SCORES_FILE, "w") as f:
-        json.dump(scores, f)
+def save_json(filename, data):
+    with open(filename, "w") as f: json.dump(data, f)
 
-# --- 4. تصميم القوائم (الواجهة الجديدة والمريحة) ---
+def update_stat(category):
+    stats = load_json(STATS_FILE)
+    stats[category] = stats.get(category, 0) + 1
+    save_json(STATS_FILE, stats)
+
+ai_sessions = {}
+active_challenges = {}
+
+# --- 3. بنك الأسئلة ---
+QUESTIONS = [
+    {"q": "ما هو عنوان الـ IP الذي يُعرف بـ (Localhost)؟", "options": ["192.168.1.1", "127.0.0.1", "8.8.8.8", "255.255.255.0"], "answer": 1},
+    {"q": "أي من المكونات يعتبر 'العقل المدبر' للحاسب؟", "options": ["HDD", "RAM", "CPU", "Motherboard"], "answer": 2},
+    {"q": "أمر في لينكس لعرض قائمة الملفات؟", "options": ["cd", "ls", "pwd", "mkdir"], "answer": 1},
+    {"q": "أي الكيابل يوفر أعلى سرعة نقل بيانات؟", "options": ["Coaxial", "Fiber Optic", "UTP", "Phone"], "answer": 1}
+]
+
+# --- 4. تصميم القوائم ---
+
+# القائمة الرئيسية المحدثة (رسمية وأكثر ترتيباً)
 def get_main_menu():
     keyboard = [
-        # السطر الأول: الذكاء الاصطناعي
         ["🤖 المعلم الذكي (اسألني)"], 
-        # السطر الثاني: المواد الأكاديمية
+        ["🕹️ قسم الألعاب والتحديات"], # تم دمج الألعاب هنا
         ["📚 الحقائب التدريبية", "📄 الخطط التدريبية"],
-        # السطر الثالث: شؤون المتدربين
         ["📊 استعلام الغياب", "📝 رفع الغياب والأعذار"],
-        # السطر الرابع: الترفيه والتنافس
-        ["🎮 تحدي الأسبوع", "🏆 بطل الأسبوع"], 
-        # السطر الخامس: أدوات المعهد
         ["🔗 منصة تقني ورايات", "📅 التقويم التدريبي"],
-        # السطر السادس: معلومات عامة
         ["📰 أخبار القسم والمعهد", "📍 موقع القسم"],
-        # السطر السابع: الدعم والمساندة
         ["👨‍🏫 تواصل مع رئيس القسم"]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, is_persistent=True)
 
-def get_plans_menu():
+# قائمة الألعاب والتحديات الجديدة
+def get_games_menu():
     keyboard = [
-        ["1️⃣ الفصل الأول", "2️⃣ الفصل الثاني"],
-        ["3️⃣ الفصل الثالث", "4️⃣ الفصل الرابع"],
-        ["5️⃣ الفصل الخامس", "6️⃣ الفصل السادس"],
-        ["🖥️ برامج فصلية (إدخال بيانات)"],
+        ["🎮 تحدي الأسبوع", "🏆 بطل الأسبوع"],
         ["🔙 الرجوع للقائمة الرئيسية"]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+def get_plans_menu():
+    return ReplyKeyboardMarkup([["1️⃣ الفصل الأول", "2️⃣ الفصل الثاني"], ["3️⃣ الفصل الثالث", "4️⃣ الفصل الرابع"], ["5️⃣ الفصل الخامس", "6️⃣ الفصل السادس"], ["🖥️ برامج فصلية"], ["🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
 
 def get_back_menu():
     return ReplyKeyboardMarkup([["🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
 
 # --- 5. المهام والمنطق ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    ai_sessions[str(update.effective_user.id)] = False
-    await update.message.reply_text(
-        f"أهلاً بك {update.effective_user.first_name} في بوت قسم الحاسب 💻✨\nاختر من القائمة أدناه 👇",
-        reply_markup=get_main_menu()
-    )
+    user_id = str(update.effective_user.id)
+    stats = load_json(STATS_FILE)
+    users = stats.get("users_list", [])
+    if user_id not in users:
+        users.append(user_id)
+        stats["users_list"] = users
+        save_json(STATS_FILE, stats)
+    ai_sessions[user_id] = False
+    await update.message.reply_text(f"أهلاً بك {update.effective_user.first_name} في بوت قسم الحاسب 💻✨", reply_markup=get_main_menu())
 
 async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = str(update.effective_user.id)
 
-    known_commands = [
-        "🔙 الرجوع للقائمة الرئيسية", "📊 استعلام الغياب", "📍 موقع القسم", 
-        "📚 الحقائب التدريبية", "📄 الخطط التدريبية", "🔗 منصة تقني ورايات", 
-        "📅 التقويم التدريبي", "📝 رفع الغياب والأعذار", "👨‍🏫 تواصل مع رئيس القسم",
-        "🎮 تحدي الأسبوع", "🏆 بطل الأسبوع", "📰 أخبار القسم والمعهد", "🤖 المعلم الذكي (اسألني)"
-    ]
-
-    if text in known_commands and text != "🤖 المعلم الذكي (اسألني)":
-        ai_sessions[user_id] = False
-
     if text == "🔙 الرجوع للقائمة الرئيسية":
+        ai_sessions[user_id] = False
         await update.message.reply_text("🏠 تم العودة للقائمة الرئيسية:", reply_markup=get_main_menu())
         return
 
-    # --- 🤖 نظام المعلم الذكي ---
+    # --- الدخول لقسم الألعاب ---
+    if text == "🕹️ قسم الألعاب والتحديات":
+        await update.message.reply_text("🕹️ **مرحباً بك في ساحة التحدي!**\nاختر التحدي الذي تود خوضه الآن 👇", reply_markup=get_games_menu(), parse_mode='Markdown')
+        return
+
+    # --- 🤖 المعلم الذكي ---
     if text == "🤖 المعلم الذكي (اسألني)":
         ai_sessions[user_id] = True
-        welcome_ai = (
-            "🤖 **أهلاً بك في خدمة المعلم الذكي!**\n\n"
-            "أنا هنا لمساعدتك. اسألني عن أي موضوع في الشبكات، البرمجة، مكونات الحاسب، قواعد البيانات، أو صيانة الأجهزة.\n"
-            "💬 **اكتب سؤالك التقني الآن...**\n\n"
-            "*(للخروج من هذه الخدمة، اضغط على زر الرجوع للقائمة الرئيسية)*"
-        )
-        await update.message.reply_text(welcome_ai, reply_markup=get_back_menu(), parse_mode='Markdown')
+        await update.message.reply_text("🤖 اكتب سؤالك التقني الآن وسأشرحه لك فوراً...", reply_markup=get_back_menu())
         return
 
     if ai_sessions.get(user_id) == True:
-        if not ai_model:
-            await update.message.reply_text("⚠️ المعلم الذكي غير متصل حالياً. تأكد من إعدادات المفتاح في السيرفر.", reply_markup=get_back_menu())
-            return
-            
-        status_msg = await update.message.reply_text("⏳ أقرأ سؤالك وأبحث عن أفضل إجابة...")
+        update_stat("ai_questions")
+        status_msg = await update.message.reply_text("⏳ جاري التفكير...")
         try:
-            prompt = (
-                f"أنت معلم حاسب وتقنية معلومات في معهد صناعي ثانوي بالسعودية. "
-                f"أجب على سؤال المتدرب التالي بأسلوب مبسط، عملي ومشجع. "
-                f"السؤال: {text}"
-            )
+            prompt = f"أنت معلم حاسب آلي سعودي، أجب بوضوح على: {text}"
             response = await ai_model.generate_content_async(prompt)
             await status_msg.delete()
-            try:
-                await update.message.reply_text(response.text, parse_mode='Markdown', reply_markup=get_back_menu())
-            except:
-                await update.message.reply_text(response.text, reply_markup=get_back_menu())
-        except Exception as e:
+            await update.message.reply_text(response.text)
+        except:
             await status_msg.delete()
-            print(f"Gemini API Error: {e}")
-            error_msg = f"⚠️ واجهت مشكلة فنية!\nالسبب: `{str(e)}`\n\nسنقوم بمعالجة هذا الخلل قريباً."
-            await update.message.reply_text(error_msg, parse_mode='Markdown', reply_markup=get_back_menu())
+            await update.message.reply_text("⚠️ المعلم الذكي غير متاح حالياً.")
         return
 
-    # --- باقي الخدمات ---
+    # --- خدمات الألعاب ---
     if text == "🎮 تحدي الأسبوع":
-        scores = load_scores()
+        update_stat("quiz_attempts")
+        scores = load_json(SCORES_FILE)
         user_data = scores.get(user_id, {"answered": []})
-        answered_questions = user_data.get("answered", [])
-        available_questions = [i for i in range(len(QUESTIONS)) if i not in answered_questions]
-        
-        if not available_questions:
-            await update.message.reply_text("🎉 لقد أنهيت جميع التحديات المتاحة حالياً! بانتظار تحديث الأسئلة 💪.", reply_markup=get_back_menu())
+        available = [i for i in range(len(QUESTIONS)) if i not in user_data.get("answered", [])]
+        if not available:
+            await update.message.reply_text("🎉 أكملت جميع التحديات المتاحة حالياً!")
             return
-            
-        q_idx = random.choice(available_questions)
-        question_data = QUESTIONS[q_idx]
-        
-        keyboard = []
-        for i, opt in enumerate(question_data["options"]):
-            keyboard.append([InlineKeyboardButton(opt, callback_data=f"ans_{q_idx}_{i}")])
-            
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        q_idx = random.choice(available)
         active_challenges[user_id] = time.time()
-        
-        challenge_msg = f"❓ **تحدي الأسبوع:**\n\n⚠️ **تنبيه:** أمامك {TIME_LIMIT} ثانية فقط للإجابة!\n\n🔸 {question_data['q']}"
-        await update.message.reply_text(challenge_msg, reply_markup=reply_markup, parse_mode='Markdown')
+        keyboard = [[InlineKeyboardButton(opt, callback_data=f"ans_{q_idx}_{i}")] for i, opt in enumerate(QUESTIONS[q_idx]['options'])]
+        await update.message.reply_text(f"❓ {QUESTIONS[q_idx]['q']}", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
     if text == "🏆 بطل الأسبوع":
-        scores = load_scores()
-        valid_scores = {uid: data for uid, data in scores.items() if data.get("score", 0) > 0}
-        if not valid_scores:
-            await update.message.reply_text("📉 لم يحصل أي متدرب على نقاط حتى الآن. شارك لتكون الأول!", reply_markup=get_back_menu())
+        scores = load_json(SCORES_FILE)
+        if not scores:
+            await update.message.reply_text("📉 لا يوجد نقاط بعد.")
             return
-            
-        sorted_scores = sorted(valid_scores.items(), key=lambda x: x[1]['score'], reverse=True)
-        top_student_id, top_student_data = sorted_scores[0]
-        
-        leaderboard_msg = f"🏆 **بطل قسم الحاسب لهذا الأسبوع:**\n\n🥇 **{top_student_data['name']}**\n🌟 الرصيد: {top_student_data['score']} نقطة\n\n"
-        if len(sorted_scores) > 1:
-            leaderboard_msg += "🎖️ **بقية لوحة الشرف:**\n"
-            for i, (uid, data) in enumerate(sorted_scores[1:5], start=2): 
-                leaderboard_msg += f"{i}. {data['name']} ({data['score']} نقطة)\n"
-            
-        await update.message.reply_text(leaderboard_msg, parse_mode='Markdown', reply_markup=get_back_menu())
+        sorted_scores = sorted(scores.items(), key=lambda x: x[1]['score'], reverse=True)
+        top = sorted_scores[0][1]
+        await update.message.reply_text(f"🥇 بطل الأسبوع الحالي: {top['name']}\n🌟 الرصيد: {top['score']} نقطة")
         return
 
-    if text == "📄 الخطط التدريبية":
-        await update.message.reply_text("📄 **الخطط التدريبية لدبلوم الحاسب الآلي:**\nاختر الفصل التدريبي 👇", reply_markup=get_plans_menu(), parse_mode='Markdown')
-        return
-
-    if text == "📰 أخبار القسم والمعهد":
-        news_msg = "📰 **أحدث إعلانات المعهد:**\n\n🔸 *الأسبوع 6 و 7 موعد اختبارات الفترة الأولى.*\n🔗 [حساب المعهد على X](https://x.com/tvtc_m_buraidah?s=21)"
-        await update.message.reply_text(news_msg, reply_markup=get_back_menu(), parse_mode='Markdown', disable_web_page_preview=True)
-        return
-
-    term_plans = {
-        "1️⃣ الفصل الأول": "📚 **مقررات الفصل التدريبي الأول:**\n🔹 ثقافة إسلامية 1\n🔹 لغة إنجليزية 1\n🔹 رياضيات 1\n🔹 فيزياء\n🔹 التربية البدنية 1\n🔹 لغة عربية 1\n🔹 أساسيات الحاسب الآلي\n🔹 مدخل إلى مهارات القرن 21\n🔹 السلامة والصحة المهنية",
-        "2️⃣ الفصل الثاني": "📚 **مقررات الفصل التدريبي الثاني:**\n🔹 سلو مهني\n🔹 لغة عربية 2\n🔹 لغة إنجليزية 2\n🔹 رياضيات 2\n🔹 التربية البدنية 2\n🔹 ثقافة إسلامية 2\n🔹 ورش تأسيسية\n🔹 تطبيقات الحاسب الآلي\n🔹 مهارات التواصل والتعاون\n🔹 التفكير الناقد والإبداعي",
-        "3️⃣ الفصل الثالث": "📚 **مقررات الفصل التدريبي الثالث:**\n🔹 ثقافة إسلامية 3\n🔹 الرسم الهندسي\n🔹 بحث ومصادر المعلومات\n🔹 رياضيات 3\n🔹 لغة إنجليزية 3\n🔹 أجهزة وقياس\n🔹 أساسيات الكهرباء\n🔹 أساسيات الإلكترونيات\n🔹 تطبيقات مفتوحة المصدر",
-        "4️⃣ الفصل الرابع": "📚 **مقررات الفصل التدريبي الرابع:**\n🔹 مقدمة في ريادة الأعمال\n🔹 تقنيات الانترنت\n🔹 مكونات الحاسب 1\n🔹 لغة برمجة 1\n🔹 أساسيات الشبكات\n🔹 رسم الشبكات بالحاسب\n🔹 أساسيات نظام لينكس\n🔹 أنشطة مهنية",
-        "5️⃣ الفصل الخامس": "📚 **مقررات الفصل التدريبي الخامس:**\n🔹 مكونات الحاسب 2\n🔹 صيانة الأجهزة الكفية\n🔹 لغة برمجة 2\n🔹 تمديد الكيابل النحاسية\n🔹 شبكات الحاسب\n🔹 نظام تشغيل الشبكة 1\n🔹 مشاريع إنتاجية\n🔹 أنشطة مهنية 2",
-        "6️⃣ الفصل السادس": "📚 **مقررات الفصل التدريبي السادس:**\n🔹 مبادئ قواعد البيانات\n🔹 طرفيات الحاسب\n🔹 مهارات صيانة الحاسب\n🔹 تمديد كيابل الألياف الضوئية\n🔹 نظام تشغيل الشبكة 2\n🔹 تدريب إنتاجي\n🔹 أنشطة مهنية 3",
-        "🖥️ برامج فصلية (إدخال بيانات)": "📚 **البرامج القصيرة:**\n🔹 **برنامج إدخال البيانات ومعالجة النصوص**"
-    }
-
-    if text in term_plans:
-        await update.message.reply_text(f"{term_plans[text]}\n\n🔗 **لتحميل الحقائب:**\n{DRIVE_LINK}", parse_mode='Markdown', disable_web_page_preview=True)
-        return
-
-    if text == "🔗 منصة تقني ورايات":
-        await update.message.reply_text("🌐 **روابط هامة:**\n🔹 تقني: https://tvtclms.edu.sa\n🔹 رايات: https://rayat.tvtc.gov.sa", reply_markup=get_back_menu(), disable_web_page_preview=True)
-        return
-
-    if text == "📍 موقع القسم":
-        await update.message.reply_text("📍 موقع القسم:\nhttp://maps.google.com/?q=Buraydah", reply_markup=get_back_menu())
-        return
-    
-    if text == "📚 الحقائب التدريبية":
-        await update.message.reply_text(f"📚 **المستودع:**\n{DRIVE_LINK}", reply_markup=get_back_menu(), disable_web_page_preview=True)
-        return
-    
-    if text == "📅 التقويم التدريبي":
-        if os.path.exists('calendar.jpg'): await update.message.reply_photo(photo=open('calendar.jpg', 'rb'), reply_markup=get_back_menu())
-        else: await update.message.reply_text("⚠️ ملف التقويم مفقود.", reply_markup=get_back_menu())
-        return
-    
-    if text == "👨‍🏫 تواصل مع رئيس القسم":
-        await update.message.reply_text(f"👨‍🏫 تواصل مباشر:\n🔗 {TELEGRAM_CONTACT_LINK}", reply_markup=get_back_menu())
-        return
-
+    # --- بقية الخدمات الأساسية ---
     if text == "📊 استعلام الغياب":
-        await update.message.reply_text("🔎 أرسل **رقمك التدريبي** الآن للبحث..", reply_markup=get_back_menu())
+        await update.message.reply_text("🔎 أرسل رقمك التدريبي الآن للبحث..")
         return
 
     if text == "📝 رفع الغياب والأعذار":
-        await update.message.reply_text("📝 **تعليمات:** أرسل صورة العذر واكتب رقمك التدريبي في الوصف.", reply_markup=get_back_menu())
+        await update.message.reply_text("📝 أرسل صورة العذر واكتب رقمك التدريبي في الوصف.")
+        return
+
+    if text == "📄 الخطط التدريبية":
+        await update.message.reply_text("📄 اختر الفصل:", reply_markup=get_plans_menu())
+        return
+
+    if text == "📰 أخبار القسم والمعهد":
+        await update.message.reply_text("📰 الأسبوع القادم موعد اختبارات الفترة الأولى.\n🔗 [حساب المعهد](https://x.com/tvtc_m_buraidah)")
+        return
+        
+    if text == "📚 الحقائب التدريبية":
+        await update.message.reply_text(f"📚 مستودع الحقائب: {DRIVE_LINK}")
+        return
+
+    if text == "🔗 منصة تقني ورايات":
+        await update.message.reply_text("🌐 منصة تقني: https://tvtclms.edu.sa\n بوابة رايات: https://rayat.tvtc.gov.sa")
+        return
+
+    if text == "📍 موقع القسم":
+        await update.message.reply_text("📍 الموقع الجغرافي للقسم:\nhttps://maps.app.goo.gl/3wG8F4")
+        return
+
+    if text == "📅 التقويم التدريبي":
+        if os.path.exists('calendar.jpg'): await update.message.reply_photo(photo=open('calendar.jpg', 'rb'))
+        else: await update.message.reply_text("⚠️ ملف التقويم غير متوفر.")
+        return
+
+    if text == "👨‍🏫 تواصل مع رئيس القسم":
+        update_stat("contact_clicks")
+        await update.message.reply_text(f"👨‍🏫 تواصل مباشر: {TELEGRAM_CONTACT_LINK}")
         return
 
     if text.isdigit():
-        status_msg = await update.message.reply_text("⏳ جاري البحث...")
         try:
             df = pd.read_excel('data.xlsx')
             df.columns = df.columns.astype(str).str.strip()
             result = df[df['stu_num'].astype(str).str.strip() == text]
-            await status_msg.delete()
-            
             if not result.empty:
                 name = result.iloc[0]['stu_nam']
-                msg = f"✅ <b>النتائج لـ:</b> <code>{name}</code>\n━━━━━━━━━━━━━━\n"
-                max_absence = 0 
-                for _, row in result.iterrows():
-                    val = float(row['parsnt'])
-                    if val > max_absence: max_absence = val 
-                    icon = "🔴 حرمان" if val >= 20 else ("⚠️ تنبيه" if val >= 15 else "🟢 منتظم")
-                    msg += f"📖 {row['c_nam']}: %{val} {icon}\n"
-                
-                msg += "\n💡 <b>رسالة القسم:</b>\n"
-                if max_absence == 0: msg += "🌟 أداء مثالي! القسم يفتخر بانتظامك والتزامك التام، استمر يا بطل."
-                elif max_absence < 15: msg += "🟢 وضعك سليم ومنتظم، لكن احرص على عدم زيادة غيابك."
-                elif max_absence < 20: msg += "⚠️ تنبيه هام! لقد اقتربت من حافة الحرمان، مستقبلك أهم."
-                else: msg += "🔴 للأسف وصلت لنسبة الحرمان. نأمل مراجعة إدارة القسم فوراً."
-                await update.message.reply_text(msg, parse_mode='HTML', reply_markup=get_back_menu())
-            else:
-                await update.message.reply_text("❌ الرقم غير مسجل لدينا.", reply_markup=get_back_menu())
-        except:
-            if 'status_msg' in locals(): await status_msg.delete()
-            await update.message.reply_text("⚠️ خطأ في قراءة ملف `data.xlsx`.", reply_markup=get_back_menu())
+                msg = f"✅ النتائج لـ: {name}\n"
+                for _, row in result.iterrows(): msg += f"📖 {row['c_nam']}: %{row['parsnt']}\n"
+                await update.message.reply_text(msg)
+            else: await update.message.reply_text("❌ الرقم غير مسجل.")
+        except: await update.message.reply_text("⚠️ خطأ في قراءة ملف البيانات.")
         return
 
-    await update.message.reply_text("⚠️ عذراً، لم أتعرف على طلبك. الرجاء استخدام الأزرار المتاحة 👇", reply_markup=get_main_menu())
+    await update.message.reply_text("⚠️ الرجاء اختيار خدمة من القائمة 👇", reply_markup=get_main_menu())
 
-# --- معالجة إجابات التحدي ---
-async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer() 
-    
-    data = query.data
-    user_id = str(query.from_user.id)
-    user_name = query.from_user.first_name
-    
-    if data.startswith("ans_"):
-        start_time = active_challenges.get(user_id)
-        if not start_time:
-            await query.edit_message_text("❌ انتهت صلاحية هذا التحدي أو أنك قمت بالإجابة مسبقاً.")
-            return
-            
-        time_taken = time.time() - start_time
-        del active_challenges[user_id] 
-        
-        parts = data.split("_")
-        q_idx = int(parts[1])
-        selected_ans = int(parts[2])
-        question_data = QUESTIONS[q_idx]
-        correct_ans = question_data["answer"]
-        
-        scores = load_scores()
-        if user_id not in scores: scores[user_id] = {"name": user_name, "score": 0, "answered": []}
-        if q_idx not in scores[user_id].get("answered", []): scores[user_id].setdefault("answered", []).append(q_idx)
-            
-        if time_taken > TIME_LIMIT:
-            result_text = f"⏳ **انتهى الوقت!**\nاستغرقت {int(time_taken)} ثانية (الحد الأقصى {TIME_LIMIT} ثانية).\nمما يعني أنك بحثت عن الإجابة 😉.\n\nالإجابة الصحيحة كانت: {question_data['options'][correct_ans]}"
-            save_scores(scores)
-        else:
-            if selected_ans == correct_ans:
-                scores[user_id]["score"] += 10 
-                save_scores(scores)
-                result_text = f"🎉 **إجابة صحيحة يا {user_name}!**\nأجبت خلال {int(time_taken)} ثواني وكسبت 10 نقاط 🌟\nرصيدك الحالي: {scores[user_id]['score']} نقطة."
-            else:
-                save_scores(scores)
-                result_text = f"❌ **إجابة خاطئة!**\nالإجابة الصحيحة هي: {question_data['options'][correct_ans]}\nحاول التعويض في التحدي القادم 💪"
-            
-        await query.edit_message_text(text=f"❓ **تحدي الأسبوع:**\n{question_data['q']}\n\n{result_text}", parse_mode='Markdown')
-
+# --- معالجة الصور والأعذار ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.caption:
-        await update.message.reply_text("⚠️ عذراً، يجب كتابة (رقمك التدريبي) في وصف الصورة قبل الإرسال.", reply_markup=get_back_menu())
+        await update.message.reply_text("⚠️ يجب كتابة الرقم التدريبي في وصف الصورة.")
         return
     try:
         await context.bot.send_message(chat_id=GROUP_ID, text=f"📥 عذر جديد:\nالبيانات: {update.message.caption}")
         await update.message.copy(chat_id=GROUP_ID)
-        await update.message.reply_text("✅ تم استلام عذرك بنجاح وتوجيهه للمسؤول.", reply_markup=get_main_menu())
-    except Exception as e:
-        await update.message.reply_text("⚠️ حدث خطأ. تأكد أن البوت مضاف كمشرف في مجموعة الأرشيف.", reply_markup=get_main_menu())
+        await update.message.reply_text("✅ تم استلام عذرك بنجاح وتوجيهه للمسؤول.")
+    except: await update.message.reply_text("⚠️ خطأ في إرسال العذر.")
+
+# --- معالجة الأزرار الشفافة ---
+async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = str(query.from_user.id)
+    await query.answer()
+    if query.data.startswith("ans_"):
+        start_time = active_challenges.get(user_id, 0)
+        time_taken = time.time() - start_time
+        parts = query.data.split("_")
+        q_idx, selected = int(parts[1]), int(parts[2])
+        scores = load_json(SCORES_FILE)
+        user_info = scores.get(user_id, {"name": query.from_user.first_name, "score": 0, "answered": []})
+        if time_taken > 15: msg = "⌛ انتهى الوقت!"
+        elif selected == QUESTIONS[q_idx]["answer"]:
+            user_info["score"] += 10
+            msg = "🎉 صح! +10 نقاط."
+        else: msg = "❌ خطأ!"
+        user_info["answered"].append(q_idx)
+        scores[user_id] = user_info
+        save_json(SCORES_FILE, scores)
+        await query.edit_message_text(f"{QUESTIONS[q_idx]['q']}\n\n{msg}")
 
 def main():
     Thread(target=run_web_server, daemon=True).start()
     app = Application.builder().token(TOKEN).build()
-    
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_logic))
-    app.add_handler(CallbackQueryHandler(button_callback)) 
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
-    
-    print("🚀 البوت يعمل الآن بالتصميم الجديد لقوائم العرض...")
-    app.run_polling(drop_pending_updates=True)
+    app.add_handler(CallbackQueryHandler(button_callback))
+    print("🚀 البوت المنسق يعمل الآن..")
+    app.run_polling()
 
 if __name__ == '__main__':
     main()
