@@ -32,7 +32,8 @@ DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    ai_model = genai.GenerativeModel('gemini-1.5-flash')
+    # تم تغيير اسم الموديل هنا إلى الموديل المستقر
+    ai_model = genai.GenerativeModel('gemini-pro')
 else:
     ai_model = None
 
@@ -152,7 +153,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"أجب على سؤال المتدرب التالي بأسلوب مبسط، عملي ومشجع. "
                 f"السؤال: {text}"
             )
-            # تم التحديث إلى الاتصال غير المتزامن (الأكثر استقراراً لتليجرام)
             response = await ai_model.generate_content_async(prompt)
             await status_msg.delete()
             try:
@@ -162,7 +162,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await status_msg.delete()
             print(f"Gemini API Error: {e}")
-            # تم إضافة هذا السطر لطباعة الخطأ بدقة في تليجرام
             error_msg = f"⚠️ واجهت مشكلة فنية!\nالسبب: `{str(e)}`\n\nتأكد من صحة مفتاح API في Render."
             await update.message.reply_text(error_msg, parse_mode='Markdown', reply_markup=get_back_menu())
         return
