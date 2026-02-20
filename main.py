@@ -220,7 +220,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if text == "📍 موقع القسم":
-        await update.message.reply_text("📍 الموقع الجغرافي للقسم:\nhttps://maps.app.goo.gl/3wG8F4")
+        await update.message.reply_text("📍 الموقع الجغرافي للقسم الحاسب الالي مبنى 19:\nhttps://maps.app.goo.gl/3wG8F4")
         return
 
     if text == "📅 التقويم التدريبي":
