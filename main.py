@@ -32,15 +32,13 @@ DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    # نستخدم الموديل السريع
     ai_model = genai.GenerativeModel('gemini-1.5-flash')
 else:
     ai_model = None
 
-# حالة المتدربين (لمعرفة من يتحدث مع المعلم الذكي)
 ai_sessions = {}
 
-# --- 3. بنك أسئلة تحدي الأسبوع ونظام النقاط والمؤقت ---
+# --- 3. بنك الأسئلة والنقاط ---
 QUESTIONS = [
     {
         "q": "ما هو عنوان الـ IP الذي يُعرف بـ (Localhost) ويستخدم لاختبار كرت الشبكة؟",
@@ -81,7 +79,7 @@ def save_scores(scores):
 # --- 4. تصميم القوائم ---
 def get_main_menu():
     keyboard = [
-        ["🤖 المعلم الذكي (اسألني)"], # زر الذكاء الاصطناعي الجديد في الصدارة
+        ["🤖 المعلم الذكي (اسألني)"], 
         ["🎮 تحدي الأسبوع", "🏆 بطل الأسبوع"], 
         ["📰 أخبار القسم والمعهد"], 
         ["📊 استعلام الغياب", "📍 موقع القسم"],
@@ -106,7 +104,6 @@ def get_back_menu():
 
 # --- 5. المهام والمنطق ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # إنهاء جلسة الذكاء الاصطناعي لو كان المتدرب عالقاً فيها
     ai_sessions[str(update.effective_user.id)] = False
     await update.message.reply_text(
         f"أهلاً بك {update.effective_user.first_name} في بوت قسم الحاسب 💻✨\nاختر من القائمة أدناه 👇",
@@ -117,60 +114,68 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = str(update.effective_user.id)
 
-    # --- أزرار التنقل ---
+    known_commands = [
+        "🔙 الرجوع للقائمة الرئيسية", "📊 استعلام الغياب", "📍 موقع القسم", 
+        "📚 الحقائب التدريبية", "📄 الخطط التدريبية", "🔗 منصة تقني ورايات", 
+        "📅 التقويم التدريبي", "📝 رفع الغياب والأعذار", "👨‍🏫 تواصل مع رئيس القسم",
+        "🎮 تحدي الأسبوع", "🏆 بطل الأسبوع", "📰 أخبار القسم والمعهد", "🤖 المعلم الذكي (اسألني)"
+    ]
+
+    if text in known_commands and text != "🤖 المعلم الذكي (اسألني)":
+        ai_sessions[user_id] = False
+
     if text == "🔙 الرجوع للقائمة الرئيسية":
-        ai_sessions[user_id] = False # الخروج من وضع الذكاء الاصطناعي
         await update.message.reply_text("🏠 تم العودة للقائمة الرئيسية:", reply_markup=get_main_menu())
         return
 
-    # --- 🌟 نظام المعلم الذكي (الذكاء الاصطناعي) ---
+    # --- 🤖 نظام المعلم الذكي ---
     if text == "🤖 المعلم الذكي (اسألني)":
         ai_sessions[user_id] = True
         welcome_ai = (
             "🤖 **أهلاً بك في خدمة المعلم الذكي!**\n\n"
-            "أنا هنا لمساعدتك في فهم أي موضوع تقني (برمجة، شبكات، صيانة أجهزة، أنظمة تشغيل).\n"
-            "💬 **اكتب سؤالك الآن وسأقوم بشرحه لك فوراً...**\n\n"
+            "أنا هنا لمساعدتك. اسألني عن أي موضوع في الشبكات، البرمجة، مكونات الحاسب، قواعد البيانات، أو صيانة الأجهزة.\n"
+            "💬 **اكتب سؤالك التقني الآن...**\n\n"
             "*(للخروج من هذه الخدمة، اضغط على زر الرجوع للقائمة الرئيسية)*"
         )
         await update.message.reply_text(welcome_ai, reply_markup=get_back_menu(), parse_mode='Markdown')
         return
 
-    # التحقق مما إذا كان المتدرب يتحدث مع الذكاء الاصطناعي حالياً
     if ai_sessions.get(user_id) == True:
         if not ai_model:
-            await update.message.reply_text("⚠️ عذراً، خدمة الذكاء الاصطناعي غير مفعلة حالياً. (الرجاء التأكد من إضافة مفتاح GEMINI_API_KEY في السيرفر).")
+            await update.message.reply_text("⚠️ لم يتم العثور على مفتاح GEMINI_API_KEY في السيرفر.", reply_markup=get_back_menu())
             return
             
-        status_msg = await update.message.reply_text("⏳ المعلم الذكي يقرأ سؤالك ويكتب الإجابة...")
+        status_msg = await update.message.reply_text("⏳ أقرأ سؤالك وأبحث عن أفضل إجابة...")
         try:
-            # إعطاء الذكاء الاصطناعي شخصية المعلم السعودي التقني
-            prompt = f"أنت معلم حاسب آلي ودعم فني وشبكات في معهد صناعي ثانوي في السعودية. اسمك 'المعلم الذكي'. أجب على سؤال المتدرب التالي بأسلوب مبسط، مشجع، وعملي. تجنب الإطالة المفرطة. السؤال: {text}"
-            
-            response = ai_model.generate_content(prompt)
+            prompt = (
+                f"أنت معلم حاسب وتقنية معلومات في معهد صناعي ثانوي بالسعودية. "
+                f"أجب على سؤال المتدرب التالي بأسلوب مبسط، عملي ومشجع. "
+                f"السؤال: {text}"
+            )
+            # تم التحديث إلى الاتصال غير المتزامن (الأكثر استقراراً لتليجرام)
+            response = await ai_model.generate_content_async(prompt)
             await status_msg.delete()
-            
-            # إرسال الإجابة (مع محاولة استخدام التنسيق، وفي حال الخطأ نرسل النص العادي)
             try:
-                await update.message.reply_text(response.text, parse_mode='Markdown')
+                await update.message.reply_text(response.text, parse_mode='Markdown', reply_markup=get_back_menu())
             except:
-                await update.message.reply_text(response.text)
-                
+                await update.message.reply_text(response.text, reply_markup=get_back_menu())
         except Exception as e:
             await status_msg.delete()
-            print(f"AI Error: {e}")
-            await update.message.reply_text("⚠️ حدث ضغط على شبكة الذكاء الاصطناعي. الرجاء المحاولة بعد قليل.")
+            print(f"Gemini API Error: {e}")
+            # تم إضافة هذا السطر لطباعة الخطأ بدقة في تليجرام
+            error_msg = f"⚠️ واجهت مشكلة فنية!\nالسبب: `{str(e)}`\n\nتأكد من صحة مفتاح API في Render."
+            await update.message.reply_text(error_msg, parse_mode='Markdown', reply_markup=get_back_menu())
         return
 
-    # --- نظام التحدي (المؤقت والمحاولة الواحدة) ---
+    # --- باقي الخدمات ---
     if text == "🎮 تحدي الأسبوع":
         scores = load_scores()
         user_data = scores.get(user_id, {"answered": []})
         answered_questions = user_data.get("answered", [])
-        
         available_questions = [i for i in range(len(QUESTIONS)) if i not in answered_questions]
         
         if not available_questions:
-            await update.message.reply_text("🎉 لقد أنهيت جميع التحديات المتاحة حالياً! بانتظار تحديث الأسئلة الأسبوع القادم 💪.", reply_markup=get_back_menu())
+            await update.message.reply_text("🎉 لقد أنهيت جميع التحديات المتاحة حالياً! بانتظار تحديث الأسئلة 💪.", reply_markup=get_back_menu())
             return
             
         q_idx = random.choice(available_questions)
@@ -183,32 +188,21 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         active_challenges[user_id] = time.time()
         
-        challenge_msg = (
-            f"❓ **تحدي الأسبوع:**\n\n"
-            f"⚠️ **تنبيه:** أمامك {TIME_LIMIT} ثانية فقط للإجابة، محاولة البحث خارج التطبيق ستلغي محاولتك!\n\n"
-            f"🔸 {question_data['q']}"
-        )
+        challenge_msg = f"❓ **تحدي الأسبوع:**\n\n⚠️ **تنبيه:** أمامك {TIME_LIMIT} ثانية فقط للإجابة!\n\n🔸 {question_data['q']}"
         await update.message.reply_text(challenge_msg, reply_markup=reply_markup, parse_mode='Markdown')
         return
 
     if text == "🏆 بطل الأسبوع":
         scores = load_scores()
-        if not scores:
-            await update.message.reply_text("🤔 لا يوجد نقاط مسجلة حتى الآن. كُن أنت أول المشاركين في 'تحدي الأسبوع'!", reply_markup=get_back_menu())
-            return
-        
         valid_scores = {uid: data for uid, data in scores.items() if data.get("score", 0) > 0}
         if not valid_scores:
-            await update.message.reply_text("📉 لم يحصل أي متدرب على نقاط حتى الآن. شارك الآن لتكون في الصدارة!", reply_markup=get_back_menu())
+            await update.message.reply_text("📉 لم يحصل أي متدرب على نقاط حتى الآن. شارك لتكون الأول!", reply_markup=get_back_menu())
             return
             
         sorted_scores = sorted(valid_scores.items(), key=lambda x: x[1]['score'], reverse=True)
         top_student_id, top_student_data = sorted_scores[0]
         
-        leaderboard_msg = f"🏆 **بطل قسم الحاسب لهذا الأسبوع:**\n\n"
-        leaderboard_msg += f"🥇 **{top_student_data['name']}**\n"
-        leaderboard_msg += f"🌟 الرصيد: {top_student_data['score']} نقطة\n\n"
-        
+        leaderboard_msg = f"🏆 **بطل قسم الحاسب لهذا الأسبوع:**\n\n🥇 **{top_student_data['name']}**\n🌟 الرصيد: {top_student_data['score']} نقطة\n\n"
         if len(sorted_scores) > 1:
             leaderboard_msg += "🎖️ **بقية لوحة الشرف:**\n"
             for i, (uid, data) in enumerate(sorted_scores[1:5], start=2): 
@@ -217,19 +211,12 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(leaderboard_msg, parse_mode='Markdown', reply_markup=get_back_menu())
         return
 
-    # --- بقية الأكواد الثابتة (الخطط، الغياب، الأخبار) ---
     if text == "📄 الخطط التدريبية":
-        await update.message.reply_text("📄 **الخطط التدريبية لدبلوم الحاسب الآلي:**\nاختر الفصل التدريبي المطلوب 👇", reply_markup=get_plans_menu(), parse_mode='Markdown')
+        await update.message.reply_text("📄 **الخطط التدريبية לדبلوم الحاسب الآلي:**\nاختر الفصل التدريبي 👇", reply_markup=get_plans_menu(), parse_mode='Markdown')
         return
 
     if text == "📰 أخبار القسم والمعهد":
-        news_msg = (
-            "📰 **أحدث إعلانات القسم والمعهد:**\n\n"
-            "🔔 **إعلان هام:**\n"
-            "🔸 *الأسبوع القادم (الأسبوع 6 و 7) سيكون موعداً لاختبارات الفترة الأولى. نتمنى لجميع المتدربين التوفيق والنجاح.*\n\n"
-            "📱 **حساب المعهد على منصة X:**\n"
-            "🔗 [اضغط هنا للزيارة](https://x.com/tvtc_m_buraidah?s=21)\n"
-        )
+        news_msg = "📰 **أحدث إعلانات المعهد:**\n\n🔸 *الأسبوع 6 و 7 موعد اختبارات الفترة الأولى.*\n🔗 [حساب المعهد على X](https://x.com/tvtc_m_buraidah?s=21)"
         await update.message.reply_text(news_msg, reply_markup=get_back_menu(), parse_mode='Markdown', disable_web_page_preview=True)
         return
 
@@ -240,17 +227,15 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "4️⃣ الفصل الرابع": "📚 **مقررات الفصل التدريبي الرابع:**\n🔹 مقدمة في ريادة الأعمال\n🔹 تقنيات الانترنت\n🔹 مكونات الحاسب 1\n🔹 لغة برمجة 1\n🔹 أساسيات الشبكات\n🔹 رسم الشبكات بالحاسب\n🔹 أساسيات نظام لينكس\n🔹 أنشطة مهنية",
         "5️⃣ الفصل الخامس": "📚 **مقررات الفصل التدريبي الخامس:**\n🔹 مكونات الحاسب 2\n🔹 صيانة الأجهزة الكفية\n🔹 لغة برمجة 2\n🔹 تمديد الكيابل النحاسية\n🔹 شبكات الحاسب\n🔹 نظام تشغيل الشبكة 1\n🔹 مشاريع إنتاجية\n🔹 أنشطة مهنية 2",
         "6️⃣ الفصل السادس": "📚 **مقررات الفصل التدريبي السادس:**\n🔹 مبادئ قواعد البيانات\n🔹 طرفيات الحاسب\n🔹 مهارات صيانة الحاسب\n🔹 تمديد كيابل الألياف الضوئية\n🔹 نظام تشغيل الشبكة 2\n🔹 تدريب إنتاجي\n🔹 أنشطة مهنية 3",
-        "🖥️ برامج فصلية (إدخال بيانات)": "📚 **البرامج القصيرة:**\n🔹 **برنامج إدخال البيانات ومعالجة النصوص**\nيُعد هذا البرنامج دورة مستقلة عن خطة الدبلوم."
+        "🖥️ برامج فصلية (إدخال بيانات)": "📚 **البرامج القصيرة:**\n🔹 **برنامج إدخال البيانات ومعالجة النصوص**"
     }
 
     if text in term_plans:
-        reply_content = f"{term_plans[text]}\n\n🔗 **لتحميل الحقائب التدريبية:**\n{DRIVE_LINK}"
-        await update.message.reply_text(reply_content, parse_mode='Markdown', disable_web_page_preview=True)
+        await update.message.reply_text(f"{term_plans[text]}\n\n🔗 **لتحميل الحقائب:**\n{DRIVE_LINK}", parse_mode='Markdown', disable_web_page_preview=True)
         return
 
     if text == "🔗 منصة تقني ورايات":
-        msg = "🌐 **أهم الروابط التدريبية:**\n🔹 منصة تقني: https://tvtclms.edu.sa\n🔹 بوابة رايات: https://rayat.tvtc.gov.sa"
-        await update.message.reply_text(msg, reply_markup=get_back_menu(), disable_web_page_preview=True)
+        await update.message.reply_text("🌐 **روابط هامة:**\n🔹 تقني: https://tvtclms.edu.sa\n🔹 رايات: https://rayat.tvtc.gov.sa", reply_markup=get_back_menu(), disable_web_page_preview=True)
         return
 
     if text == "📍 موقع القسم":
@@ -258,18 +243,16 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if text == "📚 الحقائب التدريبية":
-        await update.message.reply_text(f"📚 **مستودع الحقائب التدريبية:**\n{DRIVE_LINK}", reply_markup=get_back_menu(), disable_web_page_preview=True)
+        await update.message.reply_text(f"📚 **المستودع:**\n{DRIVE_LINK}", reply_markup=get_back_menu(), disable_web_page_preview=True)
         return
     
     if text == "📅 التقويم التدريبي":
-        if os.path.exists('calendar.jpg'):
-            await update.message.reply_photo(photo=open('calendar.jpg', 'rb'), caption="📅 التقويم المعتمد", reply_markup=get_back_menu())
-        else:
-            await update.message.reply_text("⚠️ ملف التقويم مفقود.", reply_markup=get_back_menu())
+        if os.path.exists('calendar.jpg'): await update.message.reply_photo(photo=open('calendar.jpg', 'rb'), reply_markup=get_back_menu())
+        else: await update.message.reply_text("⚠️ ملف التقويم مفقود.", reply_markup=get_back_menu())
         return
     
     if text == "👨‍🏫 تواصل مع رئيس القسم":
-        await update.message.reply_text(f"👨‍🏫 للتواصل المباشر:\n🔗 {TELEGRAM_CONTACT_LINK}", reply_markup=get_back_menu())
+        await update.message.reply_text(f"👨‍🏫 تواصل مباشر:\n🔗 {TELEGRAM_CONTACT_LINK}", reply_markup=get_back_menu())
         return
 
     if text == "📊 استعلام الغياب":
@@ -303,15 +286,17 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 elif max_absence < 15: msg += "🟢 وضعك سليم ومنتظم، لكن احرص على عدم زيادة غيابك."
                 elif max_absence < 20: msg += "⚠️ تنبيه هام! لقد اقتربت من حافة الحرمان، مستقبلك أهم."
                 else: msg += "🔴 للأسف وصلت لنسبة الحرمان. نأمل مراجعة إدارة القسم فوراً."
-
                 await update.message.reply_text(msg, parse_mode='HTML', reply_markup=get_back_menu())
             else:
                 await update.message.reply_text("❌ الرقم غير مسجل لدينا.", reply_markup=get_back_menu())
         except:
             if 'status_msg' in locals(): await status_msg.delete()
             await update.message.reply_text("⚠️ خطأ في قراءة ملف `data.xlsx`.", reply_markup=get_back_menu())
+        return
 
-# --- 6. معالجة إجابات التحدي ---
+    await update.message.reply_text("⚠️ عذراً، لم أتعرف على طلبك. الرجاء استخدام الأزرار المتاحة 👇", reply_markup=get_main_menu())
+
+# --- معالجة إجابات التحدي ---
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer() 
@@ -323,7 +308,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("ans_"):
         start_time = active_challenges.get(user_id)
         if not start_time:
-            await query.edit_message_text("❌ لقد انتهت صلاحية هذا التحدي أو أنك قمت بالإجابة مسبقاً.")
+            await query.edit_message_text("❌ انتهت صلاحية هذا التحدي أو أنك قمت بالإجابة مسبقاً.")
             return
             
         time_taken = time.time() - start_time
@@ -332,19 +317,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts = data.split("_")
         q_idx = int(parts[1])
         selected_ans = int(parts[2])
-        
         question_data = QUESTIONS[q_idx]
         correct_ans = question_data["answer"]
         
         scores = load_scores()
-        if user_id not in scores:
-            scores[user_id] = {"name": user_name, "score": 0, "answered": []}
-            
-        if q_idx not in scores[user_id].get("answered", []):
-            scores[user_id].setdefault("answered", []).append(q_idx)
+        if user_id not in scores: scores[user_id] = {"name": user_name, "score": 0, "answered": []}
+        if q_idx not in scores[user_id].get("answered", []): scores[user_id].setdefault("answered", []).append(q_idx)
             
         if time_taken > TIME_LIMIT:
-            result_text = f"⏳ **انتهى الوقت!**\nلقد استغرقت {int(time_taken)} ثانية (الحد الأقصى {TIME_LIMIT} ثانية).\nمما يعني أنك بحثت عن الإجابة 😉.\n\nالإجابة الصحيحة كانت: {question_data['options'][correct_ans]}"
+            result_text = f"⏳ **انتهى الوقت!**\nاستغرقت {int(time_taken)} ثانية (الحد الأقصى {TIME_LIMIT} ثانية).\nمما يعني أنك بحثت عن الإجابة 😉.\n\nالإجابة الصحيحة كانت: {question_data['options'][correct_ans]}"
             save_scores(scores)
         else:
             if selected_ans == correct_ans:
@@ -353,7 +334,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 result_text = f"🎉 **إجابة صحيحة يا {user_name}!**\nأجبت خلال {int(time_taken)} ثواني وكسبت 10 نقاط 🌟\nرصيدك الحالي: {scores[user_id]['score']} نقطة."
             else:
                 save_scores(scores)
-                result_text = f"❌ **إجابة خاطئة!**\nأجبت خلال {int(time_taken)} ثواني.\nالإجابة الصحيحة هي: {question_data['options'][correct_ans]}\nحاول التعويض في التحدي القادم 💪"
+                result_text = f"❌ **إجابة خاطئة!**\nالإجابة الصحيحة هي: {question_data['options'][correct_ans]}\nحاول التعويض في التحدي القادم 💪"
             
         await query.edit_message_text(text=f"❓ **تحدي الأسبوع:**\n{question_data['q']}\n\n{result_text}", parse_mode='Markdown')
 
@@ -368,7 +349,6 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text("⚠️ حدث خطأ. تأكد أن البوت مضاف كمشرف في مجموعة الأرشيف.", reply_markup=get_main_menu())
 
-# --- 7. التشغيل ---
 def main():
     Thread(target=run_web_server, daemon=True).start()
     app = Application.builder().token(TOKEN).build()
@@ -378,7 +358,7 @@ def main():
     app.add_handler(CallbackQueryHandler(button_callback)) 
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     
-    print("🚀 تم تشغيل البوت مع المعلم الذكي بنجاح...")
+    print("🚀 البوت يعمل الآن...")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
