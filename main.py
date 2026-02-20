@@ -22,7 +22,6 @@ def run_web_server():
 TOKEN = os.environ.get("TOKEN") 
 GROUP_ID = "-5193577198"
 TELEGRAM_CONTACT_LINK = "https://t.me/majod119"
-# الرابط الموحد للحقائب
 DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
 
 # --- 3. تصميم القوائم ---
@@ -37,7 +36,6 @@ def get_main_menu():
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, is_persistent=True)
 
 def get_plans_menu():
-    # قائمة الفصول التفاعلية بناءً على الخطة المعتمدة
     keyboard = [
         ["1️⃣ الفصل الأول", "2️⃣ الفصل الثاني"],
         ["3️⃣ الفصل الثالث", "4️⃣ الفصل الرابع"],
@@ -60,7 +58,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
 
-    # --- 1. أزرار التنقل ---
+    # --- أزرار التنقل ---
     if text == "🔙 الرجوع للقائمة الرئيسية":
         await update.message.reply_text("🏠 تم العودة للقائمة الرئيسية:", reply_markup=get_main_menu())
         return
@@ -69,7 +67,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📄 **الخطط التدريبية لدبلوم الحاسب الآلي:**\nاختر الفصل التدريبي المطلوب 👇", reply_markup=get_plans_menu(), parse_mode='Markdown')
         return
 
-    # --- 2. قسم الأخبار ---
+    # --- قسم الأخبار ---
     if text == "📰 أخبار القسم والمعهد":
         news_msg = (
             "📰 **أحدث إعلانات القسم والمعهد:**\n\n"
@@ -82,7 +80,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(news_msg, reply_markup=get_back_menu(), parse_mode='Markdown', disable_web_page_preview=True)
         return
 
-    # --- 3. الخطط الفرعية (الفصول التدريبية) ---
+    # --- الخطط الفرعية ---
     term_plans = {
         "1️⃣ الفصل الأول": "📚 **مقررات الفصل التدريبي الأول:**\n🔹 ثقافة إسلامية 1\n🔹 لغة إنجليزية 1\n🔹 رياضيات 1\n🔹 فيزياء\n🔹 التربية البدنية 1\n🔹 لغة عربية 1\n🔹 أساسيات الحاسب الآلي\n🔹 مدخل إلى مهارات القرن 21\n🔹 السلامة والصحة المهنية",
         "2️⃣ الفصل الثاني": "📚 **مقررات الفصل التدريبي الثاني:**\n🔹 سلوك مهني\n🔹 لغة عربية 2\n🔹 لغة إنجليزية 2\n🔹 رياضيات 2\n🔹 التربية البدنية 2\n🔹 ثقافة إسلامية 2\n🔹 ورش تأسيسية\n🔹 تطبيقات الحاسب الآلي\n🔹 مهارات التواصل والتعاون\n🔹 التفكير الناقد والإبداعي",
@@ -94,12 +92,11 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
 
     if text in term_plans:
-        # دمج المقررات مع رابط الحقائب
-        reply_content = f"{term_plans[text]}\n\n🔗 **لتحميل الحقائب التدريبية، تفضل بزيارة المستودع الشامل:**\n{DRIVE_LINK}"
+        reply_content = f"{term_plans[text]}\n\n🔗 **لتحميل الحقائب التدريبية:**\n{DRIVE_LINK}"
         await update.message.reply_text(reply_content, parse_mode='Markdown', disable_web_page_preview=True)
         return
 
-    # --- 4. الروابط والأقسام الثابتة ---
+    # --- الروابط والأقسام الثابتة ---
     if text == "🔗 منصة تقني ورايات":
         msg = "🌐 **أهم الروابط التدريبية:**\n\n🔹 منصة تقني:\nhttps://tvtclms.edu.sa\n\n🔹 بوابة رايات:\nhttps://rayat.tvtc.gov.sa"
         await update.message.reply_text(msg, reply_markup=get_back_menu(), parse_mode='Markdown', disable_web_page_preview=True)
@@ -110,7 +107,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if text == "📚 الحقائب التدريبية":
-        await update.message.reply_text(f"📚 **المستودع الشامل للحقائب التدريبية المعتمدة:**\n{DRIVE_LINK}", reply_markup=get_back_menu(), parse_mode='Markdown', disable_web_page_preview=True)
+        await update.message.reply_text(f"📚 **المستودع الشامل للحقائب التدريبية:**\n{DRIVE_LINK}", reply_markup=get_back_menu(), parse_mode='Markdown', disable_web_page_preview=True)
         return
     
     if text == "📅 التقويم التدريبي":
@@ -124,7 +121,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"👨‍🏫 للتواصل المباشر والخاص:\n🔗 {TELEGRAM_CONTACT_LINK}", reply_markup=get_back_menu())
         return
 
-    # --- 5. خدمات الغياب والأعذار ---
+    # --- خدمات الغياب والأعذار ---
     if text == "📊 استعلام الغياب":
         await update.message.reply_text("🔎 أرسل **رقمك التدريبي** الآن للبحث في السجلات..", reply_markup=get_back_menu())
         return
@@ -133,7 +130,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📝 **تعليمات هامة:**\nأرسل صورة العذر واكتب رقمك التدريبي في خانة (الوصف / Caption).", reply_markup=get_back_menu())
         return
 
-    # --- 6. منطق البحث في الإكسل ---
+    # --- منطق البحث في الإكسل (مع الرد الذكي للتحفيز) ---
     if text.isdigit():
         status_msg = await update.message.reply_text("⏳ جاري البحث...")
         try:
@@ -145,10 +142,28 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not result.empty:
                 name = result.iloc[0]['stu_nam']
                 msg = f"✅ <b>النتائج لـ:</b> <code>{name}</code>\n━━━━━━━━━━━━━━\n"
+                
+                max_absence = 0 # متغير لحفظ أعلى نسبة غياب للطالب
+                
                 for _, row in result.iterrows():
                     val = float(row['parsnt'])
+                    if val > max_absence:
+                        max_absence = val # تحديث أعلى نسبة
+                        
                     icon = "🔴 حرمان" if val >= 20 else ("⚠️ تنبيه" if val >= 15 else "🟢 منتظم")
                     msg += f"📖 {row['c_nam']}: %{val} {icon}\n"
+                
+                # إضافة الرد الذكي والتحفيزي بناءً على أعلى نسبة غياب
+                msg += "\n💡 <b>رسالة القسم:</b>\n"
+                if max_absence == 0:
+                    msg += "🌟 أداء مثالي! القسم يفتخر بانتظامك والتزامك التام، استمر يا بطل ولا تتراجع."
+                elif max_absence < 15:
+                    msg += "🟢 وضعك سليم ومنتظم، لكن احرص على عدم زيادة غيابك لضمان التفوق والنجاح."
+                elif max_absence < 20:
+                    msg += "⚠️ تنبيه هام! لقد اقتربت من حافة الحرمان في بعض المواد. مستقبلك أهم، ننتظر التزامك."
+                else:
+                    msg += "🔴 للأسف وصلت لنسبة الحرمان. نأمل منك مراجعة إدارة القسم فوراً لمعالجة وضعك الأكاديمي."
+
                 await update.message.reply_text(msg, parse_mode='HTML', reply_markup=get_back_menu())
             else:
                 await update.message.reply_text("❌ عذراً، الرقم التدريبي غير مسجل لدينا.", reply_markup=get_back_menu())
