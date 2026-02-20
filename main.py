@@ -26,6 +26,7 @@ TELEGRAM_CONTACT_LINK = "https://t.me/majod119"
 # --- 3. تصميم القوائم ---
 def get_main_menu():
     keyboard = [
+        ["📰 أخبار القسم والمعهد"], 
         ["📊 استعلام الغياب", "📍 موقع القسم"],
         ["📚 الحقائب التدريبية", "📄 الخطط التدريبية"],
         ["🔗 منصة تقني ورايات", "📅 التقويم التدريبي"],
@@ -63,7 +64,20 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📄 قسم الخطط:\nاختر التخصص المطلوب 👇", reply_markup=get_plans_menu())
         return
 
-    # --- 2. الخطط الفرعية ---
+    # --- 2. قسم الأخبار المحدث ---
+    if text == "📰 أخبار القسم والمعهد":
+        news_msg = (
+            "📰 **أحدث إعلانات القسم والمعهد:**\n\n"
+            "🔔 **إعلان هام:**\n"
+            "🔸 *الأسبوع القادم (الأسبوع 6 و 7) سيكون موعداً لاختبارات الفترة الأولى. نتمنى لجميع المتدربين التوفيق والنجاح.*\n\n"
+            "📱 **حساب المعهد الصناعي الثانوي ببريدة على منصة X:**\n"
+            "🔗 [اضغط هنا لزيارة حساب المعهد](https://x.com/tvtc_m_buraidah?s=21)\n\n"
+            "*(تنبيه: سيتم تحديث الأخبار هنا بشكل دوري)*"
+        )
+        await update.message.reply_text(news_msg, reply_markup=get_back_menu(), parse_mode='Markdown', disable_web_page_preview=True)
+        return
+
+    # --- 3. الخطط الفرعية ---
     plans = {
         "🖥️ خطة الدعم الفني": "📍 [رابط خطة الدعم الفني هنا]",
         "🌐 خطة الشبكات": "📍 [رابط خطة الشبكات هنا]",
@@ -73,7 +87,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ **{text}:**\n\n{plans[text]}", parse_mode='Markdown')
         return
 
-    # --- 3. الروابط والأقسام الثابتة (التي كانت مفقودة) ---
+    # --- 4. الروابط والأقسام الثابتة ---
     if text == "🔗 منصة تقني ورايات":
         msg = "🌐 **أهم الروابط التدريبية:**\n\n🔹 منصة تقني:\nhttps://tvtclms.edu.sa\n\n🔹 بوابة رايات:\nhttps://rayat.tvtc.gov.sa"
         await update.message.reply_text(msg, reply_markup=get_back_menu(), parse_mode='Markdown', disable_web_page_preview=True)
@@ -98,7 +112,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"👨‍🏫 للتواصل المباشر والخاص:\n🔗 {TELEGRAM_CONTACT_LINK}", reply_markup=get_back_menu())
         return
 
-    # --- 4. خدمات الغياب والأعذار ---
+    # --- 5. خدمات الغياب والأعذار ---
     if text == "📊 استعلام الغياب":
         await update.message.reply_text("🔎 أرسل **رقمك التدريبي** الآن للبحث في السجلات..", reply_markup=get_back_menu())
         return
@@ -107,7 +121,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📝 **تعليمات هامة:**\nأرسل صورة العذر واكتب رقمك التدريبي في خانة (الوصف / Caption).", reply_markup=get_back_menu())
         return
 
-    # --- 5. منطق البحث في الإكسل (20% حرمان) ---
+    # --- 6. منطق البحث في الإكسل ---
     if text.isdigit():
         status_msg = await update.message.reply_text("⏳ جاري البحث...")
         try:
@@ -133,7 +147,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """استقبال صور الأعذار وتوجيهها للمجموعة"""
     if not update.message.caption:
         await update.message.reply_text("⚠️ عذراً، يجب كتابة (رقمك التدريبي) في وصف الصورة قبل الإرسال.", reply_markup=get_back_menu())
         return
@@ -146,7 +159,7 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"Group Error: {e}")
         await update.message.reply_text("⚠️ حدث خطأ. تأكد أن البوت مضاف كمشرف (Admin) في مجموعة الأرشيف.", reply_markup=get_main_menu())
 
-# --- 5. التشغيل النهائي والآمن ---
+# --- 7. التشغيل ---
 def main():
     Thread(target=run_web_server, daemon=True).start()
     app = Application.builder().token(TOKEN).build()
