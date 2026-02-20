@@ -103,20 +103,18 @@ QUESTIONS = [
 
 # --- 4. تصميم القوائم ---
 
-# القائمة الرئيسية المحدثة (رسمية وأكثر ترتيباً)
 def get_main_menu():
     keyboard = [
         ["🤖 المعلم الذكي (اسألني)"], 
-        ["🕹️ قسم الألعاب والتحديات"], # تم دمج الألعاب هنا
         ["📚 الحقائب التدريبية", "📄 الخطط التدريبية"],
         ["📊 استعلام الغياب", "📝 رفع الغياب والأعذار"],
         ["🔗 منصة تقني ورايات", "📅 التقويم التدريبي"],
         ["📰 أخبار القسم والمعهد", "📍 موقع القسم"],
-        ["👨‍🏫 تواصل مع رئيس القسم"]
+        ["👨‍🏫 تواصل مع رئيس القسم"],
+        ["🕹️ قسم الألعاب والتحديات"] # التحدي أصبح في آخر شي كما طلبت
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, is_persistent=True)
 
-# قائمة الألعاب والتحديات الجديدة
 def get_games_menu():
     keyboard = [
         ["🎮 تحدي الأسبوع", "🏆 بطل الأسبوع"],
@@ -151,12 +149,10 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🏠 تم العودة للقائمة الرئيسية:", reply_markup=get_main_menu())
         return
 
-    # --- الدخول لقسم الألعاب ---
     if text == "🕹️ قسم الألعاب والتحديات":
-        await update.message.reply_text("🕹️ **مرحباً بك في ساحة التحدي!**\nاختر التحدي الذي تود خوضه الآن 👇", reply_markup=get_games_menu(), parse_mode='Markdown')
+        await update.message.reply_text("🕹️ **ساحة التحدي والمنافسة**\nأثبت جدارتك وتصدر لوحة الشرف 👇", reply_markup=get_games_menu(), parse_mode='Markdown')
         return
 
-    # --- 🤖 المعلم الذكي ---
     if text == "🤖 المعلم الذكي (اسألني)":
         ai_sessions[user_id] = True
         await update.message.reply_text("🤖 اكتب سؤالك التقني الآن وسأشرحه لك فوراً...", reply_markup=get_back_menu())
@@ -175,14 +171,13 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ المعلم الذكي غير متاح حالياً.")
         return
 
-    # --- خدمات الألعاب ---
     if text == "🎮 تحدي الأسبوع":
         update_stat("quiz_attempts")
         scores = load_json(SCORES_FILE)
         user_data = scores.get(user_id, {"answered": []})
         available = [i for i in range(len(QUESTIONS)) if i not in user_data.get("answered", [])]
         if not available:
-            await update.message.reply_text("🎉 أكملت جميع التحديات المتاحة حالياً!")
+            await update.message.reply_text("🎉 أكملت جميع تحديات الأسبوع!")
             return
         q_idx = random.choice(available)
         active_challenges[user_id] = time.time()
@@ -193,14 +188,13 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "🏆 بطل الأسبوع":
         scores = load_json(SCORES_FILE)
         if not scores:
-            await update.message.reply_text("📉 لا يوجد نقاط بعد.")
+            await update.message.reply_text("📉 لا يوجد مشاركون حتى الآن.")
             return
         sorted_scores = sorted(scores.items(), key=lambda x: x[1]['score'], reverse=True)
         top = sorted_scores[0][1]
         await update.message.reply_text(f"🥇 بطل الأسبوع الحالي: {top['name']}\n🌟 الرصيد: {top['score']} نقطة")
         return
 
-    # --- بقية الخدمات الأساسية ---
     if text == "📊 استعلام الغياب":
         await update.message.reply_text("🔎 أرسل رقمك التدريبي الآن للبحث..")
         return
@@ -253,7 +247,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except: await update.message.reply_text("⚠️ خطأ في قراءة ملف البيانات.")
         return
 
-    await update.message.reply_text("⚠️ الرجاء اختيار خدمة من القائمة 👇", reply_markup=get_main_menu())
+    await update.message.reply_text("⚠️ اختر خدمة من القائمة 👇", reply_markup=get_main_menu())
 
 # --- معالجة الصور والأعذار ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -295,7 +289,6 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_logic))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
-    print("🚀 البوت المنسق يعمل الآن..")
     app.run_polling()
 
 if __name__ == '__main__':
