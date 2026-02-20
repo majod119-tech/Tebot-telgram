@@ -28,14 +28,31 @@ GROUP_ID = "-5193577198"
 TELEGRAM_CONTACT_LINK = "https://t.me/majod119"
 DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
 
-# إعداد الذكاء الاصطناعي (Gemini)
+# --- 🌟 إعداد الذكاء الاصطناعي (بنظام الاكتشاف التلقائي) ---
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+ai_model = None
+
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    # تم تغيير اسم الموديل هنا إلى الموديل المستقر
-    ai_model = genai.GenerativeModel('gemini-pro')
-else:
-    ai_model = None
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        # البحث التلقائي عن الموديلات المدعومة لمفتاحك
+        selected_model_name = None
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                selected_model_name = m.name.replace('models/', '') # تنظيف الاسم
+                # إذا وجدنا الموديل السريع نعتمده فوراً
+                if 'flash' in selected_model_name.lower():
+                    break
+                    
+        if selected_model_name:
+            ai_model = genai.GenerativeModel(selected_model_name)
+            print(f"✅ تم تفعيل المعلم الذكي بنجاح على موديل: {selected_model_name}")
+        else:
+            # افتراضي في حال فشل البحث
+            ai_model = genai.GenerativeModel('gemini-1.5-flash')
+    except Exception as e:
+        print(f"Gemini Init Error: {e}")
+        ai_model = genai.GenerativeModel('gemini-1.5-flash')
 
 ai_sessions = {}
 
@@ -143,7 +160,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if ai_sessions.get(user_id) == True:
         if not ai_model:
-            await update.message.reply_text("⚠️ لم يتم العثور على مفتاح GEMINI_API_KEY في السيرفر.", reply_markup=get_back_menu())
+            await update.message.reply_text("⚠️ المعلم الذكي غير متصل حالياً. تأكد من إعدادات المفتاح في السيرفر.", reply_markup=get_back_menu())
             return
             
         status_msg = await update.message.reply_text("⏳ أقرأ سؤالك وأبحث عن أفضل إجابة...")
@@ -162,7 +179,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await status_msg.delete()
             print(f"Gemini API Error: {e}")
-            error_msg = f"⚠️ واجهت مشكلة فنية!\nالسبب: `{str(e)}`\n\nتأكد من صحة مفتاح API في Render."
+            error_msg = f"⚠️ واجهت مشكلة فنية!\nالسبب: `{str(e)}`\n\nسنقوم بمعالجة هذا الخلل قريباً."
             await update.message.reply_text(error_msg, parse_mode='Markdown', reply_markup=get_back_menu())
         return
 
@@ -357,7 +374,7 @@ def main():
     app.add_handler(CallbackQueryHandler(button_callback)) 
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     
-    print("🚀 البوت يعمل الآن...")
+    print("🚀 البوت يعمل الآن بنظام الاستكشاف التلقائي للموديلات...")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
