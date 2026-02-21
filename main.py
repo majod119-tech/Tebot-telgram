@@ -171,7 +171,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🏠 **تم العودة للقائمة الرئيسية.**\nاختر الخدمة التي تريدها من الأسفل 👇", reply_markup=get_main_menu())
         return
 
-    # --- 🤖 المعلم الذكي ---
+    # --- 🤖 المعلم الذكي (مع نظام الحماية من الأخطاء) ---
     if text == "🤖 المعلم الذكي (الدليل الشامل)":
         ai_sessions[user_id] = True
         guide_msg = (
@@ -198,10 +198,21 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             prompt = f"{AI_KNOWLEDGE}\nسؤال المتدرب: {text}"
             response = await ai_model.generate_content_async(prompt)
             await status_msg.delete()
-            await update.message.reply_text(f"📝 **رد المعلم الذكي:**\n{SEP}{response.text}\n\n💡 *هل لديك سؤال آخر؟ اكتبه مباشرة!*", parse_mode='Markdown', reply_markup=get_back_menu())
+            
+            reply_text = f"📝 **رد المعلم الذكي:**\n{SEP}{response.text}\n\n💡 *هل لديك سؤال آخر؟ اكتبه مباشرة!*"
+            
+            # محاولة إرسال الإجابة بتنسيق Markdown
+            try:
+                await update.message.reply_text(reply_text, parse_mode='Markdown', reply_markup=get_back_menu())
+            except Exception as format_error:
+                # إذا رفض تليجرام التنسيق (بسبب رموز معينة من الذكاء الاصطناعي)، نرسلها كنص عادي لضمان وصولها
+                await update.message.reply_text(reply_text, reply_markup=get_back_menu())
+                
         except Exception as e: 
             await status_msg.delete()
-            await update.message.reply_text(f"⚠️ **عذراً، واجهت مشكلة أثناء محاولة الإجابة.**\nالرجاء المحاولة مرة أخرى أو صياغة السؤال بشكل مختلف.", reply_markup=get_back_menu())
+            error_details = str(e)
+            # إظهار الخطأ الفعلي للإدارة لسهولة حله
+            await update.message.reply_text(f"⚠️ **عذراً، واجهت مشكلة تقنية.**\n\nتفاصيل الخطأ للإدارة:\n`{error_details}`\n\nالرجاء المحاولة لاحقاً أو صياغة السؤال بشكل مختلف.", parse_mode='Markdown', reply_markup=get_back_menu())
         return
 
     # --- 📬 صندوق المقترحات ---
@@ -381,7 +392,8 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # رسالة التنبيه في حال إدخال نص غير معروف
-    await update.message.reply_text("⚠️ **عذراً، لم أتعرف على طلبك.**\nالرجاء اختيار إحدى الخدمات من القائمة المتاحة أدناه 👇", reply_markup=get_main_menu())
+    if not ai_sessions.get(user_id) and not feedback_sessions.get(user_id):
+        await update.message.reply_text("⚠️ **عذراً، لم أتعرف على طلبك.**\nالرجاء اختيار إحدى الخدمات من القائمة المتاحة أدناه 👇", reply_markup=get_main_menu())
 
 # --- معالجة الصور (رفع الأعذار) ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
