@@ -21,29 +21,31 @@ class SimpleHandler(BaseHTTPRequestHandler):
             html = f"""
             <html><head><title>لوحة قيادة قسم الحاسب</title>
             <style>
-                body {{ font-family: 'Segoe UI'; direction: rtl; background: #f4f7f6; padding: 20px; text-align: center; }}
-                .card-container {{ display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }}
-                .card {{ background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 200px; }}
-                .card p {{ font-size: 24px; color: #27ae60; font-weight: bold; }}
-                table {{ margin: 30px auto; width: 90%; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-collapse: collapse; }}
-                th, td {{ padding: 15px; border-bottom: 1px solid #ddd; }}
-                th {{ background: #27ae60; color: white; }}
+                body {{ font-family: 'Segoe UI', Tahoma, Arial; direction: rtl; background: #f4f7f6; padding: 20px; text-align: center; }}
+                .card-container {{ display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 30px; }}
+                .card {{ background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 220px; }}
+                .card h3 {{ color: #2c3e50; font-size: 18px; }}
+                .card p {{ font-size: 28px; color: #27ae60; font-weight: bold; margin: 10px 0 0 0; }}
+                table {{ margin: 0 auto; width: 90%; max-width: 800px; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-collapse: collapse; }}
+                th, td {{ padding: 15px; border-bottom: 1px solid #ddd; text-align: center; }}
+                th {{ background: #27ae60; color: white; font-size: 18px; }}
+                tr:hover {{ background-color: #f1f1f1; }}
             </style></head><body>
-            <h1>📊 لوحة إحصائيات النظام الذكي</h1>
+            <h1 style="color:#2c3e50; border-bottom: 3px solid #27ae60; display: inline-block; padding-bottom: 10px;">📊 لوحة إحصائيات النظام الذكي</h1>
             <div class="card-container">
-                <div class="card"><h3>👥 المستخدمين</h3><p>{len(stats.get('users_list', []))}</p></div>
-                <div class="card"><h3>🤖 أسئلة الذكاء</h3><p>{stats.get('ai_questions', 0)}</p></div>
-                <div class="card"><h3>🎮 التحديات</h3><p>{stats.get('quiz_attempts', 0)}</p></div>
+                <div class="card"><h3>👥 إجمالي المستخدمين</h3><p>{len(stats.get('users_list', []))}</p></div>
+                <div class="card"><h3>🤖 أسئلة المعلم الذكي</h3><p>{stats.get('ai_questions', 0)}</p></div>
+                <div class="card"><h3>🎮 محاولات التحدي</h3><p>{stats.get('quiz_attempts', 0)}</p></div>
             </div>
-            <h2>🏆 قائمة المتصدرين</h2>
-            <table><tr><th>الاسم</th><th>النقاط</th><th>التحديات</th></tr>
-            {"".join([f"<tr><td>{v['name']}</td><td>{v['score']}</td><td>{len(v.get('answered', []))}</td></tr>" for k,v in sorted(scores.items(), key=lambda x: x[1]['score'], reverse=True)])}
+            <h2 style="color:#2c3e50;">🏆 قائمة المتصدرين (لوحة الشرف)</h2>
+            <table><tr><th>الاسم</th><th>إجمالي النقاط</th><th>التحديات المنجزة</th></tr>
+            {"".join([f"<tr><td>{v['name']}</td><td style='color:#27ae60; font-weight:bold;'>{v['score']}</td><td>{len(v.get('answered', []))}</td></tr>" for k,v in sorted(scores.items(), key=lambda x: x[1]['score'], reverse=True)])}
             </table></body></html>"""
             self.wfile.write(html.encode("utf-8"))
         else:
             self.send_response(200)
             self.end_headers()
-            self.wfile.write(b"Bot Server Online")
+            self.wfile.write(b"Bot Server Online. Access /stats for dashboard.")
 
 def run_web_server():
     port = int(os.environ.get("PORT", 10000))
@@ -58,12 +60,14 @@ ADMIN_ID = "10073498"
 TELEGRAM_CONTACT_LINK = "https://t.me/majod119"
 SEP = "\n━━━━━━━━━━━━━━\n"
 
-# تغذية عقل الذكاء الاصطناعي
-AI_KNOWLEDGE = f"""أنت المساعد الذكي لقسم الحاسب. معلوماتك:
-- الحقائب التدريبية: {DRIVE_LINK}
-- الغياب: تنبيه عند 15% وحرمان عند 20%.
-- إذا سألك الطالب عن درجاته أو غيابه، اطلب منه كتابة الرقم التدريبي في القائمة الرئيسية.
-- أنت تشرح مواد الشبكات والبرمجة والصيانة بأسلوب سعودي تقني مهذب."""
+# إعدادات المعلم الذكي
+AI_KNOWLEDGE = f"""
+أنت المساعد الذكي لقسم الحاسب الآلي في المعهد الصناعي الثانوي.
+- رابط الحقائب التدريبية الرسمي هو: {DRIVE_LINK}
+- نظام الغياب: إنذار عند 15%، وحرمان عند 20%.
+- إذا سأل المتدرب عن غيابه، اطلب منه إدخال رقمه التدريبي في القائمة الرئيسية للبوت ليقوم النظام بالبحث التلقائي.
+- اشرح المفاهيم التقنية بأسلوب عملي، مبسط، وداعم للمتدربين.
+"""
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 ai_model = None
@@ -71,7 +75,9 @@ if GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         ai_model = genai.GenerativeModel('gemini-1.5-flash')
-    except: ai_model = None
+    except Exception as e: 
+        print(f"Error initializing Gemini: {e}")
+        ai_model = None
 
 SCORES_FILE = "scores.json"
 STATS_FILE = "stats.json"
@@ -79,25 +85,28 @@ STATS_FILE = "stats.json"
 def load_json(f): return json.load(open(f, "r")) if os.path.exists(f) else {}
 def save_json(f, d): json.dump(d, open(f, "w"))
 def update_stat(cat):
-    s = load_json(STATS_FILE); s[cat] = s.get(cat, 0) + 1; save_json(STATS_FILE, s)
+    s = load_json(STATS_FILE)
+    s[cat] = s.get(cat, 0) + 1
+    save_json(STATS_FILE, s)
 
 ai_sessions = {}
 feedback_sessions = {}
 active_challenges = {}
 
 TECH_TIPS = [
-    "💡 استخدم اختصار Win + L لقفل جهازك فوراً.",
-    "🛡️ لا تستخدم نفس كلمة المرور لأكثر من حساب.",
-    "🚀 في بايثون، المسافات البادئة (Indentation) أساسية لعمل الكود.",
-    "🌐 عنوان 127.0.0.1 يشير دائماً لجهازك المحلي."
+    "💡 **نصيحة أمنية:** استخدم اختصار `Win + L` لقفل شاشة جهازك فوراً عند الابتعاد عنه لحماية بياناتك.",
+    "🛡️ **نصيحة تقنية:** احرص دائماً على تحديث نظام التشغيل لديك لسد الثغرات الأمنية المكتشفة حديثاً.",
+    "🚀 **نصيحة برمجية:** في لغة بايثون، التنسيق والمسافات البادئة (Indentation) هي أساس عمل الكود وليست للجماليات فقط.",
+    "🌐 **نصيحة شبكات:** عنوان `127.0.0.1` يُعرف بـ Localhost ويستخدم لاختبار كرت الشبكة في جهازك دون الحاجة لإنترنت."
 ]
 
 QUESTIONS = [
-    {"q": "ما هو عنوان الـ IP الذي يُعرف بـ (Localhost)؟", "options": ["192.168.1.1", "127.0.0.1", "8.8.8.8", "255.255.255.0"], "answer": 1},
-    {"q": "أي من المكونات يعتبر 'العقل المدبر' للحاسب؟", "options": ["HDD", "RAM", "CPU", "Motherboard"], "answer": 2}
+    {"q": "ما هو عنوان الـ IP الذي يُعرف بـ (Localhost) ويستخدم لاختبار كرت الشبكة؟", "options": ["192.168.1.1", "127.0.0.1", "8.8.8.8", "255.255.255.0"], "answer": 1},
+    {"q": "أي من المكونات التالية يعتبر 'العقل المدبر' للحاسب الآلي؟", "options": ["القرص الصلب (HDD)", "الذاكرة العشوائية (RAM)", "المعالج (CPU)", "اللوحة الأم"], "answer": 2},
+    {"q": "في نظام لينكس، ما هو الأمر المستخدم لعرض قائمة الملفات في المجلد الحالي؟", "options": ["cd", "ls", "pwd", "mkdir"], "answer": 1}
 ]
 
-# --- 3. تصميم القوائم (الواجهة المكتملة) ---
+# --- 3. تصميم القوائم ---
 def get_main_menu():
     return ReplyKeyboardMarkup([
         ["🤖 المعلم الذكي (الدليل الشامل)"], 
@@ -125,150 +134,308 @@ def get_games_menu():
         ["🔙 الرجوع للقائمة الرئيسية"]
     ], resize_keyboard=True)
 
-def get_back_menu(): return ReplyKeyboardMarkup([["🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
+def get_back_menu(): 
+    return ReplyKeyboardMarkup([["🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
 
-# --- 4. المنطق البرمجي الشامل ---
+# --- 4. المنطق البرمجي والمحتوى المفصل ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
-    stats = load_json(STATS_FILE); users = stats.get("users_list", [])
-    if user_id not in users: users.append(user_id); stats["users_list"] = users; save_json(STATS_FILE, stats)
+    stats = load_json(STATS_FILE)
+    users = stats.get("users_list", [])
+    if user_id not in users: 
+        users.append(user_id)
+        stats["users_list"] = users
+        save_json(STATS_FILE, stats)
+    
     ai_sessions[user_id] = False
     feedback_sessions[user_id] = False
-    await update.message.reply_text(f"أهلاً بك {update.effective_user.first_name} في نظام قسم الحاسب الذكي 💻{SEP}اختر من القائمة أدناه للبدء 👇", reply_markup=get_main_menu())
+    
+    welcome_msg = (
+        f"أهلاً بك يا {update.effective_user.first_name} في بوت قسم الحاسب وتقنية المعلومات 💻✨{SEP}"
+        f"أنا مساعدك الرقمي، تم تصميمي لتسهيل رحلتك التدريبية.\n"
+        f"يمكنك من خلالي استعراض الخطط، تحميل الحقائب، متابعة غيابك، وحتى سؤالي عن أي استفسار تقني!\n\n"
+        f"👇 **الرجاء اختيار الخدمة المطلوبة من القائمة السفلية:**"
+    )
+    await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
 
 async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = str(update.effective_user.id)
 
-    # الرجوع
+    # إلغاء أي جلسة نشطة عند اختيار زر من القائمة
+    if text in ["🔙 الرجوع للقائمة الرئيسية", "📚 الحقائب التدريبية", "📄 الخطط التدريبية", "📊 استعلام الغياب", "📝 رفع الغياب والأعذار", "🔗 منصة تقني ورايات", "📅 التقويم التدريبي", "📰 أخبار القسم والمعهد", "📍 موقع القسم", "👨‍🏫 تواصل مع رئيس القسم", "🕹️ قسم الألعاب والإضافات"]:
+        ai_sessions[user_id] = False
+        feedback_sessions[user_id] = False
+
     if text == "🔙 الرجوع للقائمة الرئيسية":
-        ai_sessions[user_id] = False; feedback_sessions[user_id] = False
-        await update.message.reply_text("🏠 عدنا للقائمة الرئيسية:", reply_markup=get_main_menu())
+        await update.message.reply_text("🏠 **تم العودة للقائمة الرئيسية.**\nاختر الخدمة التي تريدها من الأسفل 👇", reply_markup=get_main_menu())
         return
 
-    # 🤖 المعلم الذكي
+    # --- 🤖 المعلم الذكي ---
     if text == "🤖 المعلم الذكي (الدليل الشامل)":
         ai_sessions[user_id] = True
-        await update.message.reply_text(f"🤖 **مرحباً بك في الدليل الذكي**{SEP}اسألني عن (المواد، الحقائب، الأنظمة) أو أي موضوع تقني وسأجيبك فوراً 👇", reply_markup=get_back_menu(), parse_mode='Markdown')
+        guide_msg = (
+            f"🤖 **المعلم الذكي في خدمتك!**{SEP}"
+            f"أنا مدعوم بتقنيات الذكاء الاصطناعي لمساعدتك في فهم تخصصك.\n\n"
+            f"💡 **ماذا يمكنني أن أفعل لك؟**\n"
+            f"🔹 شرح مبسط لأي مصطلح تقني أو برمجي يصعب عليك فهمه.\n"
+            f"🔹 إرشادك للخطط التدريبية وتزويدك بروابط الحقائب.\n"
+            f"🔹 تقديم نصائح حول كيفية المذاكرة واجتياز الاختبارات.\n\n"
+            f"💬 **اكتب سؤالك التقني الآن في رسالة وسأقوم بالرد عليك فوراً...**\n"
+            f"*(للخروج من هذه المحادثة، اضغط على زر الرجوع)*"
+        )
+        await update.message.reply_text(guide_msg, reply_markup=get_back_menu(), parse_mode='Markdown')
         return
 
     if ai_sessions.get(user_id) == True:
+        if not ai_model:
+            await update.message.reply_text("⚠️ المعلم الذكي غير متصل حالياً بسبب مشكلة في إعدادات السيرفر. يرجى مراجعة الإدارة.", reply_markup=get_back_menu())
+            return
+            
         update_stat("ai_questions")
-        status_msg = await update.message.reply_text("⏳ جاري التفكير...")
+        status_msg = await update.message.reply_text("⏳ أقرأ سؤالك وأقوم بتجهيز الإجابة الأفضل لك...")
         try:
-            resp = ai_model.generate_content(f"{AI_KNOWLEDGE}\nالمتدرب: {text}")
+            prompt = f"{AI_KNOWLEDGE}\nسؤال المتدرب: {text}"
+            response = await ai_model.generate_content_async(prompt)
             await status_msg.delete()
-            await update.message.reply_text(f"📝 **رد المعلم الذكي:**\n{SEP}{resp.text}", parse_mode='Markdown')
-        except: await status_msg.delete(); await update.message.reply_text("⚠️ المعلم مشغول حالياً.")
+            await update.message.reply_text(f"📝 **رد المعلم الذكي:**\n{SEP}{response.text}\n\n💡 *هل لديك سؤال آخر؟ اكتبه مباشرة!*", parse_mode='Markdown', reply_markup=get_back_menu())
+        except Exception as e: 
+            await status_msg.delete()
+            await update.message.reply_text(f"⚠️ **عذراً، واجهت مشكلة أثناء محاولة الإجابة.**\nالرجاء المحاولة مرة أخرى أو صياغة السؤال بشكل مختلف.", reply_markup=get_back_menu())
         return
 
-    # 📬 صندوق المقترحات
+    # --- 📬 صندوق المقترحات ---
     if text == "📬 صندوق المقترحات":
         feedback_sessions[user_id] = True
-        await update.message.reply_text(f"📬 **صندوق المقترحات**{SEP}اكتب مقترحك الآن ليصل للإدارة مباشرة 👇", reply_markup=get_back_menu())
+        msg = (
+            f"📬 **صندوق المقترحات والشكاوى**{SEP}"
+            f"رأيك يهمنا جداً في تطوير القسم وخدماته.\n"
+            f"سواء كان لديك فكرة جديدة، أو ملاحظة، أو مشكلة واجهتك، اكتبها هنا وسوف تصل مباشرة وبسرية لإدارة القسم.\n\n"
+            f"✍️ **اكتب رسالتك الآن في الأسفل...**"
+        )
+        await update.message.reply_text(msg, reply_markup=get_back_menu(), parse_mode='Markdown')
         return
 
     if feedback_sessions.get(user_id) == True:
-        await context.bot.send_message(chat_id=GROUP_ID, text=f"💡 مقترح من {update.effective_user.first_name}:\n{text}")
-        feedback_sessions[user_id] = False
-        await update.message.reply_text("✅ تم إرسال مقترحك، شكراً لك!", reply_markup=get_games_menu())
+        try:
+            await context.bot.send_message(chat_id=GROUP_ID, text=f"💡 **رسالة من صندوق المقترحات:**\nالمرسل: {update.effective_user.first_name}\nالرسالة: {text}")
+            feedback_sessions[user_id] = False
+            await update.message.reply_text("✅ **تم استلام رسالتك بنجاح.** شكراً لتواصلك ومساهمتك في التطوير!", reply_markup=get_games_menu(), parse_mode='Markdown')
+        except:
+            await update.message.reply_text("⚠️ عذراً، فشل إرسال الرسالة إلى الإدارة. تأكد من إعدادات البوت.", reply_markup=get_games_menu())
         return
 
-    # 📄 الخطط التدريبية (المحتوى الكامل)
+    # --- 📄 الخطط التدريبية (تم ترتيبها بشكل عمودي مفصل) ---
     term_plans = {
-        "1️⃣ الفصل الأول": "📚 الفصل 1: أساسيات الحاسب، ثقافة إسلامية 1، رياضيات 1، إنجليزية 1.",
-        "2️⃣ الفصل الثاني": "📚 الفصل 2: تطبيقات الحاسب، سلوك مهني، رياضيات 2، إنجليزية 2.",
-        "3️⃣ الفصل الثالث": "📚 الفصل 3: أساسيات الكهرباء، أجهزة وقياس، رياضيات 3، تطبيقات مفتوحة.",
-        "4️⃣ الفصل الرابع": "📚 الفصل 4: شبكات، مكونات حاسب 1، لغة برمجة 1، تقنيات الإنترنت.",
-        "5️⃣ الفصل الخامس": "📚 الفصل 5: شبكات متقدمة، صيانة أجهزة، لغة برمجة 2، تمديد نحاس.",
-        "6️⃣ الفصل السادس": "📚 الفصل 6: ألياف ضوئية، قواعد بيانات، صيانة حاسب، تشغيل شبكات.",
-        "🖥️ برامج فصلية": "📚 دورة إدخال البيانات ومعالجة النصوص."
+        "1️⃣ الفصل الأول": "📚 **مقررات الفصل التدريبي الأول:**\n🔹 ثقافة إسلامية 1\n🔹 لغة إنجليزية 1\n🔹 رياضيات 1\n🔹 فيزياء\n🔹 التربية البدنية 1\n🔹 لغة عربية 1\n🔹 أساسيات الحاسب الآلي\n🔹 مدخل إلى مهارات القرن 21\n🔹 السلامة والصحة المهنية",
+        "2️⃣ الفصل الثاني": "📚 **مقررات الفصل التدريبي الثاني:**\n🔹 سلوك مهني\n🔹 لغة عربية 2\n🔹 لغة إنجليزية 2\n🔹 رياضيات 2\n🔹 التربية البدنية 2\n🔹 ثقافة إسلامية 2\n🔹 ورش تأسيسية\n🔹 تطبيقات الحاسب الآلي\n🔹 مهارات التواصل والتعاون\n🔹 التفكير الناقد والإبداعي",
+        "3️⃣ الفصل الثالث": "📚 **مقررات الفصل التدريبي الثالث:**\n🔹 ثقافة إسلامية 3\n🔹 الرسم الهندسي\n🔹 بحث ومصادر المعلومات\n🔹 رياضيات 3\n🔹 لغة إنجليزية 3\n🔹 أجهزة وقياس\n🔹 أساسيات الكهرباء\n🔹 أساسيات الإلكترونيات\n🔹 تطبيقات مفتوحة المصدر",
+        "4️⃣ الفصل الرابع": "📚 **مقررات الفصل التدريبي الرابع:**\n🔹 مقدمة في ريادة الأعمال\n🔹 تقنيات الانترنت\n🔹 مكونات الحاسب 1\n🔹 لغة برمجة 1\n🔹 أساسيات الشبكات\n🔹 رسم الشبكات بالحاسب\n🔹 أساسيات نظام لينكس\n🔹 أنشطة مهنية",
+        "5️⃣ الفصل الخامس": "📚 **مقررات الفصل التدريبي الخامس:**\n🔹 مكونات الحاسب 2\n🔹 صيانة الأجهزة الكفية\n🔹 لغة برمجة 2\n🔹 تمديد الكيابل النحاسية\n🔹 شبكات الحاسب\n🔹 نظام تشغيل الشبكة 1\n🔹 مشاريع إنتاجية\n🔹 أنشطة مهنية 2",
+        "6️⃣ الفصل السادس": "📚 **مقررات الفصل التدريبي السادس:**\n🔹 مبادئ قواعد البيانات\n🔹 طرفيات الحاسب\n🔹 مهارات صيانة الحاسب\n🔹 تمديد كيابل الألياف الضوئية\n🔹 نظام تشغيل الشبكة 2\n🔹 تدريب إنتاجي\n🔹 أنشطة مهنية 3",
+        "🖥️ برامج فصلية": "📚 **البرامج القصيرة المساندة:**\n🔹 برنامج إدخال البيانات ومعالجة النصوص"
     }
+
     if text in term_plans:
-        await update.message.reply_text(f"{term_plans[text]}{SEP}🔗 الحقائب: {DRIVE_LINK}", parse_mode='Markdown')
+        reply_msg = f"{term_plans[text]}{SEP}🔗 **لتحميل ملفات الحقائب التدريبية الخاصة بهذه المواد، اضغط على الرابط التالي:**\n{DRIVE_LINK}"
+        await update.message.reply_text(reply_msg, parse_mode='Markdown', disable_web_page_preview=True)
         return
 
     if text == "📄 الخطط التدريبية":
-        await update.message.reply_text("📄 اختر الفصل:", reply_markup=get_plans_menu()); return
+        msg = (
+            f"📄 **الخطط التدريبية الشاملة**{SEP}"
+            f"هنا يمكنك استعراض جميع المقررات الدراسية المطلوبة لاجتياز الدبلوم.\n"
+            f"👇 **الرجاء اختيار الفصل التدريبي الذي تبحث عنه من القائمة أدناه:**"
+        )
+        await update.message.reply_text(msg, reply_markup=get_plans_menu(), parse_mode='Markdown')
+        return
 
-    # 🕹️ قسم الألعاب
+    # --- 🕹️ قسم الألعاب والإضافات ---
     if text == "🕹️ قسم الألعاب والإضافات":
-        await update.message.reply_text(f"🕹️ **ساحة التفاعل**{SEP}اختر من الأسفل 👇", reply_markup=get_games_menu(), parse_mode='Markdown'); return
+        msg = (
+            f"🕹️ **ساحة الأنشطة والتفاعل**{SEP}"
+            f"هذا القسم مخصص للترفيه والفائدة!\n"
+            f"يمكنك هنا اختبار معلوماتك في (تحدي الأسبوع)، معرفة المتصدرين في (بطل الأسبوع)، أخذ (نصيحة تقنية)، أو مراسلتنا عبر (صندوق المقترحات).\n\n"
+            f"👇 **اختر النشاط الذي تفضله:**"
+        )
+        await update.message.reply_text(msg, reply_markup=get_games_menu(), parse_mode='Markdown')
+        return
 
     if text == "💡 نصيحة تقنية":
-        await update.message.reply_text(f"💡 **نصيحة اليوم:**\n{SEP}{random.choice(TECH_TIPS)}", parse_mode='Markdown'); return
+        await update.message.reply_text(random.choice(TECH_TIPS), parse_mode='Markdown')
+        return
 
     if text == "🎮 تحدي الأسبوع":
         update_stat("quiz_attempts")
         q = random.choice(QUESTIONS)
         active_challenges[user_id] = time.time()
         kb = [[InlineKeyboardButton(o, callback_data=f"ans_{QUESTIONS.index(q)}_{i}")] for i, o in enumerate(q['options'])]
-        await update.message.reply_text(f"❓ {q['q']}", reply_markup=InlineKeyboardMarkup(kb)); return
+        await update.message.reply_text(f"❓ **تحدي الأسبوع:**\n\n{q['q']}\n\n⚠️ أمامك 15 ثانية فقط للإجابة، اختر من الخيارات أدناه:", reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
+        return
 
     if text == "🏆 بطل الأسبوع":
         sc = load_json(SCORES_FILE)
-        if not sc: await update.message.reply_text("📉 لا يوجد نقاط."); return
+        if not sc: 
+            await update.message.reply_text("📉 لم يتم تسجيل أي نقاط لأي متدرب حتى الآن. كن أنت المبادر الأول!", parse_mode='Markdown')
+            return
         top = sorted(sc.items(), key=lambda x: x[1]['score'], reverse=True)[0][1]
-        await update.message.reply_text(f"🥇 البطل: {top['name']}\n🌟 النقاط: {top['score']}"); return
+        msg = (
+            f"🏆 **لوحة شرف قسم الحاسب**{SEP}"
+            f"🥇 **المتصدر لهذا الأسبوع:** {top['name']}\n"
+            f"🌟 **الرصيد:** {top['score']} نقطة\n\n"
+            f"تهانينا للبطل! شارك في (تحدي الأسبوع) لتخطف المركز الأول. 💪"
+        )
+        await update.message.reply_text(msg, parse_mode='Markdown')
+        return
 
-    # 📊 استعلام الغياب (Excel)
+    # --- 📊 استعلام الغياب بالرقم ---
     if text == "📊 استعلام الغياب":
-        await update.message.reply_text(f"🔎 **استعلام الغياب**{SEP}أرسل رقمك التدريبي الآن للبحث.."); return
+        msg = (
+            f"🔎 **نظام استعلام الغياب الذكي**{SEP}"
+            f"هذا النظام يتيح لك معرفة نسبة غيابك الحالية في جميع المواد التدريبية.\n\n"
+            f"⚠️ **تنبيه:** يتم توجيه إنذار للمتدرب عند بلوغ غيابه 15%، ويُحرم من المادة عند بلوغ 20%.\n\n"
+            f"👇 **الرجاء إرسال (رقمك التدريبي) المكون من أرقام فقط الآن للبحث في السجلات...**"
+        )
+        await update.message.reply_text(msg, parse_mode='Markdown')
+        return
 
     if text.isdigit():
+        status_msg = await update.message.reply_text("⏳ جاري البحث في سجلات القسم...")
         try:
             df = pd.read_excel('data.xlsx')
             df.columns = df.columns.astype(str).str.strip()
             res = df[df['stu_num'].astype(str).str.strip() == text]
+            await status_msg.delete()
+            
             if not res.empty:
-                m = f"✅ **النتائج لـ:** `{res.iloc[0]['stu_nam']}`{SEP}"
-                for _, r in res.iterrows(): m += f"📖 {r['c_nam']}: %{r['parsnt']}\n"
+                m = f"✅ **تم العثور على السجل التدريبي لـ:** `{res.iloc[0]['stu_nam']}`{SEP}"
+                for _, r in res.iterrows(): 
+                    val = float(r['parsnt'])
+                    icon = "🔴 حرمان" if val >= 20 else ("⚠️ إنذار" if val >= 15 else "🟢 منتظم")
+                    m += f"📖 {r['c_nam']}: %{val} {icon}\n"
                 await update.message.reply_text(m, parse_mode='Markdown')
-            else: await update.message.reply_text("❌ الرقم غير مسجل.")
-        except: await update.message.reply_text("⚠️ ملف الغياب غير متوفر.")
+            else: 
+                await update.message.reply_text("❌ **عذراً، الرقم التدريبي الذي أدخلته غير مسجل لدينا.**\nيرجى التأكد من كتابة الرقم بشكل صحيح باللغة الإنجليزية.", parse_mode='Markdown')
+        except Exception as e:
+            if 'status_msg' in locals(): await status_msg.delete()
+            await update.message.reply_text("⚠️ **حدث خطأ فني:** ملف الغياب (data.xlsx) غير متوفر في السيرفر حالياً. يرجى مراجعة إدارة القسم.", parse_mode='Markdown')
         return
 
-    # خدمات أخرى
-    if text == "📝 رفع الغياب والأعذار": await update.message.reply_text(f"📝 **رفع العذر**{SEP}أرسل صورة العذر واكتب رقمك في الوصف."); return
-    if text == "📚 الحقائب التدريبية": await update.message.reply_text(f"📚 الحقائب: {DRIVE_LINK}"); return
-    if text == "🔗 منصة تقني ورايات": await update.message.reply_text("🌐 تقني: https://tvtclms.edu.sa\nرايات: https://rayat.tvtc.gov.sa"); return
-    if text == "📍 موقع القسم": await update.message.reply_text("📍 الموقع:\nhttp://googleusercontent.com/maps.google.com/3"); return
-    if text == "📰 أخبار القسم والمعهد": await update.message.reply_text("📰 الأسبوع القادم اختبارات الفترة الأولى."); return
+    # --- الخدمات الأكاديمية والرسمية ---
+    if text == "📝 رفع الغياب والأعذار": 
+        msg = (
+            f"📝 **بوابة رفع الأعذار**{SEP}"
+            f"لضمان قبول عذرك (الطبي أو الرسمي) وعدم احتسابه في نسبة الحرمان، اتبع الخطوات التالية بدقة:\n\n"
+            f"1️⃣ التقط صورة واضحة لورقة العذر.\n"
+            f"2️⃣ اكتب (رقمك التدريبي + اسمك) في خانة الوصف (Caption) للصورة.\n"
+            f"3️⃣ أرسل الصورة هنا في المحادثة وسنقوم بتسليمها للإدارة فوراً."
+        )
+        await update.message.reply_text(msg, parse_mode='Markdown')
+        return
+        
+    if text == "📚 الحقائب التدريبية": 
+        msg = (
+            f"📚 **المستودع الرقمي للحقائب التدريبية**{SEP}"
+            f"جميع الكتب والمقررات التدريبية الخاصة بالمؤسسة العامة للتدريب التقني والمهني متوفرة بصيغة PDF.\n\n"
+            f"🔗 **للدخول والتحميل اضغط على الرابط التالي:**\n{DRIVE_LINK}"
+        )
+        await update.message.reply_text(msg, parse_mode='Markdown', disable_web_page_preview=True)
+        return
+        
+    if text == "🔗 منصة تقني ورايات": 
+        msg = (
+            f"🌐 **روابط المنصات الإلكترونية الهامة**{SEP}"
+            f"🔹 **منصة التدريب الإلكتروني (تقني):** للمحاضرات عن بعد والواجبات.\nhttps://tvtclms.edu.sa\n\n"
+            f"🔹 **بوابة المتدربين (رايات):** للجداول والدرجات الرسمية.\nhttps://rayat.tvtc.gov.sa"
+        )
+        await update.message.reply_text(msg, parse_mode='Markdown', disable_web_page_preview=True)
+        return
+        
+    if text == "📍 موقع القسم": 
+        await update.message.reply_text(f"📍 **الموقع الجغرافي لقسم الحاسب الآلي:**{SEP}http://googleusercontent.com/maps.google.com/3", parse_mode='Markdown')
+        return
+        
+    if text == "📰 أخبار القسم والمعهد": 
+        msg = (
+            f"📰 **لوحة الإعلانات والأخبار**{SEP}"
+            f"🔸 **إعلان هام:** الأسبوع القادم هو موعد انطلاق اختبارات الفترة الأولى، نرجو من الجميع الاستعداد.\n\n"
+            f"🔗 **للمزيد من التغطيات والأخبار، تابع حساب المعهد الرسمي على X (تويتر سابقاً):**\nhttps://x.com/tvtc_m_buraidah"
+        )
+        await update.message.reply_text(msg, parse_mode='Markdown', disable_web_page_preview=True)
+        return
+        
     if text == "📅 التقويم التدريبي":
-        if os.path.exists('calendar.jpg'): await update.message.reply_photo(photo=open('calendar.jpg', 'rb'))
-        else: await update.message.reply_text("⚠️ ملف التقويم مفقود."); return
+        if os.path.exists('calendar.jpg'): 
+            await update.message.reply_photo(photo=open('calendar.jpg', 'rb'), caption="📅 التقويم التدريبي المعتمد للفصل الحالي.")
+        else: 
+            await update.message.reply_text("⚠️ **عذراً:** ملف صورة التقويم التدريبي غير متوفر في النظام حالياً.", parse_mode='Markdown')
+        return
+        
     if text == "👨‍🏫 تواصل مع رئيس القسم": 
         update_stat("contact_clicks")
-        await update.message.reply_text(f"👨‍🏫 تواصل مباشر: {TELEGRAM_CONTACT_LINK}"); return
+        msg = (
+            f"👨‍🏫 **التواصل مع الإدارة**{SEP}"
+            f"رئيس قسم الحاسب يرحب باستفساراتكم.\nللتواصل المباشر مع م. ماجد، اضغط على الرابط التالي:\n\n🔗 {TELEGRAM_CONTACT_LINK}"
+        )
+        await update.message.reply_text(msg, parse_mode='Markdown')
+        return
 
-    await update.message.reply_text("⚠️ اختر من القائمة 👇", reply_markup=get_main_menu())
+    # رسالة التنبيه في حال إدخال نص غير معروف
+    await update.message.reply_text("⚠️ **عذراً، لم أتعرف على طلبك.**\nالرجاء اختيار إحدى الخدمات من القائمة المتاحة أدناه 👇", reply_markup=get_main_menu())
 
+# --- معالجة الصور (رفع الأعذار) ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message.caption: await update.message.reply_text("⚠️ اكتب رقمك التدريبي في الوصف."); return
+    if not update.message.caption: 
+        await update.message.reply_text("⚠️ **خطأ في الرفع:**\nالرجاء إرفاق الصورة مرة أخرى، والتأكد من كتابة **رقمك التدريبي** في خانة الوصف (Caption) للصورة ليتم قبول عذرك.", parse_mode='Markdown')
+        return
     try:
-        await context.bot.send_message(chat_id=GROUP_ID, text=f"📥 عذر من {update.effective_user.first_name}:\n{update.message.caption}")
+        await context.bot.send_message(chat_id=GROUP_ID, text=f"📥 **عذر طبي/رسمي جديد:**\nالمرسل: {update.effective_user.first_name}\nالبيانات: {update.message.caption}")
         await update.message.copy(chat_id=GROUP_ID)
-        await update.message.reply_text("✅ تم استلام عذرك بنجاح.");
-    except: await update.message.reply_text("⚠️ خطأ في الإرسال.")
+        await update.message.reply_text("✅ **تم استلام عذرك بنجاح.**\nسيتم مراجعته من قبل مشرفي القسم قريباً. شكراً لك!", parse_mode='Markdown')
+    except Exception as e: 
+        await update.message.reply_text("⚠️ **خطأ فني:** تعذر إرسال العذر لمجموعة الأرشيف. الرجاء التأكد من إضافة البوت كمشرف في المجموعة.", parse_mode='Markdown')
 
+# --- معالجة أزرار التحدي ---
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query; user_id = str(query.from_user.id); await query.answer()
+    query = update.callback_query
+    user_id = str(query.from_user.id)
+    await query.answer()
+    
     if query.data.startswith("ans_"):
-        parts = query.data.split("_"); q_idx, sel = int(parts[1]), int(parts[2])
-        sc = load_json(SCORES_FILE); ui = sc.get(user_id, {"name": query.from_user.first_name, "score": 0, "answered": []})
-        if sel == QUESTIONS[q_idx]["answer"]: ui["score"] += 10; m = "🎉 صح! +10"
-        else: m = "❌ خطأ"
-        ui["answered"].append(q_idx); sc[user_id] = ui; save_json(SCORES_FILE, sc)
-        await query.edit_message_text(f"{QUESTIONS[q_idx]['q']}{SEP}{m}")
+        start_time = active_challenges.get(user_id, 0)
+        time_taken = time.time() - start_time
+        parts = query.data.split("_")
+        q_idx, sel = int(parts[1]), int(parts[2])
+        
+        sc = load_json(SCORES_FILE)
+        ui = sc.get(user_id, {"name": query.from_user.first_name, "score": 0, "answered": []})
+        
+        if time_taken > 15: 
+            m = "⏳ **انتهى الوقت!** لقد استغرقت أكثر من 15 ثانية."
+        elif sel == QUESTIONS[q_idx]["answer"]: 
+            ui["score"] += 10
+            m = "🎉 **إجابة صحيحة!** كسبت 10 نقاط."
+        else: 
+            correct_answer_text = QUESTIONS[q_idx]['options'][QUESTIONS[q_idx]['answer']]
+            m = f"❌ **إجابة خاطئة!**\nالإجابة الصحيحة هي: {correct_answer_text}"
+            
+        ui["answered"].append(q_idx)
+        sc[user_id] = ui
+        save_json(SCORES_FILE, sc)
+        
+        await query.edit_message_text(f"❓ **تحدي الأسبوع:**\n{QUESTIONS[q_idx]['q']}{SEP}{m}", parse_mode='Markdown')
 
 def main():
     Thread(target=run_web_server, daemon=True).start()
     app = Application.builder().token(TOKEN).build()
+    
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_logic))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
-    print("🚀 تم تشغيل النسخة الكاملة والمصلحة...")
+    
+    print("🚀 تم تشغيل النسخة الشاملة والمفصلة بنجاح...")
     app.run_polling()
 
-if __name__ == '__main__': main()
+if __name__ == '__main__': 
+    main()
