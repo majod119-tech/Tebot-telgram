@@ -69,12 +69,27 @@ AI_KNOWLEDGE = f"""
 - اشرح المفاهيم التقنية بأسلوب عملي، مبسط، وداعم للمتدربين.
 """
 
+# نظام الاستكشاف التلقائي لموديل الذكاء الاصطناعي (الحل الجذري لخطأ 404)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 ai_model = None
 if GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        ai_model = genai.GenerativeModel('gemini-1.5-flash')
+        selected_model_name = None
+        # البحث عن الموديلات المتاحة للمفتاح
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                model_name = m.name.replace('models/', '')
+                selected_model_name = model_name
+                # نفضل موديل flash لسرعته إن وجد
+                if 'flash' in model_name.lower():
+                    break
+        
+        if selected_model_name:
+            ai_model = genai.GenerativeModel(selected_model_name)
+            print(f"✅ AI Model loaded successfully: {selected_model_name}")
+        else:
+            print("⚠️ No suitable generation model found.")
     except Exception as e: 
         print(f"Error initializing Gemini: {e}")
         ai_model = None
@@ -171,7 +186,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🏠 **تم العودة للقائمة الرئيسية.**\nاختر الخدمة التي تريدها من الأسفل 👇", reply_markup=get_main_menu())
         return
 
-    # --- 🤖 المعلم الذكي (مع نظام الحماية من الأخطاء) ---
+    # --- 🤖 المعلم الذكي ---
     if text == "🤖 المعلم الذكي (الدليل الشامل)":
         ai_sessions[user_id] = True
         guide_msg = (
@@ -189,7 +204,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if ai_sessions.get(user_id) == True:
         if not ai_model:
-            await update.message.reply_text("⚠️ المعلم الذكي غير متصل حالياً بسبب مشكلة في إعدادات السيرفر. يرجى مراجعة الإدارة.", reply_markup=get_back_menu())
+            await update.message.reply_text("⚠️ المعلم الذكي غير متصل حالياً بسبب مشكلة في مفتاح التشغيل. يرجى مراجعة الإدارة.", reply_markup=get_back_menu())
             return
             
         update_stat("ai_questions")
@@ -201,17 +216,15 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             reply_text = f"📝 **رد المعلم الذكي:**\n{SEP}{response.text}\n\n💡 *هل لديك سؤال آخر؟ اكتبه مباشرة!*"
             
-            # محاولة إرسال الإجابة بتنسيق Markdown
+            # محاولة الإرسال بتنسيق، وإن فشل يرسل كنص عادي
             try:
                 await update.message.reply_text(reply_text, parse_mode='Markdown', reply_markup=get_back_menu())
             except Exception as format_error:
-                # إذا رفض تليجرام التنسيق (بسبب رموز معينة من الذكاء الاصطناعي)، نرسلها كنص عادي لضمان وصولها
                 await update.message.reply_text(reply_text, reply_markup=get_back_menu())
                 
         except Exception as e: 
             await status_msg.delete()
             error_details = str(e)
-            # إظهار الخطأ الفعلي للإدارة لسهولة حله
             await update.message.reply_text(f"⚠️ **عذراً، واجهت مشكلة تقنية.**\n\nتفاصيل الخطأ للإدارة:\n`{error_details}`\n\nالرجاء المحاولة لاحقاً أو صياغة السؤال بشكل مختلف.", parse_mode='Markdown', reply_markup=get_back_menu())
         return
 
@@ -236,7 +249,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ عذراً، فشل إرسال الرسالة إلى الإدارة. تأكد من إعدادات البوت.", reply_markup=get_games_menu())
         return
 
-    # --- 📄 الخطط التدريبية (تم ترتيبها بشكل عمودي مفصل) ---
+    # --- 📄 الخطط التدريبية ---
     term_plans = {
         "1️⃣ الفصل الأول": "📚 **مقررات الفصل التدريبي الأول:**\n🔹 ثقافة إسلامية 1\n🔹 لغة إنجليزية 1\n🔹 رياضيات 1\n🔹 فيزياء\n🔹 التربية البدنية 1\n🔹 لغة عربية 1\n🔹 أساسيات الحاسب الآلي\n🔹 مدخل إلى مهارات القرن 21\n🔹 السلامة والصحة المهنية",
         "2️⃣ الفصل الثاني": "📚 **مقررات الفصل التدريبي الثاني:**\n🔹 سلوك مهني\n🔹 لغة عربية 2\n🔹 لغة إنجليزية 2\n🔹 رياضيات 2\n🔹 التربية البدنية 2\n🔹 ثقافة إسلامية 2\n🔹 ورش تأسيسية\n🔹 تطبيقات الحاسب الآلي\n🔹 مهارات التواصل والتعاون\n🔹 التفكير الناقد والإبداعي",
