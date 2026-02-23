@@ -57,10 +57,9 @@ TOKEN = os.environ.get("TOKEN")
 GROUP_ID = "-5193577198"
 DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
 ADMIN_ID = "10073498"
-TELEGRAM_CONTACT_LINK = "https://t.me/majod119"
 SEP = "\n━━━━━━━━━━━━━━\n"
 
-# إعدادات المعلم الذكي (تم تقييده وتوجيهه للاختصار)
+# إعدادات المعلم الذكي
 AI_KNOWLEDGE = f"""
 أنت المعلم الذكي لقسم الحاسب الآلي في المعهد الصناعي الثانوي.
 التعليمات الصارمة لك:
@@ -125,7 +124,7 @@ def get_main_menu():
         ["📊 استعلام الغياب", "📝 رفع الغياب والأعذار"],
         ["🔗 منصة تقني ورايات", "📅 التقويم التدريبي"],
         ["📰 أخبار القسم والمعهد", "📍 موقع القسم"],
-        ["👨‍🏫 تواصل مع رئيس القسم"],
+        ["📬 قسم الاقتراحات والشكاوى"],
         ["🕹️ قسم الألعاب والإضافات"]
     ], resize_keyboard=True, is_persistent=True)
 
@@ -141,7 +140,7 @@ def get_plans_menu():
 def get_games_menu():
     return ReplyKeyboardMarkup([
         ["🎮 تحدي الأسبوع", "🏆 بطل الأسبوع"],
-        ["💡 نصيحة تقنية", "📬 صندوق المقترحات"],
+        ["💡 نصيحة تقنية"],
         ["🔙 الرجوع للقائمة الرئيسية"]
     ], resize_keyboard=True)
 
@@ -173,7 +172,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = str(update.effective_user.id)
 
-    if text in ["🔙 الرجوع للقائمة الرئيسية", "📚 الحقائب التدريبية", "📄 الخطط التدريبية", "📊 استعلام الغياب", "📝 رفع الغياب والأعذار", "🔗 منصة تقني ورايات", "📅 التقويم التدريبي", "📰 أخبار القسم والمعهد", "📍 موقع القسم", "👨‍🏫 تواصل مع رئيس القسم", "🕹️ قسم الألعاب والإضافات"]:
+    if text in ["🔙 الرجوع للقائمة الرئيسية", "📚 الحقائب التدريبية", "📄 الخطط التدريبية", "📊 استعلام الغياب", "📝 رفع الغياب والأعذار", "🔗 منصة تقني ورايات", "📅 التقويم التدريبي", "📰 أخبار القسم والمعهد", "📍 موقع القسم", "📬 قسم الاقتراحات والشكاوى", "🕹️ قسم الألعاب والإضافات"]:
         ai_sessions[user_id] = False
         feedback_sessions[user_id] = False
 
@@ -181,7 +180,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🏠 **تم العودة للقائمة الرئيسية.**\nاختر الخدمة التي تريدها من الأسفل 👇", reply_markup=get_main_menu())
         return
 
-    # --- 🤖 المعلم الذكي (تم حل مشكلة النجوم والتنسيق الطويل) ---
+    # --- 🤖 المعلم الذكي ---
     if text == "🤖 المعلم الذكي (الدليل الشامل)":
         ai_sessions[user_id] = True
         guide_msg = (
@@ -204,24 +203,19 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             prompt = f"{AI_KNOWLEDGE}\nسؤال المتدرب: {text}"
             response = await ai_model.generate_content_async(prompt)
             await status_msg.delete()
-            
-            # فلترة وتنظيف النص من النجوم المزعجة الخاصة بالذكاء الاصطناعي
             clean_text = response.text.replace("**", "").replace("* ", "🔹 ").strip()
-            
-            # الإرسال كنص عادي لتجنب أي أخطاء من تليجرام
             reply_text = f"📝 رد المعلم الذكي:\n{SEP}{clean_text}\n\n💡 هل لديك سؤال آخر؟ اكتبه مباشرة!"
             await update.message.reply_text(reply_text, reply_markup=get_back_menu())
-                
         except Exception as e: 
             await status_msg.delete()
             await update.message.reply_text(f"⚠️ **عذراً، واجهت مشكلة تقنية.**\n\nالرجاء المحاولة لاحقاً.", reply_markup=get_back_menu())
         return
 
-    # --- 📬 صندوق المقترحات ---
-    if text == "📬 صندوق المقترحات":
+    # --- 📬 قسم الاقتراحات والشكاوى ---
+    if text == "📬 قسم الاقتراحات والشكاوى":
         feedback_sessions[user_id] = True
         msg = (
-            f"📬 **صندوق المقترحات والشكاوى**{SEP}"
+            f"📬 **قسم الاقتراحات والشكاوى**{SEP}"
             f"رأيك يهمنا جداً في تطوير القسم وخدماته.\n"
             f"سواء كان لديك فكرة جديدة، أو ملاحظة، أو مشكلة واجهتك، اكتبها هنا وسوف تصل مباشرة وبسرية لإدارة القسم.\n\n"
             f"✍️ **اكتب رسالتك الآن في الأسفل...**"
@@ -231,11 +225,12 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if feedback_sessions.get(user_id) == True:
         try:
-            await context.bot.send_message(chat_id=GROUP_ID, text=f"💡 **رسالة من صندوق المقترحات:**\nالمرسل: {update.effective_user.first_name}\nالرسالة: {text}")
+            await context.bot.send_message(chat_id=GROUP_ID, text=f"💡 **رسالة من قسم الاقتراحات والشكاوى:**\nالمرسل: {update.effective_user.first_name}\nالرسالة: {text}")
             feedback_sessions[user_id] = False
-            await update.message.reply_text("✅ **تم استلام رسالتك بنجاح.** شكراً لتواصلك ومساهمتك في التطوير!", reply_markup=get_games_menu(), parse_mode='Markdown')
+            # بعد الإرسال نرجعه للقائمة الرئيسية بدلاً من قائمة الألعاب
+            await update.message.reply_text("✅ **تم استلام رسالتك بنجاح.** شكراً لتواصلك ومساهمتك في التطوير!", reply_markup=get_main_menu(), parse_mode='Markdown')
         except:
-            await update.message.reply_text("⚠️ عذراً، فشل إرسال الرسالة إلى الإدارة. تأكد من إعدادات البوت.", reply_markup=get_games_menu())
+            await update.message.reply_text("⚠️ عذراً، فشل إرسال الرسالة إلى الإدارة. تأكد من إعدادات البوت.", reply_markup=get_main_menu())
         return
 
     # --- 📄 الخطط التدريبية ---
@@ -268,7 +263,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = (
             f"🕹️ **ساحة الأنشطة والتفاعل**{SEP}"
             f"هذا القسم مخصص للترفيه والفائدة!\n"
-            f"يمكنك هنا اختبار معلوماتك في (تحدي الأسبوع)، معرفة المتصدرين في (بطل الأسبوع)، أخذ (نصيحة تقنية)، أو مراسلتنا عبر (صندوق المقترحات).\n\n"
+            f"يمكنك هنا اختبار معلوماتك في (تحدي الأسبوع)، معرفة المتصدرين في (بطل الأسبوع)، أو أخذ (نصيحة تقنية).\n\n"
             f"👇 **اختر النشاط الذي تفضله:**"
         )
         await update.message.reply_text(msg, reply_markup=get_games_menu(), parse_mode='Markdown')
@@ -382,15 +377,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_photo(photo=open('calendar.jpg', 'rb'), caption="📅 التقويم التدريبي المعتمد للفصل الحالي.")
         else: 
             await update.message.reply_text("⚠️ **عذراً:** ملف صورة التقويم التدريبي غير متوفر في النظام حالياً.", parse_mode='Markdown')
-        return
-        
-    if text == "👨‍🏫 تواصل مع رئيس القسم": 
-        update_stat("contact_clicks")
-        msg = (
-            f"👨‍🏫 **التواصل مع الإدارة**{SEP}"
-            f"رئيس قسم الحاسب يرحب باستفساراتكم.\nللتواصل المباشر مع م. ماجد، اضغط على الرابط التالي:\n\n🔗 {TELEGRAM_CONTACT_LINK}"
-        )
-        await update.message.reply_text(msg, parse_mode='Markdown')
         return
 
     if not ai_sessions.get(user_id) and not feedback_sessions.get(user_id):
