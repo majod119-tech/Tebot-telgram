@@ -3,6 +3,8 @@ import pandas as pd
 import json
 import random
 import time
+import urllib.request
+import xml.etree.ElementTree as ET
 import google.generativeai as genai
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
@@ -139,9 +141,10 @@ def get_plans_menu():
     ], resize_keyboard=True)
 
 def get_games_menu():
+    # تمت إضافة زر أخبار التقنية هنا
     return ReplyKeyboardMarkup([
         ["🎮 تحدي الأسبوع", "🏆 بطل الأسبوع"],
-        ["💡 نصيحة تقنية"],
+        ["💡 نصيحة تقنية", "🌐 أخبار التقنية"],
         ["🔙 الرجوع للقائمة الرئيسية"]
     ], resize_keyboard=True)
 
@@ -168,16 +171,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👇 **الرجاء اختيار الخدمة المطلوبة من القائمة السفلية:**"
     )
     
-    # 🌟 إضافة شعار المؤسسة في رسالة الترحيب باسم الملف الجديد
     try:
         if os.path.exists('IMG_1058.jpeg'):
             await update.message.reply_photo(photo=open('IMG_1058.jpeg', 'rb'), caption=welcome_msg, reply_markup=get_main_menu())
         else:
-            # رابط افتراضي لشعار المؤسسة على الإنترنت كحل بديل
             logo_url = "https://pbs.twimg.com/profile_images/1684496035272658944/p02_gM0p_400x400.jpg"
             await update.message.reply_photo(photo=logo_url, caption=welcome_msg, reply_markup=get_main_menu())
     except Exception as e:
-        # في حال حدوث أي خطأ في تحميل الصورة، يرسل النص لضمان عدم توقف البوت
         await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
 
 async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -274,7 +274,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = (
             f"🕹️ **ساحة الأنشطة والتفاعل**{SEP}"
             f"هذا القسم مخصص للترفيه والفائدة!\n"
-            f"يمكنك هنا اختبار معلوماتك في (تحدي الأسبوع)، معرفة المتصدرين في (بطل الأسبوع)، أو أخذ (نصيحة تقنية).\n\n"
+            f"يمكنك هنا اختبار معلوماتك في (تحدي الأسبوع)، معرفة المتصدرين في (بطل الأسبوع)، أو متابعة (أخبار التقنية).\n\n"
             f"👇 **اختر النشاط الذي تفضله:**"
         )
         await update.message.reply_text(msg, reply_markup=get_games_menu(), parse_mode='Markdown')
@@ -282,6 +282,34 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if text == "💡 نصيحة تقنية":
         await update.message.reply_text(random.choice(TECH_TIPS), parse_mode='Markdown')
+        return
+
+    # 🌟 الكود الجديد لسحب الأخبار التقنية تلقائياً
+    if text == "🌐 أخبار التقنية":
+        status_msg = await update.message.reply_text("⏳ جاري سحب أحدث الأخبار التقنية...")
+        try:
+            # استخدام رابط RSS لموقع البوابة العربية للأخبار التقنية
+            url = "https://aitnews.com/feed/"
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            response = urllib.request.urlopen(req, timeout=5)
+            xml_data = response.read()
+            root = ET.fromstring(xml_data)
+
+            news_msg = f"🌐 **موجز الأخبار التقنية (تحديث تلقائي)**{SEP}"
+            count = 0
+            # قراءة أول 3 أخبار من الرابط
+            for item in root.findall('.//item'):
+                title = item.find('title').text
+                link = item.find('link').text
+                news_msg += f"🔹 [{title}]({link})\n\n"
+                count += 1
+                if count >= 3: 
+                    break
+            
+            # إرسال الأخبار وتعطيل عرض الروابط الكبيرة في المحادثة لتبقى الرسالة أنيقة
+            await status_msg.edit_text(news_msg, parse_mode='Markdown', disable_web_page_preview=True)
+        except Exception as e:
+            await status_msg.edit_text("⚠️ **عذراً، مصدر الأخبار لا يستجيب حالياً.**\nالرجاء المحاولة بعد قليل.", parse_mode='Markdown')
         return
 
     if text == "🎮 تحدي الأسبوع":
@@ -374,7 +402,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"📍 **الموقع الجغرافي لقسم الحاسب الآلي:**{SEP}http://googleusercontent.com/maps.google.com/3", parse_mode='Markdown')
         return
         
-    # 🌟 التعديل الاحترافي لقسم الأخبار بأزرار تفاعلية
     if text == "📰 أخبار القسم والمعهد": 
         msg = (
             f"📰 **لوحة الإعلانات والأخبار**{SEP}"
