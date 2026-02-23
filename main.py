@@ -58,6 +58,7 @@ GROUP_ID = "-5193577198"
 DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
 ADMIN_ID = "10073498"
 SEP = "\n━━━━━━━━━━━━━━\n"
+TVTC_X_LINK = "https://x.com/tvtc_m_buraidah"
 
 # إعدادات المعلم الذكي
 AI_KNOWLEDGE = f"""
@@ -166,7 +167,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"يمكنك من خلالي استعراض الخطط، تحميل الحقائب، متابعة غيابك، وحتى سؤالي عن أي استفسار تقني!\n\n"
         f"👇 **الرجاء اختيار الخدمة المطلوبة من القائمة السفلية:**"
     )
-    await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
+    
+    # 🌟 إضافة شعار المؤسسة في رسالة الترحيب باسم الملف الجديد
+    try:
+        if os.path.exists('IMG_1058.jpeg'):
+            await update.message.reply_photo(photo=open('IMG_1058.jpeg', 'rb'), caption=welcome_msg, reply_markup=get_main_menu())
+        else:
+            # رابط افتراضي لشعار المؤسسة على الإنترنت كحل بديل
+            logo_url = "https://pbs.twimg.com/profile_images/1684496035272658944/p02_gM0p_400x400.jpg"
+            await update.message.reply_photo(photo=logo_url, caption=welcome_msg, reply_markup=get_main_menu())
+    except Exception as e:
+        # في حال حدوث أي خطأ في تحميل الصورة، يرسل النص لضمان عدم توقف البوت
+        await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
 
 async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
@@ -227,7 +239,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             await context.bot.send_message(chat_id=GROUP_ID, text=f"💡 **رسالة من قسم الاقتراحات والشكاوى:**\nالمرسل: {update.effective_user.first_name}\nالرسالة: {text}")
             feedback_sessions[user_id] = False
-            # بعد الإرسال نرجعه للقائمة الرئيسية بدلاً من قائمة الألعاب
             await update.message.reply_text("✅ **تم استلام رسالتك بنجاح.** شكراً لتواصلك ومساهمتك في التطوير!", reply_markup=get_main_menu(), parse_mode='Markdown')
         except:
             await update.message.reply_text("⚠️ عذراً، فشل إرسال الرسالة إلى الإدارة. تأكد من إعدادات البوت.", reply_markup=get_main_menu())
@@ -363,13 +374,16 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"📍 **الموقع الجغرافي لقسم الحاسب الآلي:**{SEP}http://googleusercontent.com/maps.google.com/3", parse_mode='Markdown')
         return
         
+    # 🌟 التعديل الاحترافي لقسم الأخبار بأزرار تفاعلية
     if text == "📰 أخبار القسم والمعهد": 
         msg = (
             f"📰 **لوحة الإعلانات والأخبار**{SEP}"
-            f"🔸 **إعلان هام:** الأسبوع القادم هو موعد انطلاق اختبارات الفترة الأولى، نرجو من الجميع الاستعداد.\n\n"
-            f"🔗 **للمزيد من التغطيات والأخبار، تابع حساب المعهد الرسمي على X (تويتر سابقاً):**\nhttps://x.com/tvtc_m_buraidah"
+            f"لمتابعة أحدث الإعلانات والتغطيات الرسمية لقسم الحاسب والمعهد، نرجو زيارة حسابنا الرسمي على منصة X.\n\n"
+            f"👇 **اضغط على الزر أدناه للذهاب مباشرة:**"
         )
-        await update.message.reply_text(msg, parse_mode='Markdown', disable_web_page_preview=True)
+        keyboard = [[InlineKeyboardButton("📱 عرض آخر الأخبار في منصة X", url=TVTC_X_LINK)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(msg, reply_markup=reply_markup, parse_mode='Markdown')
         return
         
     if text == "📅 التقويم التدريبي":
