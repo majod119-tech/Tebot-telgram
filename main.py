@@ -1,4 +1,5 @@
 import os
+import io
 import pandas as pd
 import json
 import random
@@ -11,6 +12,13 @@ from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKe
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
+
+# --- 🌟 استدعاء مكتبة الصور بحماية من الانهيار ---
+try:
+    from PIL import Image, ImageDraw, ImageFont
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
 
 # --- 🌟 دوال مساعدة لضمان عدم توقف السيرفر ---
 def load_json(f): 
@@ -52,7 +60,7 @@ def update_stat(cat):
     s[cat] = s.get(cat, 0) + 1
     save_json(STATS_FILE, s)
 
-# --- 🌟 النظام الذكي للتصفير التلقائي كل يوم أحد ---
+# --- 🌟 النظام الذكي للتصفير التلقائي ---
 def auto_reset_scores():
     while True:
         try:
@@ -205,7 +213,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = str(update.effective_user.id)
 
-    # 🚨 🌟 اعتراض الاستجواب الآلي (تم التعديل ليصبح عند 15%) 🌟 🚨
+    # 🚨 اعتراض الاستجواب الآلي 🚨
     if user_id in interrogation_sessions:
         session = interrogation_sessions[user_id]
         step = session['step']
@@ -222,7 +230,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         elif step == 3:
             session['pledge_answer'] = text
-            
             completed = load_json(INTERROGATIONS_FILE)
             stu_num = session['stu_num']
             if stu_num not in completed: completed[stu_num] = []
@@ -241,7 +248,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 await context.bot.send_message(chat_id=GROUP_ID, text=report, parse_mode='Markdown')
             except Exception: pass
-            
             del interrogation_sessions[user_id]
             await update.message.reply_text("✅ **تم توثيق إقرارك رسمياً.**\n\nاحرص على الحضور لتفادي الحرمان النهائي. تم رفع الإيقاف عنك.", reply_markup=get_main_menu(), parse_mode='Markdown')
             return
@@ -350,7 +356,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg, parse_mode='Markdown')
         return
 
-    # 🌟 الاستعلام عن الغياب ونظام الاستجواب المعدل 🌟
     if text == "📊 استعلام الغياب":
         msg = f"🔎 **نظام استعلام الغياب الذكي**\n👇 **أرسل (رقمك التدريبي) المكون من أرقام فقط الآن للبحث...**"
         await update.message.reply_text(msg, parse_mode='Markdown')
@@ -367,65 +372,55 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not res.empty:
                 stu_nam = res.iloc[0]['stu_nam']
                 completed_interrogations = load_json(INTERROGATIONS_FILE).get(text, [])
-                
                 subject_to_interrogate = None
                 has_deprivation = False
-                
                 m = f"✅ **تم العثور على السجل لـ:** `{stu_nam}`{SEP}"
                 
                 for _, r in res.iterrows():
                     val = float(r['parsnt'])
                     icon = "🔴 حرمان" if val >= 20 else ("⚠️ إنذار" if val >= 15 else "🟢 منتظم")
                     m += f"📖 {r['c_nam']}: %{val} {icon}\n"
-                    
                     if val >= 20:
                         has_deprivation = True
                     elif 15 <= val < 20 and r['c_nam'] not in completed_interrogations:
                         if not subject_to_interrogate:
                             subject_to_interrogate = r['c_nam']
                 
-                # 1. إيقاف وتعهد إذا كان في مرحلة الإنذار (15% فأكثر وأقل من 20%)
                 if subject_to_interrogate:
                     interrogation_sessions[user_id] = {
-                        'step': 1,
-                        'stu_num': text,
-                        'stu_nam': stu_nam,
-                        'subject': subject_to_interrogate
+                        'step': 1, 'stu_num': text, 'stu_nam': stu_nam, 'subject': subject_to_interrogate
                     }
                     warning_msg = (
                         f"⚠️ **إنذار أخير قبل الحرمان!** ⚠️\n\n"
                         f"المتدرب `{stu_nam}`، لقد بلغت نسبة غيابك مرحلة الخطر (15%) في مادة:\n"
                         f"🟡 **{subject_to_interrogate}**\n\n"
                         f"🛑 **تم إيقاف خدمات البوت عنك مؤقتاً.**\n"
-                        f"لرفع الإيقاف، يجب عليك إكمال التعهد التالي:\n\n"
-                        f"1️⃣ **هل أنت على علم بأن غيابك اقترب من نسبة الحرمان النهائي (20%)؟**"
+                        f"لرفع الإيقاف، أجب بصراحة:\n\n1️⃣ **هل أنت على علم بأن غيابك اقترب من الحرمان النهائي؟**"
                     )
                     await update.message.reply_text(warning_msg, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())
                     return
                 
-                # 2. عرض الجدول مع توجيه الحرمان وتقديم العذر (إذا تجاوز 20%)
                 if has_deprivation:
                     m += f"\n{SEP}🛑 **تنبيه حرمان إداري!** 🛑\n"
-                    m += "لقد تجاوزت النسبة المسموحة (20%) في بعض المواد وأصبحت **محروماً**.\n"
-                    m += "⚠️ **لرفع الحرمان:** إذا كان لديك عذر طبي أو رسمي، يجب عليك تقديمه عبر قسم (📝 رفع الغياب والأعذار) خلال **(3 إلى 5 أيام)** من تاريخ الغياب كحد أقصى، وإلا سيتم طي قيدك."
+                    m += "لقد تجاوزت النسبة المسموحة (20%) وأصبحت **محروماً**.\n"
+                    m += "⚠️ يجب تقديم عذرك الطبي عبر قسم (📝 رفع الغياب والأعذار) خلال **(3 إلى 5 أيام)** من الغياب."
                 
                 await update.message.reply_text(m, parse_mode='Markdown')
             else: 
                 await update.message.reply_text("❌ **عذراً، الرقم التدريبي غير مسجل لدينا.**", parse_mode='Markdown')
-        except Exception as e:
+        except Exception:
             if 'status_msg' in locals(): await status_msg.delete()
             await update.message.reply_text("⚠️ **حدث خطأ فني:** ملف الغياب غير متوفر.", parse_mode='Markdown')
         return
 
-    # 🌟 التعديل على قسم رفع الأعذار للتنبيه بالمدة النظامية 🌟
     if text == "📝 رفع الغياب والأعذار": 
         msg = (
             f"📝 **بوابة رفع الأعذار**{SEP}"
-            f"لضمان قبول عذرك (الطبي أو الرسمي) وعدم احتسابه في نسبة الحرمان، اتبع التالي:\n\n"
+            f"لضمان قبول عذرك وعدم احتسابه في نسبة الحرمان:\n\n"
             f"1️⃣ التقط صورة واضحة لورقة العذر.\n"
-            f"2️⃣ اكتب (رقمك التدريبي + اسمك) في خانة الوصف (Caption).\n"
-            f"3️⃣ أرسل الصورة هنا وسنقوم بتسليمها للإدارة فوراً.\n\n"
-            f"⏳ **ملاحظة هامة:** لن يتم قبول أي عذر إلا إذا تم تقديمه خلال **(3 إلى 5 أيام)** من تاريخ الغياب الفعلي."
+            f"2️⃣ اكتب (رقمك التدريبي + اسمك) في خانة الوصف.\n"
+            f"3️⃣ أرسل الصورة هنا وسنقوم بختمها وتسليمها للإدارة.\n\n"
+            f"⏳ **ملاحظة:** لن يتم قبول أي عذر إلا إذا تم تقديمه خلال **(3 إلى 5 أيام)** من تاريخ الغياب."
         )
         await update.message.reply_text(msg, parse_mode='Markdown')
         return
@@ -456,16 +451,63 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not ai_sessions.get(user_id) and not feedback_sessions.get(user_id):
         await update.message.reply_text("⚠️ **عذراً، لم أتعرف على طلبك.**", reply_markup=get_main_menu())
 
+# --- 🌟 التعديل الساحق: نظام الختم الرقمي للأعذار 🌟 ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.caption: 
         await update.message.reply_text("⚠️ **الرجاء إرفاق الصورة مرة أخرى مع كتابة (رقمك التدريبي) في الوصف.**", parse_mode='Markdown')
         return
+    
+    status_msg = await update.message.reply_text("⏳ جاري تحليل الصورة وختمها إلكترونياً...")
+    
     try:
-        await context.bot.send_message(chat_id=GROUP_ID, text=f"📥 **عذر جديد:**\nالمرسل: {update.effective_user.first_name}\nالبيانات: {update.message.caption}")
-        await update.message.copy(chat_id=GROUP_ID)
-        await update.message.reply_text("✅ **تم استلام عذرك بنجاح.**", parse_mode='Markdown')
-    except Exception: 
-        await update.message.reply_text("⚠️ **خطأ في الإرسال للأرشيف.**", parse_mode='Markdown')
+        caption_text = update.message.caption
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        stu_id = ''.join(filter(str.isdigit, caption_text)) # استخراج الأرقام فقط لضمان سلامة الختم
+        if not stu_id: stu_id = "UNKNOWN"
+        
+        # 🌟 إذا كانت الصورة موجودة ومكتبة PIL مثبتة، نقوم بختم الصورة
+        if update.message.photo and HAS_PIL:
+            photo = update.message.photo[-1]
+            file = await context.bot.get_file(photo.file_id)
+            
+            # تنزيل الصورة إلى الذاكرة المؤقتة
+            in_memory_img = io.BytesIO()
+            await file.download_to_memory(in_memory_img)
+            in_memory_img.seek(0)
+            
+            img = Image.open(in_memory_img)
+            width, height = img.size
+            
+            # صنع شريط أحمر للختم يتناسب مع حجم الصورة
+            watermark_text = f"AUTO-SYSTEM: VALIDATED | STU-ID: {stu_id} | DATE: {timestamp}"
+            txt_img = Image.new('RGB', (1000, 50), color='#d32f2f') # لون أحمر رسمي
+            d = ImageDraw.Draw(txt_img)
+            d.text((20, 15), watermark_text, fill="white")
+            
+            # تصغير أو تكبير الختم ليناسب عرض الصورة الأصلية
+            txt_img = txt_img.resize((width, int(width * 50 / 1000)))
+            img.paste(txt_img, (0, height - txt_img.height)) # لصق الختم أسفل الصورة
+            
+            output = io.BytesIO()
+            img.save(output, format='JPEG')
+            output.seek(0)
+            
+            await context.bot.send_photo(
+                chat_id=GROUP_ID,
+                photo=output,
+                caption=f"📥 **عذر طبي/رسمي (مختوم آلياً):**\n👤 بيانات الطالب: {caption_text}\n⏱️ وقت الرفع: {timestamp}",
+                parse_mode='Markdown'
+            )
+            
+        else:
+            # طريقة الإرسال العادية (إذا أرسل ملف PDF أو إذا كانت المكتبة غير مثبتة)
+            await context.bot.send_message(chat_id=GROUP_ID, text=f"📥 **عذر جديد:**\nالمرسل: {update.effective_user.first_name}\nالبيانات: {caption_text}\nوقت الرفع: {timestamp}")
+            await update.message.copy(chat_id=GROUP_ID)
+            
+        await status_msg.edit_text("✅ **تم ختم عذرك إلكترونياً واستلامه بنجاح.**\nسيتم مراجعته من قبل إدارة القسم.", parse_mode='Markdown')
+        
+    except Exception as e: 
+        await status_msg.edit_text("⚠️ **خطأ في المعالجة أو في الإرسال للأرشيف.**", parse_mode='Markdown')
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -511,7 +553,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تم تشغيل النسخة المستقرة مع نظام التوجيه والاستجواب الذكي...")
+    print("🚀 تم تشغيل النسخة المستقرة مع نظام الختم الرقمي للأعذار...")
     app.run_polling()
 
 if __name__ == '__main__': 
