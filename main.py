@@ -323,13 +323,15 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(random.choice(TECH_TIPS), parse_mode='Markdown')
         return
 
+    # 🌟 التعديل: ربط الموقع بالسعودي "عالم التقنية" 🌟
     if text == "🌐 أخبار التقنية":
         status_msg = await update.message.reply_text("⏳ جاري سحب أحدث الأخبار التقنية...")
         try:
-            req = urllib.request.Request("https://aitnews.com/feed/", headers={'User-Agent': 'Mozilla/5.0'})
+            # موقع عالم التقنية (من أبرز المواقع التقنية السعودية)
+            req = urllib.request.Request("https://www.tech-wd.com/wd/feed/", headers={'User-Agent': 'Mozilla/5.0'})
             response = urllib.request.urlopen(req, timeout=5)
             root = ET.fromstring(response.read())
-            news_msg = f"🌐 **موجز الأخبار التقنية**{SEP}"
+            news_msg = f"🌐 **موجز الأخبار التقنية (السعودية)**{SEP}"
             for i, item in enumerate(root.findall('.//item')):
                 if i >= 3: break
                 news_msg += f"🔹 [{item.find('title').text}]({item.find('link').text})\n\n"
@@ -438,9 +440,16 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"📍 **الموقع الجغرافي:** http://googleusercontent.com/maps.google.com/3", parse_mode='Markdown')
         return
         
+    # 🌟 التعديل: قسم أخبار القسم والمعهد مخصص 🌟
     if text == "📰 أخبار القسم والمعهد": 
+        msg = (
+            f"📰 **أخبار القسم والمعهد**{SEP}"
+            f"📢 **إعلان داخلي:**\n"
+            f"الأسبوع القادم انطلاق اختبارات الفترة الأولى، نرجو من جميع المتدربين الاستعداد الجيد والتوفيق.\n\n"
+            f"🔗 **للمزيد من التغطيات والإعلانات، تابع حساب المعهد الرسمي:**"
+        )
         keyboard = [[InlineKeyboardButton("📱 عرض آخر الأخبار في منصة X", url=TVTC_X_LINK)]]
-        await update.message.reply_text(f"📰 **لمتابعة أحدث الإعلانات:**", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+        await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
         return
         
     if text == "📅 التقويم التدريبي":
@@ -451,7 +460,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not ai_sessions.get(user_id) and not feedback_sessions.get(user_id):
         await update.message.reply_text("⚠️ **عذراً، لم أتعرف على طلبك.**", reply_markup=get_main_menu())
 
-# --- 🌟 التعديل الساحق: نظام الختم الرقمي للأعذار 🌟 ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.caption: 
         await update.message.reply_text("⚠️ **الرجاء إرفاق الصورة مرة أخرى مع كتابة (رقمك التدريبي) في الوصف.**", parse_mode='Markdown')
@@ -462,15 +470,13 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         caption_text = update.message.caption
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        stu_id = ''.join(filter(str.isdigit, caption_text)) # استخراج الأرقام فقط لضمان سلامة الختم
+        stu_id = ''.join(filter(str.isdigit, caption_text)) 
         if not stu_id: stu_id = "UNKNOWN"
         
-        # 🌟 إذا كانت الصورة موجودة ومكتبة PIL مثبتة، نقوم بختم الصورة
         if update.message.photo and HAS_PIL:
             photo = update.message.photo[-1]
             file = await context.bot.get_file(photo.file_id)
             
-            # تنزيل الصورة إلى الذاكرة المؤقتة
             in_memory_img = io.BytesIO()
             await file.download_to_memory(in_memory_img)
             in_memory_img.seek(0)
@@ -478,15 +484,13 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
             img = Image.open(in_memory_img)
             width, height = img.size
             
-            # صنع شريط أحمر للختم يتناسب مع حجم الصورة
             watermark_text = f"AUTO-SYSTEM: VALIDATED | STU-ID: {stu_id} | DATE: {timestamp}"
-            txt_img = Image.new('RGB', (1000, 50), color='#d32f2f') # لون أحمر رسمي
+            txt_img = Image.new('RGB', (1000, 50), color='#d32f2f') 
             d = ImageDraw.Draw(txt_img)
             d.text((20, 15), watermark_text, fill="white")
             
-            # تصغير أو تكبير الختم ليناسب عرض الصورة الأصلية
             txt_img = txt_img.resize((width, int(width * 50 / 1000)))
-            img.paste(txt_img, (0, height - txt_img.height)) # لصق الختم أسفل الصورة
+            img.paste(txt_img, (0, height - txt_img.height)) 
             
             output = io.BytesIO()
             img.save(output, format='JPEG')
@@ -500,7 +504,6 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             
         else:
-            # طريقة الإرسال العادية (إذا أرسل ملف PDF أو إذا كانت المكتبة غير مثبتة)
             await context.bot.send_message(chat_id=GROUP_ID, text=f"📥 **عذر جديد:**\nالمرسل: {update.effective_user.first_name}\nالبيانات: {caption_text}\nوقت الرفع: {timestamp}")
             await update.message.copy(chat_id=GROUP_ID)
             
@@ -553,7 +556,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تم تشغيل النسخة المستقرة مع نظام الختم الرقمي للأعذار...")
+    print("🚀 تم تشغيل النسخة المستقرة مع الأخبار المحلية وإعلان القسم...")
     app.run_polling()
 
 if __name__ == '__main__': 
