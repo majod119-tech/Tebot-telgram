@@ -7,7 +7,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime
 import google.generativeai as genai
-from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -39,11 +39,13 @@ except Exception as e:
 TOKEN = os.environ.get("TOKEN") 
 GROUP_ID = "-5193577198"
 DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
+ADMIN_ID = "10073498"
 SEP = "\n━━━━━━━━━━━━━━\n"
 TVTC_X_LINK = "https://x.com/tvtc_m_buraidah"
 
 SCORES_FILE = "scores.json"
 STATS_FILE = "stats.json"
+INTERROGATIONS_FILE = "interrogations.json"
 
 def update_stat(cat):
     s = load_json(STATS_FILE)
@@ -55,19 +57,16 @@ def auto_reset_scores():
     while True:
         try:
             now = datetime.now()
-            # في بايثون: يوم الاثنين هو 0، ويوم الأحد هو 6
-            if now.weekday() == 6:
+            if now.weekday() == 6: 
                 today_str = now.strftime("%Y-%m-%d")
                 stats = load_json(STATS_FILE)
-                # التأكد أنه لم يقم بالتصفير مسبقاً في هذا اليوم
                 if stats.get("last_reset_date") != today_str:
-                    save_json(SCORES_FILE, {}) # تصفير ملف النقاط
-                    stats["last_reset_date"] = today_str # تسجيل تاريخ اليوم لكي لا يصفر مرة أخرى
+                    save_json(SCORES_FILE, {}) 
+                    stats["last_reset_date"] = today_str 
                     save_json(STATS_FILE, stats)
                     print(f"✅ تم تصفير نقاط تحدي الأسبوع تلقائياً بتاريخ: {today_str}")
         except Exception as e:
             pass
-        # فحص اليوم كل ساعة (3600 ثانية) لتخفيف الضغط على السيرفر
         time.sleep(3600)
 
 # --- 2. سيرفر الويب المطور (Dashboard) ---
@@ -135,6 +134,7 @@ if GEMINI_API_KEY:
     except Exception: pass
 
 ai_sessions, feedback_sessions, active_challenges = {}, {}, {}
+interrogation_sessions = {} 
 
 TECH_TIPS = [
     "💡 **نصيحة أمنية:** استخدم اختصار `Win + L` لقفل شاشة جهازك فوراً عند الابتعاد.",
@@ -204,6 +204,47 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = str(update.effective_user.id)
+
+    # 🚨 🌟 اعتراض الاستجواب الآلي (تم التعديل ليصبح عند 15%) 🌟 🚨
+    if user_id in interrogation_sessions:
+        session = interrogation_sessions[user_id]
+        step = session['step']
+        
+        if step == 1:
+            session['aware_answer'] = text
+            session['step'] = 2
+            await update.message.reply_text("2️⃣ **ما هو المبرر أو العذر الرئيسي لغياباتك؟**\n(اكتب عذرك بالتفصيل الآن...)", parse_mode='Markdown')
+            return
+        elif step == 2:
+            session['excuse_answer'] = text
+            session['step'] = 3
+            await update.message.reply_text("3️⃣ **هل تتعهد رسمياً بالانضباط وعدم الغياب لتفادي الحرمان النهائي (20%)؟**\n(أجب بـ نعم أو أتعهد)", parse_mode='Markdown')
+            return
+        elif step == 3:
+            session['pledge_answer'] = text
+            
+            completed = load_json(INTERROGATIONS_FILE)
+            stu_num = session['stu_num']
+            if stu_num not in completed: completed[stu_num] = []
+            completed[stu_num].append(session['subject'])
+            save_json(INTERROGATIONS_FILE, completed)
+
+            report = (
+                f"🚨 **تعهد قبل الحرمان (مرحلة الإنذار 15%)** 🚨\n\n"
+                f"👤 **المتدرب:** {session['stu_nam']} ({stu_num})\n"
+                f"📖 **المادة:** {session['subject']}\n"
+                f"❓ **علم بالإنذار:** {session['aware_answer']}\n"
+                f"📝 **العذر:** {session['excuse_answer']}\n"
+                f"✍️ **الإقرار:** {session['pledge_answer']}\n\n"
+                f"✅ تم تسجيل الإقرار آلياً وحفظه."
+            )
+            try:
+                await context.bot.send_message(chat_id=GROUP_ID, text=report, parse_mode='Markdown')
+            except Exception: pass
+            
+            del interrogation_sessions[user_id]
+            await update.message.reply_text("✅ **تم توثيق إقرارك رسمياً.**\n\nاحرص على الحضور لتفادي الحرمان النهائي. تم رفع الإيقاف عنك.", reply_markup=get_main_menu(), parse_mode='Markdown')
+            return
 
     if text in ["🔙 الرجوع للقائمة الرئيسية", "📚 الحقائب التدريبية", "📄 الخطط التدريبية", "📊 استعلام الغياب", "📝 رفع الغياب والأعذار", "🔗 منصة تقني ورايات", "📅 التقويم التدريبي", "📰 أخبار القسم والمعهد", "📍 موقع القسم", "📬 قسم الاقتراحات والشكاوى", "🕹️ قسم الألعاب والإضافات"]:
         ai_sessions[user_id] = False
@@ -309,6 +350,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg, parse_mode='Markdown')
         return
 
+    # 🌟 الاستعلام عن الغياب ونظام الاستجواب المعدل 🌟
     if text == "📊 استعلام الغياب":
         msg = f"🔎 **نظام استعلام الغياب الذكي**\n👇 **أرسل (رقمك التدريبي) المكون من أرقام فقط الآن للبحث...**"
         await update.message.reply_text(msg, parse_mode='Markdown')
@@ -323,21 +365,69 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await status_msg.delete()
             
             if not res.empty:
-                m = f"✅ **تم العثور على السجل لـ:** `{res.iloc[0]['stu_nam']}`{SEP}"
-                for _, r in res.iterrows(): 
+                stu_nam = res.iloc[0]['stu_nam']
+                completed_interrogations = load_json(INTERROGATIONS_FILE).get(text, [])
+                
+                subject_to_interrogate = None
+                has_deprivation = False
+                
+                m = f"✅ **تم العثور على السجل لـ:** `{stu_nam}`{SEP}"
+                
+                for _, r in res.iterrows():
                     val = float(r['parsnt'])
                     icon = "🔴 حرمان" if val >= 20 else ("⚠️ إنذار" if val >= 15 else "🟢 منتظم")
                     m += f"📖 {r['c_nam']}: %{val} {icon}\n"
+                    
+                    if val >= 20:
+                        has_deprivation = True
+                    elif 15 <= val < 20 and r['c_nam'] not in completed_interrogations:
+                        if not subject_to_interrogate:
+                            subject_to_interrogate = r['c_nam']
+                
+                # 1. إيقاف وتعهد إذا كان في مرحلة الإنذار (15% فأكثر وأقل من 20%)
+                if subject_to_interrogate:
+                    interrogation_sessions[user_id] = {
+                        'step': 1,
+                        'stu_num': text,
+                        'stu_nam': stu_nam,
+                        'subject': subject_to_interrogate
+                    }
+                    warning_msg = (
+                        f"⚠️ **إنذار أخير قبل الحرمان!** ⚠️\n\n"
+                        f"المتدرب `{stu_nam}`، لقد بلغت نسبة غيابك مرحلة الخطر (15%) في مادة:\n"
+                        f"🟡 **{subject_to_interrogate}**\n\n"
+                        f"🛑 **تم إيقاف خدمات البوت عنك مؤقتاً.**\n"
+                        f"لرفع الإيقاف، يجب عليك إكمال التعهد التالي:\n\n"
+                        f"1️⃣ **هل أنت على علم بأن غيابك اقترب من نسبة الحرمان النهائي (20%)؟**"
+                    )
+                    await update.message.reply_text(warning_msg, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())
+                    return
+                
+                # 2. عرض الجدول مع توجيه الحرمان وتقديم العذر (إذا تجاوز 20%)
+                if has_deprivation:
+                    m += f"\n{SEP}🛑 **تنبيه حرمان إداري!** 🛑\n"
+                    m += "لقد تجاوزت النسبة المسموحة (20%) في بعض المواد وأصبحت **محروماً**.\n"
+                    m += "⚠️ **لرفع الحرمان:** إذا كان لديك عذر طبي أو رسمي، يجب عليك تقديمه عبر قسم (📝 رفع الغياب والأعذار) خلال **(3 إلى 5 أيام)** من تاريخ الغياب كحد أقصى، وإلا سيتم طي قيدك."
+                
                 await update.message.reply_text(m, parse_mode='Markdown')
             else: 
                 await update.message.reply_text("❌ **عذراً، الرقم التدريبي غير مسجل لدينا.**", parse_mode='Markdown')
-        except Exception:
+        except Exception as e:
             if 'status_msg' in locals(): await status_msg.delete()
             await update.message.reply_text("⚠️ **حدث خطأ فني:** ملف الغياب غير متوفر.", parse_mode='Markdown')
         return
 
+    # 🌟 التعديل على قسم رفع الأعذار للتنبيه بالمدة النظامية 🌟
     if text == "📝 رفع الغياب والأعذار": 
-        await update.message.reply_text(f"📝 **بوابة رفع الأعذار**\nصور العذر واكتب (رقمك التدريبي + اسمك) في الوصف ثم أرسله هنا.", parse_mode='Markdown')
+        msg = (
+            f"📝 **بوابة رفع الأعذار**{SEP}"
+            f"لضمان قبول عذرك (الطبي أو الرسمي) وعدم احتسابه في نسبة الحرمان، اتبع التالي:\n\n"
+            f"1️⃣ التقط صورة واضحة لورقة العذر.\n"
+            f"2️⃣ اكتب (رقمك التدريبي + اسمك) في خانة الوصف (Caption).\n"
+            f"3️⃣ أرسل الصورة هنا وسنقوم بتسليمها للإدارة فوراً.\n\n"
+            f"⏳ **ملاحظة هامة:** لن يتم قبول أي عذر إلا إذا تم تقديمه خلال **(3 إلى 5 أيام)** من تاريخ الغياب الفعلي."
+        )
+        await update.message.reply_text(msg, parse_mode='Markdown')
         return
         
     if text == "📚 الحقائب التدريبية": 
@@ -411,7 +501,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("⚠️ عذراً، هذا التحدي قديم وتم تحديث بنك الأسئلة. جرب تحدياً جديداً!")
 
 def main():
-    # 🌟 تشغيل المجدول التلقائي في الخلفية
     Thread(target=auto_reset_scores, daemon=True).start()
     Thread(target=run_web_server, daemon=True).start()
     
@@ -422,7 +511,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تم تشغيل النسخة المستقرة مع نظام التصفير التلقائي...")
+    print("🚀 تم تشغيل النسخة المستقرة مع نظام التوجيه والاستجواب الذكي...")
     app.run_polling()
 
 if __name__ == '__main__': 
