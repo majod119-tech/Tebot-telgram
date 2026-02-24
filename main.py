@@ -11,6 +11,15 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+# --- 🌟 استدعاء بنك الأسئلة الخارجي بأمان ---
+try:
+    from questions_bank import QUESTIONS
+except ImportError:
+    print("⚠️ تنبيه: ملف questions_bank.py غير موجود. تم وضع سؤال احتياطي.")
+    QUESTIONS = [
+        {"q": "ما هو عنوان الـ IP الذي يُعرف بـ (Localhost)؟", "options": ["192.168.1.1", "127.0.0.1", "8.8.8.8", "255.255.255.0"], "answer": 1}
+    ]
+
 # --- 1. سيرفر الويب المطور (Dashboard) ---
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -113,12 +122,6 @@ TECH_TIPS = [
     "🌐 **نصيحة شبكات:** عنوان `127.0.0.1` يُعرف بـ Localhost ويستخدم لاختبار كرت الشبكة في جهازك دون الحاجة لإنترنت."
 ]
 
-QUESTIONS = [
-    {"q": "ما هو عنوان الـ IP الذي يُعرف بـ (Localhost) ويستخدم لاختبار كرت الشبكة؟", "options": ["192.168.1.1", "127.0.0.1", "8.8.8.8", "255.255.255.0"], "answer": 1},
-    {"q": "أي من المكونات التالية يعتبر 'العقل المدبر' للحاسب الآلي؟", "options": ["القرص الصلب (HDD)", "الذاكرة العشوائية (RAM)", "المعالج (CPU)", "اللوحة الأم"], "answer": 2},
-    {"q": "في نظام لينكس، ما هو الأمر المستخدم لعرض قائمة الملفات في المجلد الحالي؟", "options": ["cd", "ls", "pwd", "mkdir"], "answer": 1}
-]
-
 # --- 3. تصميم القوائم ---
 def get_main_menu():
     return ReplyKeyboardMarkup([
@@ -141,7 +144,6 @@ def get_plans_menu():
     ], resize_keyboard=True)
 
 def get_games_menu():
-    # تمت إضافة زر أخبار التقنية هنا
     return ReplyKeyboardMarkup([
         ["🎮 تحدي الأسبوع", "🏆 بطل الأسبوع"],
         ["💡 نصيحة تقنية", "🌐 أخبار التقنية"],
@@ -192,7 +194,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🏠 **تم العودة للقائمة الرئيسية.**\nاختر الخدمة التي تريدها من الأسفل 👇", reply_markup=get_main_menu())
         return
 
-    # --- 🤖 المعلم الذكي ---
     if text == "🤖 المعلم الذكي (الدليل الشامل)":
         ai_sessions[user_id] = True
         guide_msg = (
@@ -223,7 +224,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"⚠️ **عذراً، واجهت مشكلة تقنية.**\n\nالرجاء المحاولة لاحقاً.", reply_markup=get_back_menu())
         return
 
-    # --- 📬 قسم الاقتراحات والشكاوى ---
     if text == "📬 قسم الاقتراحات والشكاوى":
         feedback_sessions[user_id] = True
         msg = (
@@ -244,7 +244,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ عذراً، فشل إرسال الرسالة إلى الإدارة. تأكد من إعدادات البوت.", reply_markup=get_main_menu())
         return
 
-    # --- 📄 الخطط التدريبية ---
     term_plans = {
         "1️⃣ الفصل الأول": "📚 **مقررات الفصل التدريبي الأول:**\n🔹 ثقافة إسلامية 1\n🔹 لغة إنجليزية 1\n🔹 رياضيات 1\n🔹 فيزياء\n🔹 التربية البدنية 1\n🔹 لغة عربية 1\n🔹 أساسيات الحاسب الآلي\n🔹 مدخل إلى مهارات القرن 21\n🔹 السلامة والصحة المهنية",
         "2️⃣ الفصل الثاني": "📚 **مقررات الفصل التدريبي الثاني:**\n🔹 سلوك مهني\n🔹 لغة عربية 2\n🔹 لغة إنجليزية 2\n🔹 رياضيات 2\n🔹 التربية البدنية 2\n🔹 ثقافة إسلامية 2\n🔹 ورش تأسيسية\n🔹 تطبيقات الحاسب الآلي\n🔹 مهارات التواصل والتعاون\n🔹 التفكير الناقد والإبداعي",
@@ -269,7 +268,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg, reply_markup=get_plans_menu(), parse_mode='Markdown')
         return
 
-    # --- 🕹️ قسم الألعاب والإضافات ---
     if text == "🕹️ قسم الألعاب والإضافات":
         msg = (
             f"🕹️ **ساحة الأنشطة والتفاعل**{SEP}"
@@ -284,11 +282,9 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(random.choice(TECH_TIPS), parse_mode='Markdown')
         return
 
-    # 🌟 الكود الجديد لسحب الأخبار التقنية تلقائياً
     if text == "🌐 أخبار التقنية":
         status_msg = await update.message.reply_text("⏳ جاري سحب أحدث الأخبار التقنية...")
         try:
-            # استخدام رابط RSS لموقع البوابة العربية للأخبار التقنية
             url = "https://aitnews.com/feed/"
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
             response = urllib.request.urlopen(req, timeout=5)
@@ -297,7 +293,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             news_msg = f"🌐 **موجز الأخبار التقنية (تحديث تلقائي)**{SEP}"
             count = 0
-            # قراءة أول 3 أخبار من الرابط
             for item in root.findall('.//item'):
                 title = item.find('title').text
                 link = item.find('link').text
@@ -306,7 +301,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if count >= 3: 
                     break
             
-            # إرسال الأخبار وتعطيل عرض الروابط الكبيرة في المحادثة لتبقى الرسالة أنيقة
             await status_msg.edit_text(news_msg, parse_mode='Markdown', disable_web_page_preview=True)
         except Exception as e:
             await status_msg.edit_text("⚠️ **عذراً، مصدر الأخبار لا يستجيب حالياً.**\nالرجاء المحاولة بعد قليل.", parse_mode='Markdown')
@@ -335,7 +329,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg, parse_mode='Markdown')
         return
 
-    # --- 📊 استعلام الغياب بالرقم ---
     if text == "📊 استعلام الغياب":
         msg = (
             f"🔎 **نظام استعلام الغياب الذكي**{SEP}"
@@ -368,7 +361,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ **حدث خطأ فني:** ملف الغياب (data.xlsx) غير متوفر في السيرفر حالياً. يرجى مراجعة إدارة القسم.", parse_mode='Markdown')
         return
 
-    # --- الخدمات الأكاديمية والرسمية ---
     if text == "📝 رفع الغياب والأعذار": 
         msg = (
             f"📝 **بوابة رفع الأعذار**{SEP}"
@@ -423,7 +415,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not ai_sessions.get(user_id) and not feedback_sessions.get(user_id):
         await update.message.reply_text("⚠️ **عذراً، لم أتعرف على طلبك.**\nالرجاء اختيار إحدى الخدمات من القائمة المتاحة أدناه 👇", reply_markup=get_main_menu())
 
-# --- معالجة الصور (رفع الأعذار) ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.caption: 
         await update.message.reply_text("⚠️ **خطأ في الرفع:**\nالرجاء إرفاق الصورة مرة أخرى، والتأكد من كتابة **رقمك التدريبي** في خانة الوصف (Caption) للصورة ليتم قبول عذرك.", parse_mode='Markdown')
@@ -435,7 +426,6 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e: 
         await update.message.reply_text("⚠️ **خطأ فني:** تعذر إرسال العذر لمجموعة الأرشيف. الرجاء التأكد من إضافة البوت كمشرف في المجموعة.", parse_mode='Markdown')
 
-# --- معالجة أزرار التحدي ---
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = str(query.from_user.id)
