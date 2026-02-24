@@ -5,3 +5,4 @@ google-auth
 pandas
 openpyxl
 google-generativeai
+Pillow
