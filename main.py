@@ -13,7 +13,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-# --- 🌟 استدعاء مكتبة الصور بحماية ---
+# --- 🌟 استدعاء مكتبة الصور للختم الآلي بحماية ---
 try:
     from PIL import Image, ImageDraw, ImageFont
     HAS_PIL = True
@@ -57,7 +57,7 @@ def update_stat(cat):
     s[cat] = s.get(cat, 0) + 1
     save_json(STATS_FILE, s)
 
-# --- 🌟 التصفير التلقائي (الأحد) ---
+# --- 🌟 التصفير التلقائي للتحديات (كل أحد) ---
 def auto_reset_scores():
     while True:
         try:
@@ -114,8 +114,18 @@ def run_web_server():
     server = HTTPServer(("0.0.0.0", port), SimpleHandler)
     server.serve_forever()
 
-# --- 3. المعلم الذكي ---
-AI_KNOWLEDGE = f"أنت المعلم الذكي لقسم الحاسب. أجب باختصار مباشر. الحقائب في {DRIVE_LINK}. الغياب: إنذار 15% وحرمان 20%."
+# --- 3. عقل المعلم الذكي (محدث ومخصص للمعهد) ---
+AI_KNOWLEDGE = f"""
+أنت المعلم الذكي الرسمي لقسم الحاسب الآلي وتقنية المعلومات في المعهد الصناعي الثانوي ببريدة (المؤسسة العامة للتدريب التقني والمهني - السعودية).
+التعليمات الصارمة لك:
+1. أجب باختصار شديد وبشكل مباشر ومهني.
+2. لا تقم بالترحيب الطويل، ولا تكرر وظائفك أو الروابط إلا إذا سألك المتدرب عنها تحديداً.
+3. اشرح المفاهيم التقنية بأسلوب مبسط وعملي يناسب متدربي الدبلوم الصناعي.
+4. معلومات القسم الثابتة:
+- الحقائب التدريبية: {DRIVE_LINK}
+- نظام الغياب: إنذار عند 15% وحرمان نهائي عند 20%. المهلة لرفع العذر هي 3 إلى 5 أيام.
+"""
+
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 ai_model = None
 if GEMINI_API_KEY:
@@ -135,7 +145,7 @@ TECH_TIPS = [
     "🚀 **نصيحة برمجية:** التنسيق في بايثون هو أساس عمل الكود."
 ]
 
-# --- 4. تصميم القوائم ---
+# --- 4. تصميم القوائم المتطورة ---
 def get_main_menu():
     return ReplyKeyboardMarkup([
         ["🤖 المعلم الذكي (الدليل الشامل)"], 
@@ -172,7 +182,7 @@ async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔️ هذا الأمر للإدارة فقط.")
         return
     await update.message.reply_text("⏳ جاري تجهيز وإرسال النسخة الاحتياطية للقسم...")
-    files_to_backup = ['data.xlsx', 'scores.json', 'interrogations.json', 'stats.json']
+    files_to_backup = ['data.xlsx', 'scores.json', 'interrogations.json', 'stats.json', 'plans.json']
     sent_any = False
     for file in files_to_backup:
         if os.path.exists(file):
@@ -183,7 +193,7 @@ async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("⚠️ لم يتم العثور على ملفات للنسخ الاحتياطي.")
 
-# --- 5. المنطق البرمجي ---
+# --- 5. المنطق البرمجي الأساسي ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     stats = load_json(STATS_FILE)
@@ -197,10 +207,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     feedback_sessions[user_id] = False
     
     welcome_msg = (
-        f"أهلاً بك يا {update.effective_user.first_name} في بوت قسم الحاسب وتقنية المعلومات 💻✨{SEP}"
-        f"أنا مساعدك الرقمي، تم تصميمي لتسهيل رحلتك التدريبية.\n"
-        f"👇 **الرجاء اختيار الخدمة المطلوبة من القائمة السفلية:**"
+        f"أهلاً بك يا {update.effective_user.first_name} في المساعد الذكي لقسم الحاسب الآلي 💻✨{SEP}"
+        f"أنا نظامك الرقمي المتكامل في المعهد الصناعي الثانوي ببريدة. تم تصميمي لتوفير وقتك وتسهيل رحلتك التدريبية.\n\n"
+        f"📌 **ماذا يمكنني أن أفعل لك؟**\n"
+        f"🔹 استعلام فوري عن نسبة الغياب والإنذارات.\n"
+        f"🔹 رفع وتوثيق الأعذار الطبية بختم آلي.\n"
+        f"🔹 الإجابة على استفساراتك عبر (المعلم الذكي).\n"
+        f"🔹 تحميل الحقائب التدريبية واستعراض الخطط.\n"
+        f"🔹 المشاركة في التحديات التقنية ومتابعة الأخبار.\n\n"
+        f"👇 **الرجاء اختيار الخدمة المطلوبة من القائمة السفلية لبدء العمل:**"
     )
+    
     try:
         if os.path.exists('IMG_1058.jpeg'):
             await update.message.reply_photo(photo=open('IMG_1058.jpeg', 'rb'), caption=welcome_msg, reply_markup=get_main_menu())
@@ -214,7 +231,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = str(update.effective_user.id)
 
-    # 🚨 اعتراض الاستجواب 🚨
+    # 🚨 اعتراض الاستجواب للغياب (15%) 🚨
     if user_id in interrogation_sessions:
         session = interrogation_sessions[user_id]
         step = session['step']
@@ -248,7 +265,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🏠 **تم العودة للقائمة الرئيسية.**", reply_markup=get_main_menu())
         return
 
-    # --- 🌟 جودة الحياة: قسم الأسئلة الشائعة الجديد 🌟 ---
+    # --- 🌟 جودة الحياة: الأسئلة الشائعة 🌟 ---
     if text == "❓ الأسئلة الشائعة":
         faq_msg = (
             f"❓ **أبرز الأسئلة الشائعة وإجاباتها:**{SEP}"
@@ -295,11 +312,11 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ فشل الإرسال.", reply_markup=get_main_menu())
         return
 
-    # --- 🌟 جودة الحياة: استدعاء الخطط من ملف خارجي نظيف 🌟 ---
+    # --- 🌟 استدعاء الخطط من ملف خارجي نظيف 🌟 ---
     if text in ["1️⃣ الفصل الأول", "2️⃣ الفصل الثاني", "3️⃣ الفصل الثالث", "4️⃣ الفصل الرابع", "5️⃣ الفصل الخامس", "6️⃣ الفصل السادس", "🖥️ برامج فصلية"]:
         plans = load_json("plans.json")
-        if not plans: # إذا لم تقم بإنشاء الملف بعد، سيتجنب الانهيار
-            await update.message.reply_text("⚠️ ملف الخطط قيد التحديث من قبل الإدارة.")
+        if not plans: 
+            await update.message.reply_text("⚠️ ملف الخطط (plans.json) قيد التحديث من قبل الإدارة.")
             return
             
         reply_msg = f"{plans.get(text, '')}{SEP}🔗 **لتحميل المنهج اضغط الزر بالأسفل:**"
@@ -400,7 +417,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg, parse_mode='Markdown')
         return
         
-    # --- 🌟 جودة الحياة: أزرار شفافة فخمة للروابط 🌟 ---
+    # --- 🌟 جودة الحياة: أزرار الروابط الشفافة الفخمة 🌟 ---
     if text == "📚 الحقائب التدريبية": 
         keyboard = [[InlineKeyboardButton("📥 الدخول للمستودع الرقمي للحقائب", url=DRIVE_LINK)]]
         await update.message.reply_text("📚 **الحقائب التدريبية:**", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
@@ -433,7 +450,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not ai_sessions.get(user_id) and not feedback_sessions.get(user_id):
         await update.message.reply_text("⚠️ **الرجاء اختيار خدمة من الأسفل 👇**", reply_markup=get_main_menu())
 
-# --- ختم الأعذار الآلي ---
+# --- 🌟 الختم الآلي للأعذار ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.caption: 
         await update.message.reply_text("⚠️ **الرجاء إرفاق الصورة مع كتابة رقمك في الوصف.**", parse_mode='Markdown')
@@ -501,7 +518,7 @@ def main():
     
     app = Application.builder().token(TOKEN).build()
     
-    # 🌟 إضافة أمر النسخ الاحتياطي الإداري
+    # 🌟 أوامر الإدارة 🌟
     app.add_handler(CommandHandler("backup", backup_command))
     
     app.add_handler(CommandHandler("start", start))
@@ -509,7 +526,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تم تشغيل النسخة الماسية (تنظيف كود، أزرار شفافة، نسخ احتياطي)...")
+    print("🚀 تم تشغيل النسخة الماسية الرسمية لمعهد بريدة...")
     app.run_polling()
 
 if __name__ == '__main__': 
