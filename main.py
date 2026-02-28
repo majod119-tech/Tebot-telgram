@@ -114,17 +114,18 @@ def run_web_server():
     server = HTTPServer(("0.0.0.0", port), SimpleHandler)
     server.serve_forever()
 
-# --- 3. عقل المعلم الذكي ---
+# --- 3. عقل المعلم الذكي (محدث ومزود بقوانين الدليل والمنصات الثلاث) ---
 AI_KNOWLEDGE = f"""
 أنت المعلم الذكي الرسمي لقسم الحاسب الآلي وتقنية المعلومات في المعهد الصناعي الثانوي ببريدة (مؤسسة التدريب التقني والمهني).
 أجب باختصار شديد ومهنية. اعتمد على أنظمة دليل المتدرب التالية في إجاباتك إذا سئلت:
 - الغياب والحرمان: إنذار عند 15% وحرمان نهائي عند 20%. يطوى القيد إذا انقطع المتدرب أسبوعين متتاليين.
-- المكافأة: 1000 ريال لمتدربي الكليات التقنية، و 800 ريال لمتدربي المعاهد الصناعية. توقف المكافأة إذا قل المعدل التراكمي عن 2.00 أو تجاوز المدة النظامية.
+- المكافأة: 1000 ريال لمتدربي الكليات التقنية، و 800 ريال لمتدربي المعاهد. توقف المكافأة إذا قل المعدل التراكمي عن 2.00 أو تجاوز المدة النظامية.
 - درجات النجاح: درجة الاجتياز في المعاهد 50، وفي الكليات التقنية 60.
-- العبء التدريبي: الحد الأدنى لتسجيل المقررات 12 وحدة، والحد الأعلى 24 وحدة.
 - مكافأة التفوق: 1000 ريال فصلياً (لمعدل 4.85 فأعلى)، و 2000 ريال للخريج (لمعدل 4.75 فأعلى).
-- الحقائب التدريبية: {DRIVE_LINK}
-- منصة التدرب الإلكتروني (بلاك بورد): https://lms.elearning.edu.sa
+- المنصات الثلاث: 
+  1. رايات: للجدول، الغياب، والسجل التدريبي (rayat.tvtc.gov.sa)
+  2. بلاك بورد: للمحتوى والاختبارات (lms.elearning.edu.sa)
+  3. تقني: (tvtclms.edu.sa)
 """
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
@@ -146,13 +147,13 @@ TECH_TIPS = [
     "🚀 **نصيحة برمجية:** التنسيق في بايثون هو أساس عمل الكود."
 ]
 
-# --- 4. تصميم القوائم المتطورة ---
+# --- 4. تصميم القوائم المتطورة (تم تعديل زر المنصات) ---
 def get_main_menu():
     return ReplyKeyboardMarkup([
         ["🤖 المعلم الذكي (الدليل الشامل)"], 
         ["📚 الحقائب التدريبية", "📄 الخطط التدريبية"],
         ["📊 استعلام الغياب", "📝 رفع الغياب والأعذار"],
-        ["🔗 منصة تقني ورايات", "📅 التقويم التدريبي"],
+        ["🔗 المنصات الإلكترونية", "📅 التقويم التدريبي"],
         ["📰 أخبار القسم والمعهد", "📍 موقع القسم"],
         ["❓ الأسئلة الشائعة", "📘 دليل المتدرب الرسمي"],
         ["📬 الاقتراحات والشكاوى", "🕹️ قسم الألعاب والإضافات"]
@@ -258,7 +259,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("✅ **تم توثيق إقرارك.**\nاحرص على الحضور. تم رفع الإيقاف عنك.", reply_markup=get_main_menu(), parse_mode='Markdown')
             return
 
-    if text in ["🔙 الرجوع للقائمة الرئيسية", "📚 الحقائب التدريبية", "📄 الخطط التدريبية", "📊 استعلام الغياب", "📝 رفع الغياب والأعذار", "🔗 منصة تقني ورايات", "📅 التقويم التدريبي", "📰 أخبار القسم والمعهد", "📍 موقع القسم", "❓ الأسئلة الشائعة", "📘 دليل المتدرب الرسمي", "📬 الاقتراحات والشكاوى", "🕹️ قسم الألعاب والإضافات"]:
+    if text in ["🔙 الرجوع للقائمة الرئيسية", "📚 الحقائب التدريبية", "📄 الخطط التدريبية", "📊 استعلام الغياب", "📝 رفع الغياب والأعذار", "🔗 المنصات الإلكترونية", "📅 التقويم التدريبي", "📰 أخبار القسم والمعهد", "📍 موقع القسم", "❓ الأسئلة الشائعة", "📘 دليل المتدرب الرسمي", "📬 الاقتراحات والشكاوى", "🕹️ قسم الألعاب والإضافات"]:
         ai_sessions[user_id] = False
         feedback_sessions[user_id] = False
 
@@ -266,7 +267,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🏠 **تم العودة للقائمة الرئيسية.**", reply_markup=get_main_menu())
         return
 
-    # --- 🌟 إرسال دليل المتدرب كملف PDF 🌟 ---
     if text == "📘 دليل المتدرب الرسمي":
         if os.path.exists("trainee_guide.pdf"):
             await update.message.reply_document(document=open("trainee_guide.pdf", 'rb'), caption="📘 **دليل المتدرب الرسمي (الإصدار الأخير)**\nيحتوي على كافة اللوائح، حقوق وواجبات المتدرب، والمكافآت.", parse_mode='Markdown')
@@ -274,7 +274,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ **عذراً، جاري تحديث ملف الدليل من قبل الإدارة.**\nيرجى المحاولة لاحقاً.", parse_mode='Markdown')
         return
 
-    # --- 🌟 الأسئلة الشائعة المحدثة بالدليل الرسمي 🌟 ---
     if text == "❓ الأسئلة الشائعة":
         faq_msg = (
             f"❓ **الأسئلة الشائعة (بناءً على دليل المتدرب الرسمي):**{SEP}"
@@ -436,11 +435,12 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📚 **الحقائب التدريبية:**", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
         return
         
-    # --- 🌟 جودة الحياة: إضافة بلاك بورد مع منصة تقني في الأزرار الشفافة 🌟 ---
-    if text == "🔗 منصة تقني ورايات": 
+    # --- 🌟 جودة الحياة: فصل المنصات الثلاث بأزرار شفافة 🌟 ---
+    if text == "🔗 المنصات الإلكترونية": 
         keyboard = [
             [InlineKeyboardButton("🎓 بوابة رايات (للمتدربين)", url="https://rayat.tvtc.gov.sa")],
-            [InlineKeyboardButton("💻 منصة تقني (بلاك بورد) للتدريب عن بعد", url="https://lms.elearning.edu.sa/")]
+            [InlineKeyboardButton("💻 منصة تقني", url="https://tvtclms.edu.sa")],
+            [InlineKeyboardButton("📝 بلاك بورد (بوابة التدرب الإلكتروني)", url="https://lms.elearning.edu.sa/")]
         ]
         await update.message.reply_text("🌐 **اختر المنصة التي تريد الدخول إليها:**", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
         return
@@ -539,7 +539,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تم تشغيل النسخة الماسية (تمت إضافة بلاك بورد للمنصات)...")
+    print("🚀 تم تشغيل النسخة الماسية (تم فصل المنصات الثلاث كأزرار شفافة مستقلة)...")
     app.run_polling()
 
 if __name__ == '__main__': 
