@@ -9,6 +9,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 import google.generativeai as genai
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
+from telegram.constants import ChatAction
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -20,7 +21,7 @@ try:
 except ImportError:
     HAS_PIL = False
 
-# --- 🌟 دوال مساعدة لضمان استقرار السيرفر ---
+# --- 🌟 دوال مساعدة لضمان استقرار السيرفر (Zero Downtime) ---
 def load_json(f): 
     if os.path.exists(f):
         try:
@@ -31,8 +32,11 @@ def load_json(f):
     return {}
 
 def save_json(f, d): 
-    with open(f, "w", encoding="utf-8") as file:
-        json.dump(d, file, ensure_ascii=False)
+    try:
+        with open(f, "w", encoding="utf-8") as file:
+            json.dump(d, file, ensure_ascii=False)
+    except Exception as e:
+        print(f"Error saving JSON: {e}")
 
 # --- 🌟 استدعاء بنك الأسئلة الخارجي ---
 try:
@@ -72,7 +76,7 @@ def auto_reset_scores():
         except Exception: pass
         time.sleep(3600)
 
-# --- 2. لوحة تحكم الويب (Dashboard) ---
+# --- 2. لوحة تحكم الويب المتقدمة (Dashboard) ---
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/stats":
@@ -93,14 +97,14 @@ class SimpleHandler(BaseHTTPRequestHandler):
                 th, td {{ padding: 15px; border-bottom: 1px solid #ddd; text-align: center; }}
                 th {{ background: #27ae60; color: white; font-size: 18px; }}
             </style></head><body>
-            <h1 style="color:#2c3e50;">📊 لوحة إحصائيات النظام الذكي</h1>
+            <h1 style="color:#2c3e50;">📊 الإحصائيات الرسمية للمساعد الذكي</h1>
             <div class="card-container">
-                <div class="card"><h3>👥 المستخدمين</h3><p>{len(stats.get('users_list', []))}</p></div>
-                <div class="card"><h3>🤖 أسئلة الذكاء</h3><p>{stats.get('ai_questions', 0)}</p></div>
-                <div class="card"><h3>🎮 التحديات</h3><p>{stats.get('quiz_attempts', 0)}</p></div>
+                <div class="card"><h3>👥 إجمالي المتدربين</h3><p>{len(stats.get('users_list', []))}</p></div>
+                <div class="card"><h3>🤖 استفسارات الذكاء الاصطناعي</h3><p>{stats.get('ai_questions', 0)}</p></div>
+                <div class="card"><h3>🎮 التحديات المنجزة</h3><p>{stats.get('quiz_attempts', 0)}</p></div>
             </div>
-            <h2 style="color:#2c3e50;">🏆 المتصدرين</h2>
-            <table><tr><th>الاسم</th><th>النقاط</th><th>التحديات</th></tr>
+            <h2 style="color:#2c3e50;">🏆 لوحة الشرف الأسبوعية</h2>
+            <table><tr><th>الاسم</th><th>النقاط</th><th>عدد الإجابات</th></tr>
             {"".join([f"<tr><td>{v['name']}</td><td style='color:#27ae60; font-weight:bold;'>{v['score']}</td><td>{len(v.get('answered', []))}</td></tr>" for k,v in sorted(scores.items(), key=lambda x: x[1]['score'], reverse=True)])}
             </table></body></html>"""
             self.wfile.write(html.encode("utf-8"))
@@ -114,17 +118,18 @@ def run_web_server():
     server = HTTPServer(("0.0.0.0", port), SimpleHandler)
     server.serve_forever()
 
-# --- 3. عقل المعلم الذكي (محدث ومزود بقوانين الدليل والمنصات الثلاث) ---
+# --- 3. عقل المعلم الذكي (محدث لتطابق الدليل الرسمي 100%) ---
 AI_KNOWLEDGE = f"""
 أنت المعلم الذكي الرسمي لقسم الحاسب الآلي وتقنية المعلومات في المعهد الصناعي الثانوي ببريدة (مؤسسة التدريب التقني والمهني).
 أجب باختصار شديد ومهنية. اعتمد على أنظمة دليل المتدرب التالية في إجاباتك إذا سئلت:
-- الغياب والحرمان: إنذار عند 15% وحرمان نهائي عند 20%. يطوى القيد إذا انقطع المتدرب أسبوعين متتاليين.
-- المكافأة: 1000 ريال لمتدربي الكليات التقنية، و 800 ريال لمتدربي المعاهد. توقف المكافأة إذا قل المعدل التراكمي عن 2.00 أو تجاوز المدة النظامية.
-- درجات النجاح: درجة الاجتياز في المعاهد 50، وفي الكليات التقنية 60.
-- مكافأة التفوق: 1000 ريال فصلياً (لمعدل 4.85 فأعلى)، و 2000 ريال للخريج (لمعدل 4.75 فأعلى).
+- [span_4](start_span)[span_5](start_span)الغياب والحرمان: إنذار عند 15% وحرمان نهائي عند 20%[span_4](end_span)[span_5](end_span). [span_6](start_span)يُطوى القيد إذا انقطع المتدرب أسبوعين متتاليين[span_6](end_span).
+- [span_7](start_span)المكافأة: 1000 ريال لمتدربي الكليات التقنية (يخصم 10 للصندوق)، و 800 ريال لمتدربي المعاهد (يخصم 5 للصندوق)[span_7](end_span). [span_8](start_span)توقف إذا قل المعدل التراكمي عن 2.00[span_8](end_span).
+- [span_9](start_span)درجات النجاح: درجة الاجتياز في المعاهد 50، وفي الكليات التقنية 60[span_9](end_span).
+- [span_10](start_span)مكافأة التفوق: 1000 ريال فصلياً (لمعدل 4.85 فأعلى)[span_10](end_span)[span_11](start_span)، و 2000 ريال للخريج (لمعدل 4.75 فأعلى)[span_11](end_span).
+- الحقائب التدريبية: {DRIVE_LINK}
 - المنصات الثلاث: 
-  1. رايات: للجدول، الغياب، والسجل التدريبي (rayat.tvtc.gov.sa)
-  2. بلاك بورد: للمحتوى والاختبارات (lms.elearning.edu.sa)
+  1. [span_12](start_span)رايات: للجدول، الغياب، والسجل التدريبي (rayat.tvtc.gov.sa)[span_12](end_span)
+  2. [span_13](start_span)بلاك بورد: للمحتوى والاختبارات (lms.elearning.edu.sa)[span_13](end_span)
   3. تقني: (tvtclms.edu.sa)
 """
 
@@ -137,17 +142,18 @@ if GEMINI_API_KEY:
             if 'generateContent' in m.supported_generation_methods and 'flash' in m.name.lower():
                 ai_model = genai.GenerativeModel(m.name.replace('models/', ''))
                 break
-    except Exception: pass
+    except Exception as e: 
+        print(f"Gemini Init Error: {e}")
 
 ai_sessions, feedback_sessions, active_challenges, interrogation_sessions = {}, {}, {}, {}
 
 TECH_TIPS = [
-    "💡 **نصيحة أمنية:** استخدم `Win + L` لقفل جهازك فوراً.",
-    "🛡️ **نصيحة تقنية:** احرص دائماً على تحديث نظام التشغيل.",
-    "🚀 **نصيحة برمجية:** التنسيق في بايثون هو أساس عمل الكود."
+    "💡 **نصيحة أمنية:** استخدم `Win + L` لقفل جهازك فوراً عند الابتعاد عنه.",
+    "🛡️ **نصيحة تقنية:** احرص دائماً على تحديث نظام التشغيل لديك لسد الثغرات.",
+    "🚀 **نصيحة برمجية:** التنسيق والمسافات البادئة في لغة بايثون هي أساس عمل الكود."
 ]
 
-# --- 4. تصميم القوائم المتطورة (تم تعديل زر المنصات) ---
+# --- 4. تصميم القوائم المتطورة ---
 def get_main_menu():
     return ReplyKeyboardMarkup([
         ["🤖 المعلم الذكي (الدليل الشامل)"], 
@@ -177,12 +183,14 @@ def get_games_menu():
 def get_back_menu(): 
     return ReplyKeyboardMarkup([["🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
 
-# --- 🌟 الأمر الإداري للنسخ الاحتياطي السريع 🌟 ---
+# --- 🌟 أوامر الإدارة المتقدمة للجوائز 🌟 ---
+
+# 1. أمر النسخ الاحتياطي
 async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
-    if user_id != ADMIN_ID:
-        await update.message.reply_text("⛔️ هذا الأمر للإدارة فقط.")
-        return
+    if user_id != ADMIN_ID: return
+    
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_DOCUMENT)
     await update.message.reply_text("⏳ جاري تجهيز وإرسال النسخة الاحتياطية للقسم...")
     files_to_backup = ['data.xlsx', 'scores.json', 'interrogations.json', 'stats.json', 'plans.json']
     sent_any = False
@@ -194,6 +202,34 @@ async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ **تم الانتهاء من النسخ الاحتياطي بنجاح.**", parse_mode='Markdown')
     else:
         await update.message.reply_text("⚠️ لم يتم العثور على ملفات للنسخ الاحتياطي.")
+
+# 2. أمر التعميم الإداري (Broadcast) المذهل
+async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    if user_id != ADMIN_ID: return
+    
+    announcement = update.message.text.replace('/broadcast', '').strip()
+    if not announcement:
+        await update.message.reply_text("⚠️ الطريقة الصحيحة: `/broadcast نصل التعميم هنا`", parse_mode='Markdown')
+        return
+
+    stats = load_json(STATS_FILE)
+    users = stats.get("users_list", [])
+    if not users:
+        await update.message.reply_text("⚠️ لا يوجد متدربين مسجلين في النظام بعد.")
+        return
+
+    await update.message.reply_text(f"📢 جاري إرسال التعميم لـ {len(users)} متدرب...")
+    success_count = 0
+    
+    for u in users:
+        try:
+            await context.bot.send_message(chat_id=u, text=f"📢 **إعلان إداري هام:**\n{SEP}{announcement}", parse_mode='Markdown')
+            success_count += 1
+        except Exception:
+            pass # يتجاهل المتدربين الذين حظروا البوت
+            
+    await update.message.reply_text(f"✅ **تم إرسال التعميم بنجاح لـ {success_count} متدرب.**", parse_mode='Markdown')
 
 # --- 5. المنطق البرمجي الأساسي ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -239,10 +275,12 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         step = session['step']
         if step == 1:
             session['aware_answer'] = text; session['step'] = 2
+            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
             await update.message.reply_text("2️⃣ **ما هو العذر الرئيسي لغياباتك؟**\n(اكتب عذرك بالتفصيل...)", parse_mode='Markdown')
             return
         elif step == 2:
             session['excuse_answer'] = text; session['step'] = 3
+            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
             await update.message.reply_text("3️⃣ **هل تتعهد بالانضباط لتفادي الحرمان (20%)؟**\n(أجب بنعم أو أتعهد)", parse_mode='Markdown')
             return
         elif step == 3:
@@ -268,6 +306,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if text == "📘 دليل المتدرب الرسمي":
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_DOCUMENT)
         if os.path.exists("trainee_guide.pdf"):
             await update.message.reply_document(document=open("trainee_guide.pdf", 'rb'), caption="📘 **دليل المتدرب الرسمي (الإصدار الأخير)**\nيحتوي على كافة اللوائح، حقوق وواجبات المتدرب، والمكافآت.", parse_mode='Markdown')
         else:
@@ -278,15 +317,15 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         faq_msg = (
             f"❓ **الأسئلة الشائعة (بناءً على دليل المتدرب الرسمي):**{SEP}"
             f"🔹 **متى يقع الحرمان أو طي القيد؟**\n"
-            f"تُحرم من المادة عند غياب (20%)، ويُطوى قيدك إذا انقطعت أسبوعين متتاليين أو قل معدلك عن 1.75 كمتدرب مستجد.\n\n"
+            [span_14](start_span)f"تُحرم من المادة عند غياب (20%)[span_14](end_span)[span_15](start_span)، ويُطوى قيدك إذا انقطعت أسبوعين متتاليين[span_15](end_span) [span_16](start_span)أو قل معدلك عن 1.75 كمتدرب مستجد[span_16](end_span).\n\n"
             f"🔹 **كم تبلغ المكافأة الشهرية ومتى تنقطع؟**\n"
-            f"تبلغ (1000 ريال) للكليات التقنية، و (800 ريال) للمعاهد الصناعية. وتتوقف إذا قل معدلك التراكمي عن (2.00) أو صدر بحقك حرمان/فصل.\n\n"
+            [span_17](start_span)f"تبلغ (1000 ريال) للكليات التقنية، و (800 ريال) للمعاهد الصناعية[span_17](end_span). [span_18](start_span)[span_19](start_span)وتتوقف إذا قل معدلك التراكمي عن (2.00) أو صدر بحقك حرمان/فصل[span_18](end_span)[span_19](end_span).\n\n"
             f"🔹 **كم درجة النجاح في المقررات؟**\n"
-            f"درجة الاجتياز في المعاهد هي (50)، وفي الكليات التقنية (60).\n\n"
+            [span_20](start_span)f"درجة الاجتياز في المعاهد هي (50)، وفي الكليات التقنية (60)[span_20](end_span).\n\n"
             f"🔹 **ما هو الحد الأدنى والأعلى لتسجيل المواد؟**\n"
-            f"الحد الأدنى 12 وحدة تدريبية، والحد الأعلى 24 وحدة للفصل.\n\n"
+            [span_21](start_span)f"الحد الأدنى 12 وحدة تدريبية، والحد الأعلى 24 وحدة للفصل[span_21](end_span).\n\n"
             f"🔹 **هل توجد مكافأة للمتفوقين؟**\n"
-            f"نعم، (1000 ريال) فصلياً بشروط لمعدل 4.85 فأعلى، و (2000 ريال) للخريج بمعدل 4.75 فأعلى."
+            [span_22](start_span)f"نعم، (1000 ريال) فصلياً بشروط لمعدل 4.85 فأعلى[span_22](end_span)[span_23](start_span)، و (2000 ريال) للخريج بمعدل 4.75 فأعلى[span_23](end_span)."
         )
         await update.message.reply_text(faq_msg, parse_mode='Markdown')
         return
@@ -301,14 +340,12 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ المعلم غير متصل.", reply_markup=get_back_menu())
             return
         update_stat("ai_questions")
-        status_msg = await update.message.reply_text("⏳ أقرأ سؤالك...")
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
         try:
             response = await ai_model.generate_content_async(f"{AI_KNOWLEDGE}\nسؤال: {text}")
-            await status_msg.delete()
             clean_text = response.text.replace("**", "").replace("* ", "🔹 ").strip()
             await update.message.reply_text(f"📝 رد المعلم الذكي:\n{SEP}{clean_text}", reply_markup=get_back_menu())
         except Exception: 
-            await status_msg.delete()
             await update.message.reply_text("⚠️ **حدث خطأ، حاول لاحقاً.**", reply_markup=get_back_menu())
         return
 
@@ -318,6 +355,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if feedback_sessions.get(user_id) == True:
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
         try:
             await context.bot.send_message(chat_id=GROUP_ID, text=f"💡 **شكوى/مقترح:**\nالمرسل: {update.effective_user.first_name}\nالنص: {text}")
             feedback_sessions[user_id] = False
@@ -350,7 +388,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if text == "🌐 أخبار التقنية":
-        status_msg = await update.message.reply_text("⏳ جاري السحب...")
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
         try:
             req = urllib.request.Request("https://www.tech-wd.com/wd/feed/", headers={'User-Agent': 'Mozilla/5.0'})
             response = urllib.request.urlopen(req, timeout=5)
@@ -359,9 +397,9 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for i, item in enumerate(root.findall('.//item')):
                 if i >= 3: break
                 news_msg += f"🔹 [{item.find('title').text}]({item.find('link').text})\n\n"
-            await status_msg.edit_text(news_msg, parse_mode='Markdown', disable_web_page_preview=True)
+            await update.message.reply_text(news_msg, parse_mode='Markdown', disable_web_page_preview=True)
         except Exception:
-            await status_msg.edit_text("⚠️ **مصدر الأخبار لا يستجيب.**", parse_mode='Markdown')
+            await update.message.reply_text("⚠️ **مصدر الأخبار لا يستجيب.**", parse_mode='Markdown')
         return
 
     if text == "🎮 تحدي الأسبوع":
@@ -387,12 +425,11 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if text.isdigit():
-        status_msg = await update.message.reply_text("⏳ جاري البحث...")
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
         try:
             df = pd.read_excel('data.xlsx')
             df.columns = df.columns.astype(str).str.strip()
             res = df[df['stu_num'].astype(str).str.strip() == text]
-            await status_msg.delete()
             
             if not res.empty:
                 stu_nam = res.iloc[0]['stu_nam']
@@ -421,7 +458,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else: 
                 await update.message.reply_text("❌ **الرقم غير مسجل.**", parse_mode='Markdown')
         except Exception:
-            if 'status_msg' in locals(): await status_msg.delete()
             await update.message.reply_text("⚠️ **ملف الغياب غير متوفر.**", parse_mode='Markdown')
         return
 
@@ -435,7 +471,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📚 **الحقائب التدريبية:**", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
         return
         
-    # --- 🌟 جودة الحياة: فصل المنصات الثلاث بأزرار شفافة 🌟 ---
     if text == "🔗 المنصات الإلكترونية": 
         keyboard = [
             [InlineKeyboardButton("🎓 بوابة رايات (للمتدربين)", url="https://rayat.tvtc.gov.sa")],
@@ -457,6 +492,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
         
     if text == "📅 التقويم التدريبي":
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
         if os.path.exists('calendar.jpg'): await update.message.reply_photo(photo=open('calendar.jpg', 'rb'))
         else: await update.message.reply_text("⚠️ ملف التقويم غير متوفر.")
         return
@@ -464,12 +500,15 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not ai_sessions.get(user_id) and not feedback_sessions.get(user_id):
         await update.message.reply_text("⚠️ **الرجاء اختيار خدمة من الأسفل 👇**", reply_markup=get_main_menu())
 
-# --- 🌟 الختم الآلي للأعذار ---
+# --- 🌟 الختم الآلي الآمن للأعذار ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.caption: 
         await update.message.reply_text("⚠️ **الرجاء إرفاق الصورة مع كتابة رقمك في الوصف.**", parse_mode='Markdown')
         return
-    status_msg = await update.message.reply_text("⏳ جاري الختم...")
+    
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
+    status_msg = await update.message.reply_text("⏳ جاري المعالجة والختم...")
+    
     try:
         caption_text = update.message.caption
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -484,22 +523,23 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             img = Image.open(in_memory_img)
             width, height = img.size
-            txt_img = Image.new('RGB', (1000, 50), color='#d32f2f') 
-            ImageDraw.Draw(txt_img).text((20, 15), f"AUTO-SYSTEM | STU-ID: {stu_id} | DATE: {timestamp}", fill="white")
+            txt_img = Image.new('RGB', (1000, 50), color='#1e3a8a') # لون كحلي رسمي للختم
+            ImageDraw.Draw(txt_img).text((20, 15), f"TVTC OFFICIAL | ID: {stu_id} | DATE: {timestamp}", fill="white")
             txt_img = txt_img.resize((width, int(width * 50 / 1000)))
             img.paste(txt_img, (0, height - txt_img.height)) 
             
             output = io.BytesIO()
             img.save(output, format='JPEG')
             output.seek(0)
-            await context.bot.send_photo(chat_id=GROUP_ID, photo=output, caption=f"📥 **عذر مختوم:**\n{caption_text}\n⏱️ {timestamp}", parse_mode='Markdown')
+            await context.bot.send_photo(chat_id=GROUP_ID, photo=output, caption=f"📥 **عذر مختوم رسمياً:**\n{caption_text}\n⏱️ {timestamp}", parse_mode='Markdown')
         else:
             await context.bot.send_message(chat_id=GROUP_ID, text=f"📥 **عذر:**\n{caption_text}\n{timestamp}")
             await update.message.copy(chat_id=GROUP_ID)
             
-        await status_msg.edit_text("✅ **تم الختم والإرسال للإدارة.**", parse_mode='Markdown')
-    except Exception: 
-        await status_msg.edit_text("⚠️ **خطأ في الإرسال.**", parse_mode='Markdown')
+        await status_msg.edit_text("✅ **تم الختم والإرسال للإدارة بنجاح.**", parse_mode='Markdown')
+    except Exception as e:
+        print(f"Doc error: {e}")
+        await status_msg.edit_text("⚠️ **حدث خطأ فني أثناء الإرسال.**", parse_mode='Markdown')
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -532,14 +572,16 @@ def main():
     
     app = Application.builder().token(TOKEN).build()
     
+    # 🌟 أوامر الإدارة العُليا 🌟
     app.add_handler(CommandHandler("backup", backup_command))
+    app.add_handler(CommandHandler("broadcast", broadcast_command))
     
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_logic))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تم تشغيل النسخة الماسية (تم فصل المنصات الثلاث كأزرار شفافة مستقلة)...")
+    print("🚀 تم تشغيل النسخة الماسية المطلقة (جاهزة لجوائز التميز)...")
     app.run_polling()
 
 if __name__ == '__main__': 
