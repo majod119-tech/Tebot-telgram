@@ -114,7 +114,7 @@ def run_web_server():
     server = HTTPServer(("0.0.0.0", port), SimpleHandler)
     server.serve_forever()
 
-# --- 3. عقل المعلم الذكي (محدث لتصحيح المكافآت) ---
+# --- 3. عقل المعلم الذكي ---
 AI_KNOWLEDGE = f"""
 أنت المعلم الذكي الرسمي لقسم الحاسب الآلي وتقنية المعلومات في المعهد الصناعي الثانوي ببريدة (مؤسسة التدريب التقني والمهني).
 أجب باختصار شديد ومهنية. اعتمد على أنظمة دليل المتدرب التالية في إجاباتك إذا سئلت:
@@ -124,6 +124,7 @@ AI_KNOWLEDGE = f"""
 - العبء التدريبي: الحد الأدنى لتسجيل المقررات 12 وحدة، والحد الأعلى 24 وحدة.
 - مكافأة التفوق: 1000 ريال فصلياً (لمعدل 4.85 فأعلى)، و 2000 ريال للخريج (لمعدل 4.75 فأعلى).
 - الحقائب التدريبية: {DRIVE_LINK}
+- منصة التدرب الإلكتروني (بلاك بورد): https://lms.elearning.edu.sa
 """
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
@@ -145,7 +146,7 @@ TECH_TIPS = [
     "🚀 **نصيحة برمجية:** التنسيق في بايثون هو أساس عمل الكود."
 ]
 
-# --- 4. تصميم القوائم المتطورة (تمت إضافة دليل المتدرب) ---
+# --- 4. تصميم القوائم المتطورة ---
 def get_main_menu():
     return ReplyKeyboardMarkup([
         ["🤖 المعلم الذكي (الدليل الشامل)"], 
@@ -265,7 +266,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🏠 **تم العودة للقائمة الرئيسية.**", reply_markup=get_main_menu())
         return
 
-    # --- 🌟 جودة الحياة: إرسال دليل المتدرب كملف PDF 🌟 ---
+    # --- 🌟 إرسال دليل المتدرب كملف PDF 🌟 ---
     if text == "📘 دليل المتدرب الرسمي":
         if os.path.exists("trainee_guide.pdf"):
             await update.message.reply_document(document=open("trainee_guide.pdf", 'rb'), caption="📘 **دليل المتدرب الرسمي (الإصدار الأخير)**\nيحتوي على كافة اللوائح، حقوق وواجبات المتدرب، والمكافآت.", parse_mode='Markdown')
@@ -273,7 +274,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ **عذراً، جاري تحديث ملف الدليل من قبل الإدارة.**\nيرجى المحاولة لاحقاً.", parse_mode='Markdown')
         return
 
-    # --- 🌟 جودة الحياة: الأسئلة الشائعة المصححة 🌟 ---
+    # --- 🌟 الأسئلة الشائعة المحدثة بالدليل الرسمي 🌟 ---
     if text == "❓ الأسئلة الشائعة":
         faq_msg = (
             f"❓ **الأسئلة الشائعة (بناءً على دليل المتدرب الرسمي):**{SEP}"
@@ -283,6 +284,8 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"تبلغ (1000 ريال) للكليات التقنية، و (800 ريال) للمعاهد الصناعية. وتتوقف إذا قل معدلك التراكمي عن (2.00) أو صدر بحقك حرمان/فصل.\n\n"
             f"🔹 **كم درجة النجاح في المقررات؟**\n"
             f"درجة الاجتياز في المعاهد هي (50)، وفي الكليات التقنية (60).\n\n"
+            f"🔹 **ما هو الحد الأدنى والأعلى لتسجيل المواد؟**\n"
+            f"الحد الأدنى 12 وحدة تدريبية، والحد الأعلى 24 وحدة للفصل.\n\n"
             f"🔹 **هل توجد مكافأة للمتفوقين؟**\n"
             f"نعم، (1000 ريال) فصلياً بشروط لمعدل 4.85 فأعلى، و (2000 ريال) للخريج بمعدل 4.75 فأعلى."
         )
@@ -433,10 +436,11 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📚 **الحقائب التدريبية:**", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
         return
         
+    # --- 🌟 جودة الحياة: إضافة بلاك بورد مع منصة تقني في الأزرار الشفافة 🌟 ---
     if text == "🔗 منصة تقني ورايات": 
         keyboard = [
             [InlineKeyboardButton("🎓 بوابة رايات (للمتدربين)", url="https://rayat.tvtc.gov.sa")],
-            [InlineKeyboardButton("💻 منصة تقني (للتدريب عن بعد)", url="https://tvtclms.edu.sa")]
+            [InlineKeyboardButton("💻 منصة تقني (بلاك بورد) للتدريب عن بعد", url="https://lms.elearning.edu.sa/")]
         ]
         await update.message.reply_text("🌐 **اختر المنصة التي تريد الدخول إليها:**", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
         return
@@ -535,7 +539,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تم تشغيل النسخة الماسية (الأسئلة الشائعة + إرسال دليل المتدرب)...")
+    print("🚀 تم تشغيل النسخة الماسية (تمت إضافة بلاك بورد للمنصات)...")
     app.run_polling()
 
 if __name__ == '__main__': 
