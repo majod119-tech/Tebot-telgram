@@ -22,7 +22,7 @@ try:
 except ImportError:
     HAS_PIL = False
 
-# --- 🌟 دوال مساعدة لضمان استقرار السيرفر ---
+# --- 🌟 دوال مساعدة لضمان استقرار السيرفر (Zero Downtime) ---
 def load_json(f): 
     if os.path.exists(f):
         try:
@@ -39,6 +39,7 @@ def save_json(f, d):
     except Exception as e:
         print(f"Error saving JSON: {e}")
 
+# --- 🌟 استدعاء بنك الأسئلة الخارجي ---
 try:
     from questions_bank import QUESTIONS
 except Exception as e:
@@ -61,6 +62,7 @@ def update_stat(cat):
     s[cat] = s.get(cat, 0) + 1
     save_json(STATS_FILE, s)
 
+# --- 🌟 التصفير التلقائي للتحديات (كل أحد) ---
 def auto_reset_scores():
     while True:
         try:
@@ -75,6 +77,7 @@ def auto_reset_scores():
         except Exception: pass
         time.sleep(3600)
 
+# --- 2. لوحة تحكم الويب المتقدمة (Dashboard) ---
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/stats":
@@ -407,6 +410,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg, parse_mode='Markdown')
         return
 
+    # --- 🌟 التحديث الساحق للبحث والتغلب على أخطاء الإكسل 🌟 ---
     if text == "📊 استعلام الغياب":
         await update.message.reply_text("🔎 **استعلام الغياب**\n👇 **أرسل رقمك التدريبي...**", parse_mode='Markdown')
         return
@@ -443,13 +447,20 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 m = f"✅ **السجل لـ:** `{stu_nam}`{SEP}"
                 
                 for _, r in res.iterrows():
-                    val = float(r['parsnt'])
-                    icon = "🔴 حرمان" if val >= 20 else ("⚠️ إنذار" if val >= 15 else "🟢 منتظم")
+                    # 🌟 الدرع الواقي: معالجة الأخطاء البشرية في الإكسل (مثل إدخال تاريخ مكان النسبة) 🌟
+                    raw_val = str(r.get('parsnt', '0')).strip()
+                    try:
+                        val = float(raw_val)
+                        icon = "🔴 حرمان" if val >= 20 else ("⚠️ إنذار" if val >= 15 else "🟢 منتظم")
+                        display_val = f"%{val} {icon}"
+                    except Exception:
+                        val = 0.0 # لتجنب انهيار الحسبة
+                        display_val = f"{raw_val} ⚠️ (خطأ في إدخال النسبة بالإكسل)"
                     
                     day_val = r.get('day', 'غير محدد')
                     if pd.isna(day_val) or str(day_val).strip() == 'nan': day_val = 'غير محدد'
                     
-                    m += f"📖 {r['c_nam']}: %{val} {icon}\n📅 أيام الغياب/التحديث: {day_val}\n\n"
+                    m += f"📖 {r['c_nam']}: {display_val}\n📅 أيام الغياب/التحديث: {day_val}\n\n"
                     
                     if val >= 20: has_deprivation = True
                     elif 15 <= val < 20 and r['c_nam'] not in completed_interrogations:
@@ -591,7 +602,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تم تشغيل النسخة الماسية (كاملة وبدون أي أخطاء)...")
+    print("🚀 تم تشغيل النسخة الماسية (الدرع الواقي للأخطاء فعال)...")
     app.run_polling()
 
 if __name__ == '__main__': 
