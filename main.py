@@ -1,5 +1,6 @@
 import os
 import io
+import csv
 import pandas as pd
 import json
 import random
@@ -44,7 +45,6 @@ try:
 except Exception as e:
     QUESTIONS = [{"q": "ما هو عنوان الـ IP لـ (Localhost)؟", "options": ["192.168.1.1", "127.0.0.1", "8.8.8.8", "255.255.255.0"], "answer": 1}]
 
-# --- 1. الإعدادات والبيانات الأساسية ---
 TOKEN = os.environ.get("TOKEN") 
 GROUP_ID = "-5193577198"
 DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
@@ -96,14 +96,13 @@ class SimpleHandler(BaseHTTPRequestHandler):
             <div class="card-container">
                 <div class="card"><h3>👥 إجمالي المتدربين</h3><p>{len(stats.get('users_list', []))}</p></div>
                 <div class="card"><h3>🤖 استفسارات الذكاء الاصطناعي</h3><p>{stats.get('ai_questions', 0)}</p></div>
-                <div class="card"><h3>🎮 التحديات المنجزة</h3><p>{stats.get('quiz_attempts', 0)}</p></div>
             </div>
             </body></html>"""
             self.wfile.write(html.encode("utf-8"))
         else:
             self.send_response(200)
             self.end_headers()
-            self.wfile.write(b"Bot Server Online. Access /stats for dashboard.")
+            self.wfile.write(b"Bot Server Online.")
 
 def run_web_server():
     port = int(os.environ.get("PORT", 10000))
@@ -111,12 +110,7 @@ def run_web_server():
     server.serve_forever()
 
 AI_KNOWLEDGE = f"""
-أنت المعلم الذكي الرسمي لقسم الحاسب الآلي وتقنية المعلومات في المعهد الصناعي الثانوي ببريدة (مؤسسة التدريب التقني والمهني).
-أجب باختصار شديد ومهنية. اعتمد على أنظمة دليل المتدرب التالية في إجاباتك إذا سئلت:
-- الغياب والحرمان: إنذار عند 15% وحرمان نهائي عند 20%. يُطوى القيد إذا انقطع المتدرب أسبوعين متتاليين.
-- المكافأة: 800 ريال لمتدربي المعاهد. توقف إذا قل المعدل التراكمي عن 2.00.
-- درجات النجاح: درجة الاجتياز في المعاهد 50.
-- الحقائب التدريبية: {DRIVE_LINK}
+أنت المعلم الذكي. الغياب إنذار 15% حرمان 20%. الحقائب: {DRIVE_LINK}
 """
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
@@ -132,12 +126,6 @@ if GEMINI_API_KEY:
         pass
 
 ai_sessions, feedback_sessions, active_challenges, interrogation_sessions = {}, {}, {}, {}
-
-TECH_TIPS = [
-    "💡 **نصيحة أمنية:** استخدم `Win + L` لقفل جهازك فوراً عند الابتعاد عنه.",
-    "🛡️ **نصيحة تقنية:** احرص دائماً على تحديث نظام التشغيل لديك لسد الثغرات.",
-    "🚀 **نصيحة برمجية:** التنسيق والمسافات البادئة في لغة بايثون هي أساس عمل الكود."
-]
 
 def get_main_menu():
     return ReplyKeyboardMarkup([
@@ -177,7 +165,7 @@ async def db_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         df = pd.read_excel('data.xlsx', dtype=str)
         sample = df['stu_num'].dropna().unique()[:5]
-        msg = f"📊 **كشاف قاعدة البيانات:**\n✅ عدد السجلات المحفوظة: {len(df)}\n🔍 أول 5 أرقام متدربين تم حفظها:\n`{', '.join(sample)}`"
+        msg = f"📊 **كشاف قاعدة البيانات:**\n✅ عدد السجلات المحفوظة: {len(df)}\n🔍 عينة من أرقام المتدربين:\n`{', '.join(sample)}`"
         await update.message.reply_text(msg, parse_mode='Markdown')
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطأ: {e}")
@@ -414,7 +402,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ **الرجاء اختيار خدمة من الأسفل 👇**", reply_markup=get_main_menu())
 
 
-# --- 🌟 محرك سحب ملفات رايات (المفصل خصيصاً على ملفك) 🌟 ---
+# --- 🌟 محرك سحب ملفات رايات (خوارزمية الماسح البشري الذكي) 🌟 ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     
@@ -422,7 +410,7 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         doc = update.message.document
         if doc.file_name.endswith(('.xlsx', '.xls', '.csv')):
             await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-            status_msg = await update.message.reply_text("⏳ **جاري قراءة ملف رايات الأصلي...**", parse_mode='Markdown')
+            status_msg = await update.message.reply_text("⏳ **جاري فحص الملف بالماسح الذكي...**", parse_mode='Markdown')
             
             try:
                 file = await context.bot.get_file(doc.file_id)
@@ -430,40 +418,55 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     temp_file = "temp_rayat.csv"
                     await file.download_to_drive(temp_file)
                     
-                    df_raw = None
-                    for enc in ['utf-8-sig', 'windows-1256', 'utf-8', 'cp1256']:
+                    raw_data = []
+                    # نقرأ الملف بمكتبة بايثون الأساسية الصارمة بدلاً من Pandas
+                    for enc in ['utf-8-sig', 'windows-1256', 'cp1256', 'utf-8']:
                         try:
-                            temp_df = pd.read_csv(temp_file, encoding=enc, dtype=str, sep=',')
-                            if len(temp_df.columns) >= 19:
-                                df_raw = temp_df
-                                break
+                            with open(temp_file, 'r', encoding=enc) as f:
+                                reader = csv.reader(f, delimiter=',')
+                                raw_data = list(reader)
+                                if len(raw_data) > 1 and len(raw_data[0]) > 5:
+                                    break
                         except Exception:
                             pass
                     
-                    if df_raw is None:
-                        raise Exception("فشل في تفكيك أعمدة الملف، تأكد من تصدير رايات بشكل صحيح.")
+                    if not raw_data:
+                        raise Exception("فشل قراءة الملف. تأكد أنه CSV سليم.")
 
-                    df_clean = pd.DataFrame()
-                    
-                    try:
-                        c_course = next(c for c in df_raw.columns if 'اسم المقرر' in str(c))
-                        c_id = next(c for c in df_raw.columns if 'رقم المتدرب' in str(c))
-                        c_name = next(c for c in df_raw.columns if 'اسم المتدرب' in str(c))
-                        c_perc = next(c for c in df_raw.columns if 'نسبة الغياب بعذر وبدون' in str(c))
+                    parsed_list = []
+                    for row in raw_data:
+                        if len(row) < 15: # تخطي السطور الفارغة والقصيرة
+                            continue
+                            
+                        stu_num = ""
+                        c_id = -1
                         
-                        df_clean['c_nam'] = df_raw[c_course]
-                        df_clean['stu_num'] = df_raw[c_id]
-                        df_clean['stu_nam'] = df_raw[c_name]
-                        df_clean['parsnt'] = df_raw[c_perc]
-                    except StopIteration:
-                        df_clean['c_nam'] = df_raw.iloc[:, 14]
-                        df_clean['stu_num'] = df_raw.iloc[:, 16]
-                        df_clean['stu_nam'] = df_raw.iloc[:, 17]
-                        df_clean['parsnt'] = df_raw.iloc[:, 18]
+                        # 🌟 الماسح البشري: يبحث عن 9 أرقام (رقم المتدرب) في أي مكان بالسطر 🌟
+                        for j, val in enumerate(row):
+                            digits = "".join(filter(str.isdigit, str(val)))
+                            if len(digits) >= 8 and len(digits) <= 11 and (digits.startswith('4') or digits.startswith('1')):
+                                stu_num = digits
+                                c_id = j
+                                break
+                        
+                        # إذا وجدنا رقم الطالب، فنحن نعرف مواقع باقي البيانات تلقائياً
+                        # بناءً على ملف رايات: الاسم بعد الرقم (+1)، النسبة بعده بـ (+2)، والمقرر قبله بـ (-2)
+                        if stu_num and c_id != -1 and len(row) > c_id + 2:
+                            c_course = c_id - 2 if c_id >= 2 else max(0, c_id - 1)
+                            c_name = c_id + 1
+                            c_perc = c_id + 2
+                            
+                            parsed_list.append({
+                                'stu_num': stu_num,
+                                'stu_nam': str(row[c_name]).strip(),
+                                'c_nam': str(row[c_course]).strip(),
+                                'parsnt': str(row[c_perc]).strip()
+                            })
 
-                    df_clean['stu_num'] = df_clean['stu_num'].astype(str).apply(lambda x: ''.join(filter(str.isdigit, x)))
-                    df_clean = df_clean[df_clean['stu_num'] != ''] 
-                    
+                    df_clean = pd.DataFrame(parsed_list)
+                    if df_clean.empty:
+                        raise Exception("الملف مقروء، لكن لم أجد أي أرقام طلاب داخله! تأكد أن الملف يخص المتدربين.")
+                        
                     df_clean['day'] = datetime.now().strftime("%Y-%m-%d")
                     df_clean.to_excel("data.xlsx", index=False)
                     records_count = len(df_clean)
@@ -479,6 +482,7 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await status_msg.edit_text(f"⚠️ **فشل التحديث:** `{e}`", parse_mode='Markdown')
             return
 
+    # --- الختم الآلي للأعذار ---
     if not update.message.caption: 
         await update.message.reply_text("⚠️ **الرجاء إرفاق الصورة مع كتابة رقمك في الوصف.**", parse_mode='Markdown')
         return
@@ -555,7 +559,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل النسخة الكاملة والنهائية...")
+    print("🚀 تشغيل النسخة الكاملة والنهائية المجهزة بـ 'الماسح البشري' لرايات...")
     app.run_polling()
 
 if __name__ == '__main__': 
