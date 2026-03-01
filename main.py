@@ -116,7 +116,6 @@ def run_web_server():
     server = HTTPServer(("0.0.0.0", port), SimpleHandler)
     server.serve_forever()
 
-# --- 3. عقل المعلم الذكي ---
 AI_KNOWLEDGE = f"""
 أنت المعلم الذكي الرسمي لقسم الحاسب الآلي وتقنية المعلومات في المعهد الصناعي الثانوي ببريدة (مؤسسة التدريب التقني والمهني).
 أجب باختصار شديد ومهنية. اعتمد على أنظمة دليل المتدرب التالية في إجاباتك إذا سئلت:
@@ -415,19 +414,19 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
         try:
             if not os.path.exists('data.xlsx'):
-                await update.message.reply_text("⚠️ **تنبيه للإدارة:** ملف الإكسل (data.xlsx) غير موجود في السيرفر.", parse_mode='Markdown')
+                await update.message.reply_text("⚠️ **تنبيه للإدارة:** قاعدة البيانات غير موجودة. يرجى إرسال ملف الإكسل أو CSV.", parse_mode='Markdown')
                 return
 
             try:
                 df = pd.read_excel('data.xlsx', dtype=str)
             except ImportError:
-                await update.message.reply_text("⚠️ **تنبيه للإدارة:** تنقص مكتبة `openpyxl`. الرجاء إضافتها في requirements.txt", parse_mode='Markdown')
+                await update.message.reply_text("⚠️ **تنبيه للإدارة:** تنقص مكتبة `openpyxl`.", parse_mode='Markdown')
                 return
 
             df.columns = df.columns.astype(str).str.strip()
             
             if 'stu_num' not in df.columns:
-                await update.message.reply_text("⚠️ **تنبيه للإدارة:** عمود رقم الطالب `stu_num` غير موجود داخل ملف الإكسل.", parse_mode='Markdown')
+                await update.message.reply_text("⚠️ **تنبيه للإدارة:** عمود رقم الطالب `stu_num` غير موجود داخل قاعدة البيانات.", parse_mode='Markdown')
                 return
             
             df['stu_num'] = df['stu_num'].astype(str).str.replace(r'\.0$', '', regex=True)
@@ -445,12 +444,10 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 for _, r in res.iterrows():
                     raw_val = str(r.get('parsnt', '0')).strip()
                     
-                    # 🌟 الخوارزمية العكسية لإصلاح خطأ الإكسل برمجياً 🌟
-                    # إذا حول الإكسل النسبة إلى تاريخ (مثل 2026-05-26)
                     if re.match(r'^\d{4}-\d{2}-\d{2}', raw_val):
-                        date_part = raw_val.split()[0] # نأخذ التاريخ فقط
-                        y, month, d = date_part.split('-') # نفككه
-                        raw_val = f"{d}.{month}" # نعيده كنسبة صحيحة!
+                        date_part = raw_val.split()[0]
+                        y, month, d = date_part.split('-')
+                        raw_val = f"{d}.{month}"
                     
                     try:
                         val = float(raw_val)
@@ -458,7 +455,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         display_val = f"%{val} {icon}"
                     except Exception:
                         val = 0.0
-                        display_val = f"{raw_val} ⚠️ (خطأ في إدخال النسبة بالإكسل)"
+                        display_val = f"{raw_val} ⚠️ (خطأ بالنظام)"
                     
                     day_val = str(r.get('day', 'غير محدد'))
                     if pd.isna(r.get('day')) or day_val.strip() == 'nan': 
@@ -527,8 +524,72 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not ai_sessions.get(user_id) and not feedback_sessions.get(user_id):
         await update.message.reply_text("⚠️ **الرجاء اختيار خدمة من الأسفل 👇**", reply_markup=get_main_menu())
 
-# --- 🌟 الختم الآلي الآمن للأعذار ---
+
+# --- 🌟 الختم الآلي للأعذار & ميزة التحديث الإداري لملفات (رايات) 🌟 ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    
+    # 🌟 ميزة الإدارة الحصرية: التحديث المباشر من نظام رايات (CSV/Excel) عبر تليجرام 🌟
+    if user_id == ADMIN_ID and update.message.document:
+        doc = update.message.document
+        if doc.file_name.endswith(('.xlsx', '.xls', '.csv')):
+            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+            status_msg = await update.message.reply_text("⏳ **جاري تحليل ملف (رايات) وتحديث السجلات...**", parse_mode='Markdown')
+            
+            try:
+                file = await context.bot.get_file(doc.file_id)
+                
+                if doc.file_name.endswith('.csv'):
+                    temp_file = "temp_rayat.csv"
+                    await file.download_to_drive(temp_file)
+                    
+                    # محاولة قراءة الملف بترميزات مختلفة لتجنب مشاكل اللغة العربية
+                    df_raw = None
+                    for enc in ['utf-8-sig', 'windows-1256', 'utf-8', 'cp1256']:
+                        try:
+                            df_raw = pd.read_csv(temp_file, encoding=enc)
+                            break
+                        except Exception:
+                            continue
+                    
+                    if df_raw is None:
+                        raise Exception("فشل في قراءة ترميز ملف رايات.")
+                        
+                    # تنظيف أسماء الأعمدة من المسافات
+                    df_raw.columns = df_raw.columns.str.strip()
+                    
+                    # خريطة تحويل الأعمدة من رايات إلى البوت
+                    col_map = {
+                        "رقم المتدرب": "stu_num",
+                        "اسم المتدرب": "stu_nam",
+                        "اسم المقرر": "c_nam",
+                        "إجمالي نسبة الغياب بعذر وبدون عذر": "parsnt"
+                    }
+                    
+                    missing_cols = [c for c in col_map.keys() if c not in df_raw.columns]
+                    if missing_cols:
+                        raise Exception(f"الرجاء التأكد من الملف. هذه الأعمدة مفقودة: {', '.join(missing_cols)}")
+                        
+                    # فلترة البيانات المطلوبة وتغيير أسماء الأعمدة
+                    df_clean = df_raw[list(col_map.keys())].rename(columns=col_map)
+                    
+                    # إضافة تاريخ اليوم تلقائياً لكل الطلاب
+                    df_clean['day'] = datetime.now().strftime("%Y-%m-%d")
+                    
+                    # حفظ الملف كـ data.xlsx ليقرأه البوت كالمعتاد
+                    df_clean.to_excel("data.xlsx", index=False)
+                    os.remove(temp_file) # تنظيف الملف المؤقت
+                    
+                else:
+                    # إذا كان ملف إكسل جاهز، نرفعه كما هو
+                    await file.download_to_drive("data.xlsx")
+                    
+                await status_msg.edit_text("✅ **تم سحب البيانات من نظام (رايات) وتحديث قاعدة الغياب بنجاح!**\nتاريخ التحديث أُضيف تلقائياً للجميع 🚀", parse_mode='Markdown')
+            except Exception as e:
+                await status_msg.edit_text(f"⚠️ **فشل التحديث:** `{e}`", parse_mode='Markdown')
+            return # توقف هنا ولا تعتبره عذراً طبياً
+
+    # --- باقي الكود: الختم الآلي للأعذار للمتدربين ---
     if not update.message.caption: 
         await update.message.reply_text("⚠️ **الرجاء إرفاق الصورة مع كتابة رقمك في الوصف.**", parse_mode='Markdown')
         return
@@ -608,7 +669,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تم تشغيل النسخة الماسية (تم إضافة الخوارزمية العكسية لخداع الإكسل)...")
+    print("🚀 تم تشغيل النسخة الماسية (التحديث السحابي لملفات رايات مفعّل)...")
     app.run_polling()
 
 if __name__ == '__main__': 
