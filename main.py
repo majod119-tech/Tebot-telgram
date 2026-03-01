@@ -122,14 +122,13 @@ def run_web_server():
 AI_KNOWLEDGE = f"""
 أنت المعلم الذكي الرسمي لقسم الحاسب الآلي وتقنية المعلومات في المعهد الصناعي الثانوي ببريدة (مؤسسة التدريب التقني والمهني).
 أجب باختصار شديد ومهنية. اعتمد على أنظمة دليل المتدرب التالية في إجاباتك إذا سئلت:
-- [span_4](start_span)[span_5](start_span)الغياب والحرمان: إنذار عند 15% وحرمان نهائي عند 20%[span_4](end_span)[span_5](end_span). [span_6](start_span)يُطوى القيد إذا انقطع المتدرب أسبوعين متتاليين[span_6](end_span).
-- [span_7](start_span)المكافأة: 1000 ريال لمتدربي الكليات التقنية (يخصم 10 للصندوق)، و 800 ريال لمتدربي المعاهد (يخصم 5 للصندوق)[span_7](end_span). [span_8](start_span)توقف إذا قل المعدل التراكمي عن 2.00[span_8](end_span).
-- [span_9](start_span)درجات النجاح: درجة الاجتياز في المعاهد 50، وفي الكليات التقنية 60[span_9](end_span).
-- [span_10](start_span)مكافأة التفوق: 1000 ريال فصلياً (لمعدل 4.85 فأعلى)[span_10](end_span)[span_11](start_span)، و 2000 ريال للخريج (لمعدل 4.75 فأعلى)[span_11](end_span).
+- الغياب والحرمان: إنذار عند 15% وحرمان نهائي عند 20%. يُطوى القيد إذا انقطع المتدرب أسبوعين متتاليين.
+- المكافأة: 800 ريال لمتدربي المعاهد (يخصم 5 للصندوق). توقف إذا قل المعدل التراكمي عن 2.00.
+- درجات النجاح: درجة الاجتياز في المعاهد 50، وفي الكليات التقنية 60.
 - الحقائب التدريبية: {DRIVE_LINK}
 - المنصات الثلاث: 
-  1. [span_12](start_span)رايات: للجدول، الغياب، والسجل التدريبي (rayat.tvtc.gov.sa)[span_12](end_span)
-  2. [span_13](start_span)بلاك بورد: للمحتوى والاختبارات (lms.elearning.edu.sa)[span_13](end_span)
+  1. رايات: للجدول، الغياب، والسجل التدريبي (rayat.tvtc.gov.sa)
+  2. بلاك بورد: للمحتوى والاختبارات (lms.elearning.edu.sa)
   3. تقني: (tvtclms.edu.sa)
 """
 
@@ -184,8 +183,6 @@ def get_back_menu():
     return ReplyKeyboardMarkup([["🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
 
 # --- 🌟 أوامر الإدارة المتقدمة للجوائز 🌟 ---
-
-# 1. أمر النسخ الاحتياطي
 async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     if user_id != ADMIN_ID: return
@@ -203,7 +200,6 @@ async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("⚠️ لم يتم العثور على ملفات للنسخ الاحتياطي.")
 
-# 2. أمر التعميم الإداري (Broadcast) المذهل
 async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     if user_id != ADMIN_ID: return
@@ -227,7 +223,7 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=u, text=f"📢 **إعلان إداري هام:**\n{SEP}{announcement}", parse_mode='Markdown')
             success_count += 1
         except Exception:
-            pass # يتجاهل المتدربين الذين حظروا البوت
+            pass 
             
     await update.message.reply_text(f"✅ **تم إرسال التعميم بنجاح لـ {success_count} متدرب.**", parse_mode='Markdown')
 
@@ -247,12 +243,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_msg = (
         f"أهلاً بك يا {update.effective_user.first_name} في المساعد الذكي لقسم الحاسب الآلي 💻✨{SEP}"
         f"أنا نظامك الرقمي المتكامل. تم تصميمي لتوفير وقتك وتسهيل رحلتك التدريبية.\n\n"
-        f"📌 **ماذا يمكنني أن أفعل لك؟**\n"
-        f"🔹 استعلام فوري عن نسبة الغياب والإنذارات.\n"
-        f"🔹 رفع وتوثيق الأعذار الطبية بختم آلي.\n"
-        f"🔹 الإجابة على استفساراتك عبر (المعلم الذكي).\n"
-        f"🔹 تحميل الحقائب التدريبية واستعراض الخطط.\n"
-        f"🔹 الحصول على دليل المتدرب الرسمي مباشرة.\n\n"
         f"👇 **الرجاء اختيار الخدمة المطلوبة من القائمة السفلية لبدء العمل:**"
     )
     
@@ -317,15 +307,15 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         faq_msg = (
             f"❓ **الأسئلة الشائعة (بناءً على دليل المتدرب الرسمي):**{SEP}"
             f"🔹 **متى يقع الحرمان أو طي القيد؟**\n"
-            [span_14](start_span)f"تُحرم من المادة عند غياب (20%)[span_14](end_span)[span_15](start_span)، ويُطوى قيدك إذا انقطعت أسبوعين متتاليين[span_15](end_span) [span_16](start_span)أو قل معدلك عن 1.75 كمتدرب مستجد[span_16](end_span).\n\n"
+            f"تُحرم من المادة عند غياب (20%)، ويُطوى قيدك إذا انقطعت أسبوعين متتاليين أو قل معدلك عن 1.75 كمتدرب مستجد.\n\n"
             f"🔹 **كم تبلغ المكافأة الشهرية ومتى تنقطع؟**\n"
-            [span_17](start_span)f"تبلغ (1000 ريال) للكليات التقنية، و (800 ريال) للمعاهد الصناعية[span_17](end_span). [span_18](start_span)[span_19](start_span)وتتوقف إذا قل معدلك التراكمي عن (2.00) أو صدر بحقك حرمان/فصل[span_18](end_span)[span_19](end_span).\n\n"
+            f"تبلغ (1000 ريال) للكليات التقنية، و (800 ريال) للمعاهد الصناعية. وتتوقف إذا قل معدلك التراكمي عن (2.00) أو صدر بحقك حرمان/فصل.\n\n"
             f"🔹 **كم درجة النجاح في المقررات؟**\n"
-            [span_20](start_span)f"درجة الاجتياز في المعاهد هي (50)، وفي الكليات التقنية (60)[span_20](end_span).\n\n"
+            f"درجة الاجتياز في المعاهد هي (50)، وفي الكليات التقنية (60).\n\n"
             f"🔹 **ما هو الحد الأدنى والأعلى لتسجيل المواد؟**\n"
-            [span_21](start_span)f"الحد الأدنى 12 وحدة تدريبية، والحد الأعلى 24 وحدة للفصل[span_21](end_span).\n\n"
+            f"الحد الأدنى 12 وحدة تدريبية، والحد الأعلى 24 وحدة للفصل.\n\n"
             f"🔹 **هل توجد مكافأة للمتفوقين؟**\n"
-            [span_22](start_span)f"نعم، (1000 ريال) فصلياً بشروط لمعدل 4.85 فأعلى[span_22](end_span)[span_23](start_span)، و (2000 ريال) للخريج بمعدل 4.75 فأعلى[span_23](end_span)."
+            f"نعم، (1000 ريال) فصلياً بشروط لمعدل 4.85 فأعلى، و (2000 ريال) للخريج بمعدل 4.75 فأعلى."
         )
         await update.message.reply_text(faq_msg, parse_mode='Markdown')
         return
@@ -420,6 +410,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg, parse_mode='Markdown')
         return
 
+    # --- 🌟 التحديث الساحق: إضافة تاريخ التحديث / الغياب من حقل day 🌟 ---
     if text == "📊 استعلام الغياب":
         await update.message.reply_text("🔎 **استعلام الغياب**\n👇 **أرسل رقمك التدريبي...**", parse_mode='Markdown')
         return
@@ -441,7 +432,13 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 for _, r in res.iterrows():
                     val = float(r['parsnt'])
                     icon = "🔴 حرمان" if val >= 20 else ("⚠️ إنذار" if val >= 15 else "🟢 منتظم")
-                    m += f"📖 {r['c_nam']}: %{val} {icon}\n"
+                    
+                    # سحب الحقل day الجديد بأمان
+                    day_val = r.get('day', 'غير محدد')
+                    if pd.isna(day_val): day_val = 'غير محدد'
+                    
+                    m += f"📖 {r['c_nam']}: %{val} {icon}\n📅 تحديث/أيام الغياب: {day_val}\n\n"
+                    
                     if val >= 20: has_deprivation = True
                     elif 15 <= val < 20 and r['c_nam'] not in completed_interrogations:
                         if not subject_to_interrogate: subject_to_interrogate = r['c_nam']
@@ -453,11 +450,12 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     return
                 
                 if has_deprivation:
-                    m += f"\n{SEP}🛑 **أنت محروم إدارياً (20%)!**\nعليك تقديم عذرك فوراً لرفع الحرمان."
+                    m += f"{SEP}🛑 **أنت محروم إدارياً (20%)!**\nعليك تقديم عذرك فوراً لرفع الحرمان."
                 await update.message.reply_text(m, parse_mode='Markdown')
             else: 
                 await update.message.reply_text("❌ **الرقم غير مسجل.**", parse_mode='Markdown')
-        except Exception:
+        except Exception as e:
+            print(f"Excel Error: {e}")
             await update.message.reply_text("⚠️ **ملف الغياب غير متوفر.**", parse_mode='Markdown')
         return
 
@@ -482,7 +480,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     if text == "📍 موقع القسم": 
         keyboard = [[InlineKeyboardButton("🗺️ فتح الموقع في خرائط جوجل", url="http://googleusercontent.com/maps.google.com/3")]]
-        await update.message.reply_text("📍 **موقع قسم الحاسب الآلي:**", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+        await update.message.reply_text("📍 **موقع قسم الحاسب الآلي مبنى 19 :**", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
         return
         
     if text == "📰 أخبار القسم والمعهد": 
@@ -523,7 +521,7 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             img = Image.open(in_memory_img)
             width, height = img.size
-            txt_img = Image.new('RGB', (1000, 50), color='#1e3a8a') # لون كحلي رسمي للختم
+            txt_img = Image.new('RGB', (1000, 50), color='#1e3a8a')
             ImageDraw.Draw(txt_img).text((20, 15), f"TVTC OFFICIAL | ID: {stu_id} | DATE: {timestamp}", fill="white")
             txt_img = txt_img.resize((width, int(width * 50 / 1000)))
             img.paste(txt_img, (0, height - txt_img.height)) 
@@ -572,7 +570,6 @@ def main():
     
     app = Application.builder().token(TOKEN).build()
     
-    # 🌟 أوامر الإدارة العُليا 🌟
     app.add_handler(CommandHandler("backup", backup_command))
     app.add_handler(CommandHandler("broadcast", broadcast_command))
     
@@ -581,7 +578,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تم تشغيل النسخة الماسية المطلقة (جاهزة لجوائز التميز)...")
+    print("🚀 تم تشغيل النسخة الماسية المطلقة (مضاف لها تاريخ الغياب من حقل day)...")
     app.run_polling()
 
 if __name__ == '__main__': 
