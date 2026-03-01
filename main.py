@@ -199,7 +199,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"أنا نظامك الرقمي المتكامل. تم تصميمي لتوفير وقتك وتسهيل رحلتك التدريبية.\n\n"
         f"👇 **الرجاء اختيار الخدمة المطلوبة من القائمة السفلية لبدء العمل:**"
     )
-    await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
+    try:
+        if os.path.exists('IMG_1058.jpeg'):
+            await update.message.reply_photo(photo=open('IMG_1058.jpeg', 'rb'), caption=welcome_msg, reply_markup=get_main_menu())
+        else:
+            logo_url = "https://pbs.twimg.com/profile_images/1684496035272658944/p02_gM0p_400x400.jpg"
+            await update.message.reply_photo(photo=logo_url, caption=welcome_msg, reply_markup=get_main_menu())
+    except:
+        await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
 
 async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
@@ -297,6 +304,20 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if text == "💡 نصيحة تقنية":
         await update.message.reply_text(random.choice(TECH_TIPS), parse_mode='Markdown')
+        return
+        
+    if text == "🌐 أخبار التقنية":
+        try:
+            req = urllib.request.Request("https://www.tech-wd.com/wd/feed/", headers={'User-Agent': 'Mozilla/5.0'})
+            response = urllib.request.urlopen(req, timeout=5)
+            root = ET.fromstring(response.read())
+            news_msg = f"🌐 **الأخبار التقنية**{SEP}"
+            for i, item in enumerate(root.findall('.//item')):
+                if i >= 3: break
+                news_msg += f"🔹 [{item.find('title').text}]({item.find('link').text})\n\n"
+            await update.message.reply_text(news_msg, parse_mode='Markdown', disable_web_page_preview=True)
+        except:
+            await update.message.reply_text("⚠️ المصدر لا يستجيب.", parse_mode='Markdown')
         return
 
     if text == "🎮 تحدي الأسبوع":
@@ -412,32 +433,35 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     df_raw = None
                     for enc in ['utf-8-sig', 'windows-1256', 'utf-8', 'cp1256']:
                         try:
-                            temp_df = pd.read_csv(temp_file, encoding=enc, dtype=str)
-                            # بما أنني رأيت الملف، أعرف أن كلمة (اسم المتدرب) موجودة
-                            if any('اسم المتدرب' in str(c) for c in temp_df.columns):
+                            temp_df = pd.read_csv(temp_file, encoding=enc, dtype=str, sep=',')
+                            if len(temp_df.columns) >= 19:
                                 df_raw = temp_df
                                 break
                         except Exception:
                             pass
                     
                     if df_raw is None:
-                        raise Exception("لم يتم التعرف على بنية ملف رايات.")
+                        raise Exception("فشل في تفكيك أعمدة الملف، تأكد من تصدير رايات بشكل صحيح.")
 
                     df_clean = pd.DataFrame()
                     
-                    # 🌟 البحث الدقيق عن الأعمدة 🌟
-                    c_course = next(c for c in df_raw.columns if 'اسم المقرر' in str(c))
-                    c_id = next(c for c in df_raw.columns if 'رقم المتدرب' in str(c))
-                    c_name = next(c for c in df_raw.columns if 'اسم المتدرب' in str(c))
-                    c_perc = next(c for c in df_raw.columns if 'نسبة الغياب بعذر وبدون' in str(c))
-                    
-                    df_clean['c_nam'] = df_raw[c_course]
-                    df_clean['stu_num'] = df_raw[c_id]
-                    df_clean['stu_nam'] = df_raw[c_name]
-                    df_clean['parsnt'] = df_raw[c_perc]
+                    try:
+                        c_course = next(c for c in df_raw.columns if 'اسم المقرر' in str(c))
+                        c_id = next(c for c in df_raw.columns if 'رقم المتدرب' in str(c))
+                        c_name = next(c for c in df_raw.columns if 'اسم المتدرب' in str(c))
+                        c_perc = next(c for c in df_raw.columns if 'نسبة الغياب بعذر وبدون' in str(c))
+                        
+                        df_clean['c_nam'] = df_raw[c_course]
+                        df_clean['stu_num'] = df_raw[c_id]
+                        df_clean['stu_nam'] = df_raw[c_name]
+                        df_clean['parsnt'] = df_raw[c_perc]
+                    except StopIteration:
+                        df_clean['c_nam'] = df_raw.iloc[:, 14]
+                        df_clean['stu_num'] = df_raw.iloc[:, 16]
+                        df_clean['stu_nam'] = df_raw.iloc[:, 17]
+                        df_clean['parsnt'] = df_raw.iloc[:, 18]
 
-                    # 🌟 تنظيف الأرقام 🌟
-                    df_clean['stu_num'] = df_clean['stu_num'].astype(str).str.replace(r'\D', '', regex=True)
+                    df_clean['stu_num'] = df_clean['stu_num'].astype(str).apply(lambda x: ''.join(filter(str.isdigit, x)))
                     df_clean = df_clean[df_clean['stu_num'] != ''] 
                     
                     df_clean['day'] = datetime.now().strftime("%Y-%m-%d")
@@ -455,7 +479,6 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await status_msg.edit_text(f"⚠️ **فشل التحديث:** `{e}`", parse_mode='Markdown')
             return
 
-    # --- باقي الكود: الختم الآلي للأعذار ---
     if not update.message.caption: 
         await update.message.reply_text("⚠️ **الرجاء إرفاق الصورة مع كتابة رقمك في الوصف.**", parse_mode='Markdown')
         return
@@ -526,16 +549,13 @@ def main():
     
     app = Application.builder().token(TOKEN).build()
     
-    app.add_handler(CommandHandler("db", db_status_command)) # 🌟 أمر كشف البيانات السري 🌟
-    app.add_handler(CommandHandler("backup", backup_command))
-    app.add_handler(CommandHandler("broadcast", broadcast_command))
-    
+    app.add_handler(CommandHandler("db", db_status_command)) 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_logic))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تم استعادة جميع القوائم والأزرار + محرك رايات الحقيقي يعمل بنجاح...")
+    print("🚀 تشغيل النسخة الكاملة والنهائية...")
     app.run_polling()
 
 if __name__ == '__main__': 
