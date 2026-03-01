@@ -544,45 +544,48 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await file.download_to_drive(temp_file)
                     
                     df_raw = None
+                    # تجربة الترميزات والتأكد من نجاحها في قراءة لغة عربية حقيقية
                     for enc in ['utf-8-sig', 'windows-1256', 'utf-8', 'cp1256']:
                         try:
-                            df_raw = pd.read_csv(temp_file, encoding=enc)
-                            break
+                            temp_df = pd.read_csv(temp_file, encoding=enc)
+                            cols_str = "".join(str(c) for c in temp_df.columns)
+                            # إذا وجدنا كلمة عربية صحيحة، إذن هذا هو الترميز الصحيح
+                            if 'المتدرب' in cols_str or 'المقرر' in cols_str or 'نسب' in cols_str:
+                                df_raw = temp_df
+                                break
                         except Exception:
                             continue
                     
                     if df_raw is None:
-                        raise Exception("فشل في قراءة ترميز ملف رايات.")
+                        raise Exception("لم أتمكن من قراءة اللغة العربية. تأكد من أن الملف لم يتلف أثناء التصدير.")
                         
-                    # 🌟 خوارزمية "الصياد الذكي" لتجاوز المسافات والشوائب المخفية من رايات 🌟
                     found_cols = {}
                     for col in df_raw.columns:
-                        # إزالة كافة المسافات والرموز لتسهيل الصيد
-                        clean_col = str(col).replace('\n', '').replace('\r', '').replace('"', '').replace(' ', '').strip()
-                        
-                        if 'رقمالمتدرب' in clean_col:
-                            found_cols[col] = 'stu_num'
-                        elif 'اسمالمتدرب' in clean_col:
-                            found_cols[col] = 'stu_nam'
-                        elif 'اسمالمقرر' in clean_col:
-                            found_cols[col] = 'c_nam'
-                        elif 'نسبةالغياب' in clean_col and 'وبدونعذر' in clean_col:
-                            found_cols[col] = 'parsnt'
+                        # تنظيف صارم لأي شوائب مخفية
+                        c = str(col).replace(' ', '').replace('أ', 'ا').replace('إ', 'ا').replace('ة', 'ه').replace('\n', '').replace('\r', '').replace('"', '')
+                        if 'رقمالمتدرب' in c: found_cols[col] = 'stu_num'
+                        elif 'اسمالمتدرب' in c: found_cols[col] = 'stu_nam'
+                        elif 'اسمالمقرر' in c: found_cols[col] = 'c_nam'
+                        elif 'نسبهالغياب' in c and 'وبدونعذر' in c: found_cols[col] = 'parsnt'
                             
-                    # التحقق من أن الصياد الذكي وجد كافة الأعمدة المطلوبة
                     required_keys = ['stu_num', 'stu_nam', 'c_nam', 'parsnt']
                     missing = [k for k in required_keys if k not in found_cols.values()]
                     
-                    if missing:
-                        raise Exception("لم يتمكن النظام من العثور على الأعمدة المطلوبة حتى بعد التنظيف الذكي.")
+                    # 🌟 الخطة (ب): إذا قام رايات بتغيير الأسماء، سيقوم البوت بالعد الأعمى للأعمدة! 🌟
+                    if missing and len(df_raw.columns) >= 19:
+                        found_cols = {
+                            df_raw.columns[14]: 'c_nam',
+                            df_raw.columns[16]: 'stu_num',
+                            df_raw.columns[17]: 'stu_nam',
+                            df_raw.columns[18]: 'parsnt'
+                        }
+                        missing = [] # تم حل المشكلة عبر الأرقام
                         
-                    # فلترة البيانات المطلوبة وإعادة التسمية للقالب الخاص بالبوت
+                    if missing:
+                        raise Exception("لم يتمكن النظام من العثور على الأعمدة المطلوبة حتى بعد تفعيل الخطة البديلة.")
+                        
                     df_clean = df_raw[list(found_cols.keys())].rename(columns=found_cols)
-                    
-                    # إضافة تاريخ اليوم تلقائياً لكل الطلاب
                     df_clean['day'] = datetime.now().strftime("%Y-%m-%d")
-                    
-                    # حفظ الملف بصيغة data.xlsx ليقرأه البوت بسلاسة تامة
                     df_clean.to_excel("data.xlsx", index=False)
                     os.remove(temp_file) 
                     
@@ -592,7 +595,7 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await status_msg.edit_text("✅ **تم سحب البيانات من نظام (رايات) وتحديث قاعدة الغياب بنجاح!**\nتاريخ التحديث أُضيف تلقائياً للجميع 🚀", parse_mode='Markdown')
             except Exception as e:
                 await status_msg.edit_text(f"⚠️ **فشل التحديث:** `{e}`", parse_mode='Markdown')
-            return # توقف هنا ولا تعتبره عذراً طبياً
+            return
 
     # --- باقي الكود: الختم الآلي للأعذار للمتدربين ---
     if not update.message.caption: 
@@ -674,7 +677,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تم تشغيل النسخة الماسية (خوارزمية الصياد الذكي لملفات رايات مفعلة)...")
+    print("🚀 تم تشغيل النسخة الماسية (الخطة ب + كاشف الترميز مفعلة)...")
     app.run_polling()
 
 if __name__ == '__main__': 
