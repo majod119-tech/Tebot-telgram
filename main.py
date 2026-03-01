@@ -21,7 +21,7 @@ try:
 except ImportError:
     HAS_PIL = False
 
-# --- 🌟 دوال مساعدة لضمان استقرار السيرفر (Zero Downtime) ---
+# --- 🌟 دوال مساعدة لضمان استقرار السيرفر ---
 def load_json(f): 
     if os.path.exists(f):
         try:
@@ -38,7 +38,6 @@ def save_json(f, d):
     except Exception as e:
         print(f"Error saving JSON: {e}")
 
-# --- 🌟 استدعاء بنك الأسئلة الخارجي ---
 try:
     from questions_bank import QUESTIONS
 except Exception as e:
@@ -61,7 +60,6 @@ def update_stat(cat):
     s[cat] = s.get(cat, 0) + 1
     save_json(STATS_FILE, s)
 
-# --- 🌟 التصفير التلقائي للتحديات (كل أحد) ---
 def auto_reset_scores():
     while True:
         try:
@@ -76,7 +74,6 @@ def auto_reset_scores():
         except Exception: pass
         time.sleep(3600)
 
-# --- 2. لوحة تحكم الويب المتقدمة (Dashboard) ---
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/stats":
@@ -118,7 +115,7 @@ def run_web_server():
     server = HTTPServer(("0.0.0.0", port), SimpleHandler)
     server.serve_forever()
 
-# --- 3. عقل المعلم الذكي (محدث لتطابق الدليل الرسمي 100%) ---
+# --- 3. عقل المعلم الذكي ---
 AI_KNOWLEDGE = f"""
 أنت المعلم الذكي الرسمي لقسم الحاسب الآلي وتقنية المعلومات في المعهد الصناعي الثانوي ببريدة (مؤسسة التدريب التقني والمهني).
 أجب باختصار شديد ومهنية. اعتمد على أنظمة دليل المتدرب التالية في إجاباتك إذا سئلت:
@@ -152,7 +149,6 @@ TECH_TIPS = [
     "🚀 **نصيحة برمجية:** التنسيق والمسافات البادئة في لغة بايثون هي أساس عمل الكود."
 ]
 
-# --- 4. تصميم القوائم المتطورة ---
 def get_main_menu():
     return ReplyKeyboardMarkup([
         ["🤖 المعلم الذكي (الدليل الشامل)"], 
@@ -182,7 +178,6 @@ def get_games_menu():
 def get_back_menu(): 
     return ReplyKeyboardMarkup([["🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
 
-# --- 🌟 أوامر الإدارة المتقدمة للجوائز 🌟 ---
 async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     if user_id != ADMIN_ID: return
@@ -227,7 +222,6 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
     await update.message.reply_text(f"✅ **تم إرسال التعميم بنجاح لـ {success_count} متدرب.**", parse_mode='Markdown')
 
-# --- 5. المنطق البرمجي الأساسي ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     stats = load_json(STATS_FILE)
@@ -259,7 +253,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = str(update.effective_user.id)
 
-    # 🚨 اعتراض الاستجواب للغياب (15%) 🚨
     if user_id in interrogation_sessions:
         session = interrogation_sessions[user_id]
         step = session['step']
@@ -385,201 +378,4 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             root = ET.fromstring(response.read())
             news_msg = f"🌐 **موجز الأخبار التقنية**{SEP}"
             for i, item in enumerate(root.findall('.//item')):
-                if i >= 3: break
-                news_msg += f"🔹 [{item.find('title').text}]({item.find('link').text})\n\n"
-            await update.message.reply_text(news_msg, parse_mode='Markdown', disable_web_page_preview=True)
-        except Exception:
-            await update.message.reply_text("⚠️ **مصدر الأخبار لا يستجيب.**", parse_mode='Markdown')
-        return
-
-    if text == "🎮 تحدي الأسبوع":
-        update_stat("quiz_attempts")
-        q = random.choice(QUESTIONS)
-        active_challenges[user_id] = time.time()
-        kb = [[InlineKeyboardButton(o, callback_data=f"ans_{QUESTIONS.index(q)}_{i}")] for i, o in enumerate(q['options'])]
-        await update.message.reply_text(f"❓ **تحدي الأسبوع:**\n\n{q['q']}\n\n⚠️ أمامك 15 ثانية:", reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
-        return
-
-    if text == "🏆 بطل الأسبوع":
-        sc = load_json(SCORES_FILE)
-        if not sc: 
-            await update.message.reply_text("📉 لا يوجد نقاط مسجلة.", parse_mode='Markdown')
-            return
-        top = sorted(sc.items(), key=lambda x: x[1]['score'], reverse=True)[0][1]
-        msg = f"🏆 **بطل الأسبوع:** {top['name']}\n🌟 **النقاط:** {top['score']}"
-        await update.message.reply_text(msg, parse_mode='Markdown')
-        return
-
-    # --- 🌟 التحديث الساحق: إضافة تاريخ التحديث / الغياب من حقل day 🌟 ---
-    if text == "📊 استعلام الغياب":
-        await update.message.reply_text("🔎 **استعلام الغياب**\n👇 **أرسل رقمك التدريبي...**", parse_mode='Markdown')
-        return
-
-    if text.isdigit():
-        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-        try:
-            df = pd.read_excel('data.xlsx')
-            df.columns = df.columns.astype(str).str.strip()
-            res = df[df['stu_num'].astype(str).str.strip() == text]
-            
-            if not res.empty:
-                stu_nam = res.iloc[0]['stu_nam']
-                completed_interrogations = load_json(INTERROGATIONS_FILE).get(text, [])
-                subject_to_interrogate = None
-                has_deprivation = False
-                m = f"✅ **السجل لـ:** `{stu_nam}`{SEP}"
-                
-                for _, r in res.iterrows():
-                    val = float(r['parsnt'])
-                    icon = "🔴 حرمان" if val >= 20 else ("⚠️ إنذار" if val >= 15 else "🟢 منتظم")
-                    
-                    # سحب الحقل day الجديد بأمان
-                    day_val = r.get('day', 'غير محدد')
-                    if pd.isna(day_val): day_val = 'غير محدد'
-                    
-                    m += f"📖 {r['c_nam']}: %{val} {icon}\n📅 تحديث/أيام الغياب: {day_val}\n\n"
-                    
-                    if val >= 20: has_deprivation = True
-                    elif 15 <= val < 20 and r['c_nam'] not in completed_interrogations:
-                        if not subject_to_interrogate: subject_to_interrogate = r['c_nam']
-                
-                if subject_to_interrogate:
-                    interrogation_sessions[user_id] = {'step': 1, 'stu_num': text, 'stu_nam': stu_nam, 'subject': subject_to_interrogate}
-                    warning_msg = f"⚠️ **إنذار قبل الحرمان!** ⚠️\nوصلت غياباتك 15% في: **{subject_to_interrogate}**\n🛑 **للإكمال، أجب:**\n1️⃣ **هل تعلم أنك اقتربت من الحرمان؟**"
-                    await update.message.reply_text(warning_msg, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())
-                    return
-                
-                if has_deprivation:
-                    m += f"{SEP}🛑 **أنت محروم إدارياً (20%)!**\nعليك تقديم عذرك فوراً لرفع الحرمان."
-                await update.message.reply_text(m, parse_mode='Markdown')
-            else: 
-                await update.message.reply_text("❌ **الرقم غير مسجل.**", parse_mode='Markdown')
-        except Exception as e:
-            print(f"Excel Error: {e}")
-            await update.message.reply_text("⚠️ **ملف الغياب غير متوفر.**", parse_mode='Markdown')
-        return
-
-    if text == "📝 رفع الغياب والأعذار": 
-        msg = f"📝 **رفع الأعذار**\nصور العذر واكتب (رقمك واسمك) في الوصف ثم أرسله هنا ليتم ختمه آلياً."
-        await update.message.reply_text(msg, parse_mode='Markdown')
-        return
-        
-    if text == "📚 الحقائب التدريبية": 
-        keyboard = [[InlineKeyboardButton("📥 الدخول للمستودع الرقمي للحقائب", url=DRIVE_LINK)]]
-        await update.message.reply_text("📚 **الحقائب التدريبية:**", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
-        return
-        
-    if text == "🔗 المنصات الإلكترونية": 
-        keyboard = [
-            [InlineKeyboardButton("🎓 بوابة رايات (للمتدربين)", url="https://rayat.tvtc.gov.sa")],
-            [InlineKeyboardButton("💻 منصة تقني", url="https://tvtclms.edu.sa")],
-            [InlineKeyboardButton("📝 بلاك بورد (بوابة التدرب الإلكتروني)", url="https://lms.elearning.edu.sa/")]
-        ]
-        await update.message.reply_text("🌐 **اختر المنصة التي تريد الدخول إليها:**", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
-        return
-        
-    if text == "📍 موقع القسم": 
-        keyboard = [[InlineKeyboardButton("🗺️ فتح الموقع في خرائط جوجل", url="http://googleusercontent.com/maps.google.com/3")]]
-        await update.message.reply_text("📍 **موقع قسم الحاسب الآلي مبنى 19 :**", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
-        return
-        
-    if text == "📰 أخبار القسم والمعهد": 
-        msg = f"📰 **أخبار القسم**\nالأسبوع القادم اختبارات الفترة الأولى، استعدوا جيداً.\n\n🔗 **للمزيد، زر حساب المعهد:**"
-        keyboard = [[InlineKeyboardButton("📱 الانتقال لحساب منصة X", url=TVTC_X_LINK)]]
-        await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
-        return
-        
-    if text == "📅 التقويم التدريبي":
-        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
-        if os.path.exists('calendar.jpg'): await update.message.reply_photo(photo=open('calendar.jpg', 'rb'))
-        else: await update.message.reply_text("⚠️ ملف التقويم غير متوفر.")
-        return
-
-    if not ai_sessions.get(user_id) and not feedback_sessions.get(user_id):
-        await update.message.reply_text("⚠️ **الرجاء اختيار خدمة من الأسفل 👇**", reply_markup=get_main_menu())
-
-# --- 🌟 الختم الآلي الآمن للأعذار ---
-async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message.caption: 
-        await update.message.reply_text("⚠️ **الرجاء إرفاق الصورة مع كتابة رقمك في الوصف.**", parse_mode='Markdown')
-        return
-    
-    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
-    status_msg = await update.message.reply_text("⏳ جاري المعالجة والختم...")
-    
-    try:
-        caption_text = update.message.caption
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        stu_id = ''.join(filter(str.isdigit, caption_text)) or "UNKNOWN"
-        
-        if update.message.photo and HAS_PIL:
-            photo = update.message.photo[-1]
-            file = await context.bot.get_file(photo.file_id)
-            in_memory_img = io.BytesIO()
-            await file.download_to_memory(in_memory_img)
-            in_memory_img.seek(0)
-            
-            img = Image.open(in_memory_img)
-            width, height = img.size
-            txt_img = Image.new('RGB', (1000, 50), color='#1e3a8a')
-            ImageDraw.Draw(txt_img).text((20, 15), f"TVTC OFFICIAL | ID: {stu_id} | DATE: {timestamp}", fill="white")
-            txt_img = txt_img.resize((width, int(width * 50 / 1000)))
-            img.paste(txt_img, (0, height - txt_img.height)) 
-            
-            output = io.BytesIO()
-            img.save(output, format='JPEG')
-            output.seek(0)
-            await context.bot.send_photo(chat_id=GROUP_ID, photo=output, caption=f"📥 **عذر مختوم رسمياً:**\n{caption_text}\n⏱️ {timestamp}", parse_mode='Markdown')
-        else:
-            await context.bot.send_message(chat_id=GROUP_ID, text=f"📥 **عذر:**\n{caption_text}\n{timestamp}")
-            await update.message.copy(chat_id=GROUP_ID)
-            
-        await status_msg.edit_text("✅ **تم الختم والإرسال للإدارة بنجاح.**", parse_mode='Markdown')
-    except Exception as e:
-        print(f"Doc error: {e}")
-        await status_msg.edit_text("⚠️ **حدث خطأ فني أثناء الإرسال.**", parse_mode='Markdown')
-
-async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    user_id = str(query.from_user.id)
-    await query.answer()
-    
-    if query.data.startswith("ans_"):
-        start_time = active_challenges.get(user_id, 0)
-        time_taken = time.time() - start_time
-        q_idx, sel = int(query.data.split("_")[1]), int(query.data.split("_")[2])
-        sc = load_json(SCORES_FILE)
-        ui = sc.get(user_id, {"name": query.from_user.first_name, "score": 0, "answered": []})
-        
-        try:
-            actual_question = QUESTIONS[q_idx]
-            if time_taken > 15: m = "⏳ **انتهى الوقت!** استغرقت أكثر من 15 ثانية."
-            elif sel == actual_question["answer"]: 
-                ui["score"] += 10
-                m = "🎉 **إجابة صحيحة!** كسبت 10 نقاط."
-            else: m = f"❌ **خاطئة!**\nالصحيحة: {actual_question['options'][actual_question['answer']]}"
-                
-            ui["answered"].append(q_idx); sc[user_id] = ui; save_json(SCORES_FILE, sc)
-            await query.edit_message_text(f"❓ **تحدي الأسبوع:**\n{actual_question['q']}{SEP}{m}", parse_mode='Markdown')
-        except Exception:
-            await query.edit_message_text("⚠️ تحدي قديم. جرب سؤالاً جديداً!")
-
-def main():
-    Thread(target=auto_reset_scores, daemon=True).start()
-    Thread(target=run_web_server, daemon=True).start()
-    
-    app = Application.builder().token(TOKEN).build()
-    
-    app.add_handler(CommandHandler("backup", backup_command))
-    app.add_handler(CommandHandler("broadcast", broadcast_command))
-    
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_logic))
-    app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
-    app.add_handler(CallbackQueryHandler(button_callback))
-    
-    print("🚀 تم تشغيل النسخة الماسية المطلقة (مضاف لها تاريخ الغياب من حقل day)...")
-    app.run_polling()
-
-if __name__ == '__main__': 
-    main()
+                if i >=
