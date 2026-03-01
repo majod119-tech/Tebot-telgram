@@ -22,7 +22,7 @@ try:
 except ImportError:
     HAS_PIL = False
 
-# --- 🌟 دوال مساعدة لضمان استقرار السيرفر (Zero Downtime) ---
+# --- 🌟 دوال مساعدة لضمان استقرار السيرفر ---
 def load_json(f): 
     if os.path.exists(f):
         try:
@@ -39,7 +39,6 @@ def save_json(f, d):
     except Exception as e:
         print(f"Error saving JSON: {e}")
 
-# --- 🌟 استدعاء بنك الأسئلة الخارجي ---
 try:
     from questions_bank import QUESTIONS
 except Exception as e:
@@ -62,7 +61,6 @@ def update_stat(cat):
     s[cat] = s.get(cat, 0) + 1
     save_json(STATS_FILE, s)
 
-# --- 🌟 التصفير التلقائي للتحديات (كل أحد) ---
 def auto_reset_scores():
     while True:
         try:
@@ -77,7 +75,6 @@ def auto_reset_scores():
         except Exception: pass
         time.sleep(3600)
 
-# --- 2. لوحة تحكم الويب المتقدمة (Dashboard) ---
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/stats":
@@ -119,7 +116,7 @@ def run_web_server():
     server = HTTPServer(("0.0.0.0", port), SimpleHandler)
     server.serve_forever()
 
-# --- 3. عقل المعلم الذكي (محدث لتطابق الدليل الرسمي 100%) ---
+# --- 3. عقل المعلم الذكي ---
 AI_KNOWLEDGE = f"""
 أنت المعلم الذكي الرسمي لقسم الحاسب الآلي وتقنية المعلومات في المعهد الصناعي الثانوي ببريدة (مؤسسة التدريب التقني والمهني).
 أجب باختصار شديد ومهنية. اعتمد على أنظمة دليل المتدرب التالية في إجاباتك إذا سئلت:
@@ -153,7 +150,6 @@ TECH_TIPS = [
     "🚀 **نصيحة برمجية:** التنسيق والمسافات البادئة في لغة بايثون هي أساس عمل الكود."
 ]
 
-# --- 4. تصميم القوائم المتطورة ---
 def get_main_menu():
     return ReplyKeyboardMarkup([
         ["🤖 المعلم الذكي (الدليل الشامل)"], 
@@ -183,7 +179,6 @@ def get_games_menu():
 def get_back_menu(): 
     return ReplyKeyboardMarkup([["🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
 
-# --- 🌟 أوامر الإدارة المتقدمة 🌟 ---
 async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     if user_id != ADMIN_ID: return
@@ -228,7 +223,6 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
     await update.message.reply_text(f"✅ **تم إرسال التعميم بنجاح لـ {success_count} متدرب.**", parse_mode='Markdown')
 
-# --- 5. المنطق البرمجي الأساسي ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     stats = load_json(STATS_FILE)
@@ -413,7 +407,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg, parse_mode='Markdown')
         return
 
-    # --- 🌟 التحديث الساحق للبحث والتغلب على أخطاء الإكسل 🌟 ---
     if text == "📊 استعلام الغياب":
         await update.message.reply_text("🔎 **استعلام الغياب**\n👇 **أرسل رقمك التدريبي...**", parse_mode='Markdown')
         return
@@ -451,6 +444,14 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 for _, r in res.iterrows():
                     raw_val = str(r.get('parsnt', '0')).strip()
+                    
+                    # 🌟 الخوارزمية العكسية لإصلاح خطأ الإكسل برمجياً 🌟
+                    # إذا حول الإكسل النسبة إلى تاريخ (مثل 2026-05-26)
+                    if re.match(r'^\d{4}-\d{2}-\d{2}', raw_val):
+                        date_part = raw_val.split()[0] # نأخذ التاريخ فقط
+                        y, month, d = date_part.split('-') # نفككه
+                        raw_val = f"{d}.{month}" # نعيده كنسبة صحيحة!
+                    
                     try:
                         val = float(raw_val)
                         icon = "🔴 حرمان" if val >= 20 else ("⚠️ إنذار" if val >= 15 else "🟢 منتظم")
@@ -459,7 +460,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         val = 0.0
                         display_val = f"{raw_val} ⚠️ (خطأ في إدخال النسبة بالإكسل)"
                     
-                    # ✂️ التنظيف الجمالي لتواريخ الغياب (إزالة الأصفار 00:00:00)
                     day_val = str(r.get('day', 'غير محدد'))
                     if pd.isna(r.get('day')) or day_val.strip() == 'nan': 
                         day_val = 'غير محدد'
@@ -608,7 +608,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تم تشغيل النسخة الماسية (مع تنظيف الأصفار من التواريخ)...")
+    print("🚀 تم تشغيل النسخة الماسية (تم إضافة الخوارزمية العكسية لخداع الإكسل)...")
     app.run_polling()
 
 if __name__ == '__main__': 
