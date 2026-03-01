@@ -22,7 +22,7 @@ try:
 except ImportError:
     HAS_PIL = False
 
-# --- 🌟 دوال مساعدة لضمان استقرار السيرفر (Zero Downtime) ---
+# --- 🌟 دوال مساعدة لضمان استقرار السيرفر ---
 def load_json(f): 
     if os.path.exists(f):
         try:
@@ -39,7 +39,6 @@ def save_json(f, d):
     except Exception as e:
         print(f"Error saving JSON: {e}")
 
-# --- 🌟 استدعاء بنك الأسئلة الخارجي ---
 try:
     from questions_bank import QUESTIONS
 except Exception as e:
@@ -62,7 +61,6 @@ def update_stat(cat):
     s[cat] = s.get(cat, 0) + 1
     save_json(STATS_FILE, s)
 
-# --- 🌟 التصفير التلقائي للتحديات (كل أحد) ---
 def auto_reset_scores():
     while True:
         try:
@@ -77,7 +75,6 @@ def auto_reset_scores():
         except Exception: pass
         time.sleep(3600)
 
-# --- 2. لوحة تحكم الويب المتقدمة (Dashboard) ---
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/stats":
@@ -119,7 +116,7 @@ def run_web_server():
     server = HTTPServer(("0.0.0.0", port), SimpleHandler)
     server.serve_forever()
 
-# --- 3. عقل المعلم الذكي (محدث لتطابق الدليل الرسمي 100%) ---
+# --- 3. عقل المعلم الذكي ---
 AI_KNOWLEDGE = f"""
 أنت المعلم الذكي الرسمي لقسم الحاسب الآلي وتقنية المعلومات في المعهد الصناعي الثانوي ببريدة (مؤسسة التدريب التقني والمهني).
 أجب باختصار شديد ومهنية. اعتمد على أنظمة دليل المتدرب التالية في إجاباتك إذا سئلت:
@@ -153,7 +150,6 @@ TECH_TIPS = [
     "🚀 **نصيحة برمجية:** التنسيق والمسافات البادئة في لغة بايثون هي أساس عمل الكود."
 ]
 
-# --- 4. تصميم القوائم المتطورة ---
 def get_main_menu():
     return ReplyKeyboardMarkup([
         ["🤖 المعلم الذكي (الدليل الشامل)"], 
@@ -183,7 +179,6 @@ def get_games_menu():
 def get_back_menu(): 
     return ReplyKeyboardMarkup([["🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
 
-# --- 🌟 أوامر الإدارة المتقدمة 🌟 ---
 async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     if user_id != ADMIN_ID: return
@@ -228,7 +223,6 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
     await update.message.reply_text(f"✅ **تم إرسال التعميم بنجاح لـ {success_count} متدرب.**", parse_mode='Markdown')
 
-# --- 5. المنطق البرمجي الأساسي ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     stats = load_json(STATS_FILE)
@@ -260,11 +254,9 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = str(update.effective_user.id)
 
-    # 🌟 تحويل الأرقام من عربية إلى إنجليزية للبحث الدقيق 🌟
     trans_table = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
     clean_text = text.translate(trans_table).strip()
 
-    # 🚨 اعتراض الاستجواب للغياب (15%) 🚨
     if user_id in interrogation_sessions:
         session = interrogation_sessions[user_id]
         step = session['step']
@@ -415,7 +407,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg, parse_mode='Markdown')
         return
 
-    # --- 🌟 التحديث الساحق للبحث (الفلتر المطلق للأرقام) 🌟 ---
     if text == "📊 استعلام الغياب":
         await update.message.reply_text("🔎 **استعلام الغياب**\n👇 **أرسل رقمك التدريبي...**", parse_mode='Markdown')
         return
@@ -439,11 +430,9 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("⚠️ **تنبيه للإدارة:** عمود رقم الطالب `stu_num` غير موجود داخل ملف الإكسل.", parse_mode='Markdown')
                 return
             
-            # 🌟 الفلتر الساحق: تنظيف أرقام الإكسل من الفواصل العشرية وأي مسافات مخفية
             df['stu_num'] = df['stu_num'].astype(str).str.replace(r'\.0$', '', regex=True)
             df['stu_num'] = df['stu_num'].str.replace(r'\D', '', regex=True) 
             
-            # البحث باستخدام الرقم النظيف
             res = df[df['stu_num'] == clean_text]
             
             if not res.empty:
@@ -570,7 +559,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data.startswith("ans_"):
         start_time = active_challenges.get(user_id, 0)
         time_taken = time.time() - start_time
-        q_idx, int(query.data.split("_")[1]), int(query.data.split("_")[2])
+        parts = query.data.split("_")
+        q_idx, sel = int(parts[1]), int(parts[2])
         sc = load_json(SCORES_FILE)
         ui = sc.get(user_id, {"name": query.from_user.first_name, "score": 0, "answered": []})
         
