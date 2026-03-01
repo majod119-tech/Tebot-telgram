@@ -48,7 +48,7 @@ except Exception as e:
 TOKEN = os.environ.get("TOKEN") 
 GROUP_ID = "-5193577198"
 DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
-ADMIN_ID = "10073498"
+ADMIN_ID = "10073498"  # تأكد أن هذا هو رقم الـ ID الخاص بك في تليجرام
 SEP = "\n━━━━━━━━━━━━━━\n"
 TVTC_X_LINK = "https://x.com/tvtc_m_buraidah"
 
@@ -534,7 +534,7 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         doc = update.message.document
         if doc.file_name.endswith(('.xlsx', '.xls', '.csv')):
             await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-            status_msg = await update.message.reply_text("⏳ **جاري تحليل ملف (رايات) وتحديث السجلات...**", parse_mode='Markdown')
+            status_msg = await update.message.reply_text("⏳ **جاري تحليل وتشفير ملف (رايات)...**", parse_mode='Markdown')
             
             try:
                 file = await context.bot.get_file(doc.file_id)
@@ -544,25 +544,25 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await file.download_to_drive(temp_file)
                     
                     df_raw = None
-                    # تجربة الترميزات والتأكد من نجاحها في قراءة لغة عربية حقيقية
-                    for enc in ['utf-8-sig', 'windows-1256', 'utf-8', 'cp1256']:
+                    # 🌟 كاشف اللغة العربية الذكي: لتجنب الطلاسم والفساد الصامت 🌟
+                    for enc in ['utf-8-sig', 'windows-1256', 'utf-8', 'cp1256', 'iso-8859-6']:
                         try:
-                            temp_df = pd.read_csv(temp_file, encoding=enc)
+                            # نقرأ الملف كنصوص فقط لحماية الأرقام
+                            temp_df = pd.read_csv(temp_file, encoding=enc, dtype=str)
                             cols_str = "".join(str(c) for c in temp_df.columns)
-                            # إذا وجدنا كلمة عربية صحيحة، إذن هذا هو الترميز الصحيح
-                            if 'المتدرب' in cols_str or 'المقرر' in cols_str or 'نسب' in cols_str:
+                            # إذا وجدنا أحرفاً عربية حقيقية، إذن هذا هو الترميز الصحيح!
+                            if re.search(r'[\u0600-\u06FF]', cols_str):
                                 df_raw = temp_df
                                 break
                         except Exception:
                             continue
                     
                     if df_raw is None:
-                        raise Exception("لم أتمكن من قراءة اللغة العربية. تأكد من أن الملف لم يتلف أثناء التصدير.")
+                        raise Exception("لم أتمكن من قراءة اللغة العربية من الملف، يبدو أن تصدير رايات تالف.")
                         
                     found_cols = {}
                     for col in df_raw.columns:
-                        # تنظيف صارم لأي شوائب مخفية
-                        c = str(col).replace(' ', '').replace('أ', 'ا').replace('إ', 'ا').replace('ة', 'ه').replace('\n', '').replace('\r', '').replace('"', '')
+                        c = str(col).replace(' ', '').replace('أ', 'ا').replace('إ', 'ا').replace('ة', 'ه').replace('\n', '').replace('\r', '').replace('"', '').strip()
                         if 'رقمالمتدرب' in c: found_cols[col] = 'stu_num'
                         elif 'اسمالمتدرب' in c: found_cols[col] = 'stu_nam'
                         elif 'اسمالمقرر' in c: found_cols[col] = 'c_nam'
@@ -571,7 +571,7 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     required_keys = ['stu_num', 'stu_nam', 'c_nam', 'parsnt']
                     missing = [k for k in required_keys if k not in found_cols.values()]
                     
-                    # 🌟 الخطة (ب): إذا قام رايات بتغيير الأسماء، سيقوم البوت بالعد الأعمى للأعمدة! 🌟
+                    # 🌟 الخطة (ب): العد الأعمى إذا غيّر رايات الأسماء 🌟
                     if missing and len(df_raw.columns) >= 19:
                         found_cols = {
                             df_raw.columns[14]: 'c_nam',
@@ -579,20 +579,28 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             df_raw.columns[17]: 'stu_nam',
                             df_raw.columns[18]: 'parsnt'
                         }
-                        missing = [] # تم حل المشكلة عبر الأرقام
+                        missing = [] 
                         
                     if missing:
-                        raise Exception("لم يتمكن النظام من العثور على الأعمدة المطلوبة حتى بعد تفعيل الخطة البديلة.")
+                        raise Exception("لم يتمكن النظام من العثور على الأعمدة المطلوبة.")
                         
                     df_clean = df_raw[list(found_cols.keys())].rename(columns=found_cols)
+                    
+                    # 🌟 الغسيل الآلي لأرقام الطلاب لمنع ضياعهم في البحث 🌟
+                    df_clean['stu_num'] = df_clean['stu_num'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
+                    df_clean = df_clean[df_clean['stu_num'] != ''] # مسح الصفوف الفارغة
+                    
                     df_clean['day'] = datetime.now().strftime("%Y-%m-%d")
                     df_clean.to_excel("data.xlsx", index=False)
+                    records_count = len(df_clean)
                     os.remove(temp_file) 
                     
                 else:
                     await file.download_to_drive("data.xlsx")
+                    df_clean = pd.read_excel('data.xlsx')
+                    records_count = len(df_clean)
                     
-                await status_msg.edit_text("✅ **تم سحب البيانات من نظام (رايات) وتحديث قاعدة الغياب بنجاح!**\nتاريخ التحديث أُضيف تلقائياً للجميع 🚀", parse_mode='Markdown')
+                await status_msg.edit_text(f"✅ **تم تحديث قاعدة البيانات بنجاح!**\n📊 **عدد السجلات المقروءة:** `{records_count}` سجل.\nتاريخ التحديث أُضيف تلقائياً للجميع 🚀", parse_mode='Markdown')
             except Exception as e:
                 await status_msg.edit_text(f"⚠️ **فشل التحديث:** `{e}`", parse_mode='Markdown')
             return
@@ -677,7 +685,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تم تشغيل النسخة الماسية (الخطة ب + كاشف الترميز مفعلة)...")
+    print("🚀 تم تشغيل النسخة الماسية (كاشف الطلاسم والغسيل الآلي مفعل)...")
     app.run_polling()
 
 if __name__ == '__main__': 
