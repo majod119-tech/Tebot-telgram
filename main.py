@@ -403,7 +403,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ **اختر من القائمة 👇**", reply_markup=get_main_menu())
 
 
-# --- 🌟 محرك سحب ملفات رايات المباشر (إصدار النخبة) 🌟 ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     
@@ -411,7 +410,7 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         doc = update.message.document
         if doc.file_name.endswith(('.xlsx', '.xls', '.csv')):
             await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-            status_msg = await update.message.reply_text("⏳ **جاري السحب عبر المحرك المباشر...**", parse_mode='Markdown')
+            status_msg = await update.message.reply_text("⏳ **جاري السحب ومعالجة اللغة العربية...**", parse_mode='Markdown')
             
             try:
                 file = await context.bot.get_file(doc.file_id)
@@ -420,11 +419,10 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await file.download_to_drive(temp_file)
                     
                     df_raw = None
-                    # تجربة التشفيرات المعتادة للغة العربية وتخطي أي سطر تالف (on_bad_lines='skip')
-                    for enc in ['windows-1256', 'cp1256', 'utf-8-sig', 'utf-8', 'iso-8859-6']:
+                    # 🌟 الحل الجذري: إجبار البوت على قراءة UTF-8 الحديث أولاً 🌟
+                    for enc in ['utf-8-sig', 'utf-8', 'cp1256', 'windows-1256', 'iso-8859-6']:
                         try:
                             temp_df = pd.read_csv(temp_file, encoding=enc, dtype=str, sep=',', on_bad_lines='skip')
-                            # التأكد من أن الملف به أكثر من 25 عمود كما هو في رايات
                             if len(temp_df.columns) >= 25:
                                 df_raw = temp_df
                                 break
@@ -436,8 +434,6 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         
                     df_clean = pd.DataFrame()
                     
-                    # 🌟 السحب المباشر بواسطة أرقام الأعمدة الدقيقة التي استخرجناها من ملفك 🌟
-                    # 14=اسم المقرر | 16=رقم المتدرب | 17=اسم المتدرب | 18=نسبة كلية | 22=نسبة بدون عذر | 25=الساعات
                     df_clean['c_nam'] = df_raw.iloc[:, 14].astype(str)
                     df_clean['stu_num'] = df_raw.iloc[:, 16].astype(str)
                     df_clean['stu_nam'] = df_raw.iloc[:, 17].astype(str)
@@ -445,11 +441,9 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     df_clean['parsnt_no'] = df_raw.iloc[:, 22].astype(str)
                     df_clean['hrs'] = df_raw.iloc[:, 25].astype(str)
                     
-                    # 🌟 التنظيف الصارم وإلغاء أي سطر لا يحمل رقماً تدريبياً حقيقياً 🌟
                     df_clean['stu_num'] = df_clean['stu_num'].str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
-                    df_clean = df_clean[df_clean['stu_num'].str.len() >= 5] # الإبقاء على الأرقام التدريبية الطويلة فقط
+                    df_clean = df_clean[df_clean['stu_num'].str.len() >= 5] 
                     
-                    # تنظيف النصوص من كلمة nan للمظهر الجمالي
                     for col in df_clean.columns:
                         df_clean[col] = df_clean[col].replace('nan', '').str.strip()
                         
@@ -463,7 +457,6 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     df_clean = pd.read_excel('data.xlsx')
                     records_count = len(df_clean)
                 
-                # 🌟 الرفع لـ GitHub للتوثيق الدائم 🌟
                 github_status = backup_to_github("data.xlsx")
                     
                 await status_msg.edit_text(f"✅ **نجاح ساحق في السحب المباشر!**\n📊 **النتيجة:** تم قراءة وحفظ `{records_count}` متدرب بنجاح تام.\n🌐 **النسخة الاحتياطية:** {github_status}", parse_mode='Markdown')
@@ -506,7 +499,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل النسخة الكاملة والنهائية (المسار المباشر)...")
+    print("🚀 تشغيل النسخة الكاملة والنهائية المجهزة بالترميز العربي النقي...")
     app.run_polling()
 
 if __name__ == '__main__': 
