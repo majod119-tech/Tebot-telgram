@@ -403,6 +403,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ **اختر من القائمة 👇**", reply_markup=get_main_menu())
 
 
+# --- 🌟 محرك سحب ملفات رايات المباشر (إصدار النخبة باللغة العربية) 🌟 ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     
@@ -410,7 +411,7 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         doc = update.message.document
         if doc.file_name.endswith(('.xlsx', '.xls', '.csv')):
             await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-            status_msg = await update.message.reply_text("⏳ **جاري السحب ومعالجة اللغة العربية...**", parse_mode='Markdown')
+            status_msg = await update.message.reply_text("⏳ **جاري السحب وفك تشفير اللغة العربية...**", parse_mode='Markdown')
             
             try:
                 file = await context.bot.get_file(doc.file_id)
@@ -418,28 +419,54 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     temp_file = "temp_rayat.csv"
                     await file.download_to_drive(temp_file)
                     
-                    df_raw = None
-                    # 🌟 الحل الجذري: إجبار البوت على قراءة UTF-8 الحديث أولاً 🌟
-                    for enc in ['utf-8-sig', 'utf-8', 'cp1256', 'windows-1256', 'iso-8859-6']:
+                    # 🌟 كاشف الترميز الذكي (لن يعتمد الترميز إلا إذا وجد كلمات عربية صحيحة) 🌟
+                    with open(temp_file, 'rb') as f:
+                        raw_bytes = f.read()
+                        
+                    best_enc = 'utf-8-sig' # الافتراضي
+                    for enc in ['utf-8-sig', 'windows-1256', 'cp1256', 'utf-8', 'iso-8859-6']:
                         try:
-                            temp_df = pd.read_csv(temp_file, encoding=enc, dtype=str, sep=',', on_bad_lines='skip')
-                            if len(temp_df.columns) >= 25:
-                                df_raw = temp_df
-                                break
-                        except Exception:
+                            text = raw_bytes.decode(enc)
+                            if 'المتدرب' in text or 'المقرر' in text or 'الغياب' in text or 'رقم' in text:
+                                best_enc = enc
+                                break # وجدنا الترميز الصحيح للغة العربية!
+                        except:
                             pass
                             
-                    if df_raw is None:
-                        raise Exception("فشل في تفكيك الملف. تأكد أن الملف مستخرج حديثاً من رايات بصيغة CSV.")
+                    # قراءة النص بالترميز الصحيح 100% وتحويله إلى جدول
+                    df_raw = pd.read_csv(io.StringIO(raw_bytes.decode(best_enc)), dtype=str, sep=',', on_bad_lines='skip')
                         
                     df_clean = pd.DataFrame()
                     
-                    df_clean['c_nam'] = df_raw.iloc[:, 14].astype(str)
-                    df_clean['stu_num'] = df_raw.iloc[:, 16].astype(str)
-                    df_clean['stu_nam'] = df_raw.iloc[:, 17].astype(str)
-                    df_clean['parsnt'] = df_raw.iloc[:, 18].astype(str)
-                    df_clean['parsnt_no'] = df_raw.iloc[:, 22].astype(str)
-                    df_clean['hrs'] = df_raw.iloc[:, 25].astype(str)
+                    # 🌟 باحث الأعمدة المرن (لتفادي أي خطأ List index out of range) 🌟
+                    col_map = {'c_course': -1, 'c_id': -1, 'c_name': -1, 'c_perc': -1, 'c_perc_no': -1, 'c_hrs': -1}
+                    for i, col in enumerate(df_raw.columns):
+                        clean_col = str(col).replace(' ', '').replace('أ', 'ا').replace('إ', 'ا').replace('"', '')
+                        if 'اسمالمقرر' in clean_col: col_map['c_course'] = i
+                        elif 'رقمالمتدرب' in clean_col: col_map['c_id'] = i
+                        elif 'اسمالمتدرب' in clean_col: col_map['c_name'] = i
+                        elif 'بعذروبدون' in clean_col and 'نسبه' in clean_col: col_map['c_perc'] = i
+                        elif 'بدونعذر' in clean_col and 'نسبه' in clean_col and 'بعذروبدون' not in clean_col: col_map['c_perc_no'] = i
+                        elif 'ساعات' in clean_col and 'بعذروبدون' in clean_col: col_map['c_hrs'] = i
+
+                    # خطة الطوارئ في حال تغيّر اسم عمود في رايات
+                    if col_map['c_course'] == -1: col_map['c_course'] = 14 if len(df_raw.columns) > 14 else 0
+                    if col_map['c_id'] == -1: col_map['c_id'] = 16 if len(df_raw.columns) > 16 else 0
+                    if col_map['c_name'] == -1: col_map['c_name'] = 17 if len(df_raw.columns) > 17 else 0
+                    if col_map['c_perc'] == -1: col_map['c_perc'] = 18 if len(df_raw.columns) > 18 else 0
+                    if col_map['c_perc_no'] == -1: col_map['c_perc_no'] = 22 if len(df_raw.columns) > 22 else -1
+                    if col_map['c_hrs'] == -1: col_map['c_hrs'] = 25 if len(df_raw.columns) > 25 else -1
+
+                    df_clean['c_nam'] = df_raw.iloc[:, col_map['c_course']].astype(str)
+                    df_clean['stu_num'] = df_raw.iloc[:, col_map['c_id']].astype(str)
+                    df_clean['stu_nam'] = df_raw.iloc[:, col_map['c_name']].astype(str)
+                    df_clean['parsnt'] = df_raw.iloc[:, col_map['c_perc']].astype(str)
+                    
+                    if col_map['c_perc_no'] != -1: df_clean['parsnt_no'] = df_raw.iloc[:, col_map['c_perc_no']].astype(str)
+                    else: df_clean['parsnt_no'] = ""
+                        
+                    if col_map['c_hrs'] != -1: df_clean['hrs'] = df_raw.iloc[:, col_map['c_hrs']].astype(str)
+                    else: df_clean['hrs'] = ""
                     
                     df_clean['stu_num'] = df_clean['stu_num'].str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
                     df_clean = df_clean[df_clean['stu_num'].str.len() >= 5] 
@@ -457,9 +484,10 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     df_clean = pd.read_excel('data.xlsx')
                     records_count = len(df_clean)
                 
+                # 🌟 الرفع لـ GitHub للتوثيق الدائم 🌟
                 github_status = backup_to_github("data.xlsx")
                     
-                await status_msg.edit_text(f"✅ **نجاح ساحق في السحب المباشر!**\n📊 **النتيجة:** تم قراءة وحفظ `{records_count}` متدرب بنجاح تام.\n🌐 **النسخة الاحتياطية:** {github_status}", parse_mode='Markdown')
+                await status_msg.edit_text(f"✅ **نجاح ساحق!**\n📊 **النتيجة:** تم قراءة وحفظ `{records_count}` متدرب بنجاح تام.\n🌐 **النسخة الاحتياطية:** {github_status}", parse_mode='Markdown')
             except Exception as e:
                 await status_msg.edit_text(f"⚠️ **فشل التحديث:** `{e}`", parse_mode='Markdown')
             return
@@ -499,7 +527,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل النسخة الكاملة والنهائية المجهزة بالترميز العربي النقي...")
+    print("🚀 تشغيل النسخة الكاملة والنهائية (كاشف اللغة العربية)...")
     app.run_polling()
 
 if __name__ == '__main__': 
