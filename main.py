@@ -24,22 +24,19 @@ try:
 except ImportError:
     HAS_PIL = False
 
-# --- 🌟 دوال مساعدة وإعدادات 🌟 ---
 def load_json(f): 
     if os.path.exists(f):
         try:
             with open(f, "r", encoding="utf-8") as file:
                 return json.load(file)
-        except Exception:
-            return {}
+        except: return {}
     return {}
 
 def save_json(f, d): 
     try:
         with open(f, "w", encoding="utf-8") as file:
             json.dump(d, file, ensure_ascii=False)
-    except Exception as e:
-        print(f"Error saving JSON: {e}")
+    except: pass
 
 try:
     from questions_bank import QUESTIONS
@@ -81,7 +78,7 @@ def auto_reset_scores():
                     save_json(SCORES_FILE, {}) 
                     stats["last_reset_date"] = today_str 
                     save_json(STATS_FILE, stats)
-        except Exception: pass
+        except: pass
         time.sleep(3600)
 
 class SimpleHandler(BaseHTTPRequestHandler):
@@ -95,21 +92,17 @@ def run_web_server():
     server = HTTPServer(("0.0.0.0", port), SimpleHandler)
     server.serve_forever()
 
-# --- 🌟 أداة الرفع لـ GitHub ---
 def backup_to_github(file_path="data.xlsx"):
     github_token = os.environ.get("GITHUB_TOKEN")
     github_repo = os.environ.get("GITHUB_REPO")
-    if not github_token or not github_repo:
-        return "⚠️ (حفظ محلي مؤقت، السحابة غير مربوطة)."
-        
+    if not github_token or not github_repo: return "⚠️ (حفظ محلي مؤقت، السحابة غير مربوطة)."
     url = f"https://api.github.com/repos/{github_repo}/contents/{file_path}"
     headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
     try:
         sha = None
         resp = requests.get(url, headers=headers)
         if resp.status_code == 200: sha = resp.json().get("sha")
-        with open(file_path, "rb") as f:
-            content = base64.b64encode(f.read()).decode("utf-8")
+        with open(file_path, "rb") as f: content = base64.b64encode(f.read()).decode("utf-8")
         data = {"message": f"تحديث قاعدة البيانات - {datetime.now().strftime('%Y-%m-%d %H:%M')}", "content": content}
         if sha: data["sha"] = sha
         put_resp = requests.put(url, headers=headers, json=data)
@@ -117,7 +110,7 @@ def backup_to_github(file_path="data.xlsx"):
         else: return "⚠️ فشل الرفع لـ GitHub."
     except: return "⚠️ خطأ بالاتصال بـ GitHub."
 
-AI_KNOWLEDGE = f"أنت المعلم الذكي لقسم الحاسب الآلي ببريدة. الغياب إنذار 15% وحرمان 20%. الحقائب: {DRIVE_LINK}"
+AI_KNOWLEDGE = f"أنت المعلم الذكي. الغياب إنذار 15% وحرمان 20%. الحقائب: {DRIVE_LINK}"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 ai_model = None
 if GEMINI_API_KEY:
@@ -129,7 +122,9 @@ if GEMINI_API_KEY:
                 break
     except: pass
 
-ai_sessions, feedback_sessions, active_challenges, interrogation_sessions = {}, {}, {}, {}
+# 🌟 نظام الحجر الذكي (لإدارة حالات المستخدمين الصارمة) 🌟
+user_states = {}
+active_challenges = {}
 
 # --- 🌟 تصميم القوائم 🌟 ---
 def get_main_menu():
@@ -142,6 +137,9 @@ def get_main_menu():
         ["❓ الأسئلة الشائعة", "📘 دليل المتدرب الرسمي"],
         ["📬 الاقتراحات والشكاوى", "🕹️ قسم الألعاب والإضافات"]
     ], resize_keyboard=True, is_persistent=True)
+
+def get_cancel_menu():
+    return ReplyKeyboardMarkup([["❌ إلغاء العملية"]], resize_keyboard=True)
 
 def get_plans_menu():
     return ReplyKeyboardMarkup([
@@ -161,7 +159,6 @@ def get_games_menu():
 def get_back_menu(): 
     return ReplyKeyboardMarkup([["🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
 
-# --- 🌟 أوامر المدير السرية المكتملة 🌟 ---
 async def db_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_user.id) != ADMIN_ID: return
     try:
@@ -172,111 +169,150 @@ async def db_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sample = df['stu_num'].dropna().unique()[:5]
         msg = f"📊 **كشاف البيانات:**\n✅ تم حفظ: {len(df)} سجل.\n🔍 عينة أرقام:\n`{', '.join(sample)}`"
         await update.message.reply_text(msg, parse_mode='Markdown')
-    except Exception as e:
-        await update.message.reply_text(f"⚠️ خطأ: {e}")
+    except: pass
 
 async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_user.id) != ADMIN_ID: return
-    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_DOCUMENT)
-    await update.message.reply_text("⏳ جاري تجهيز النسخة الاحتياطية...")
-    files = ['data.xlsx', 'scores.json', 'interrogations.json', 'stats.json', 'plans.json']
-    sent = False
-    for f in files:
-        if os.path.exists(f):
-            await context.bot.send_document(chat_id=update.effective_chat.id, document=open(f, 'rb'))
-            sent = True
-    if sent: await update.message.reply_text("✅ تم إرسال النسخة الاحتياطية.", parse_mode='Markdown')
-    else: await update.message.reply_text("⚠️ لا توجد ملفات للنسخ الاحتياطي.")
+    await update.message.reply_text("⏳ جاري التجهيز...")
+    for f in ['data.xlsx', 'scores.json', 'interrogations.json', 'stats.json', 'plans.json']:
+        if os.path.exists(f): await context.bot.send_document(chat_id=update.effective_chat.id, document=open(f, 'rb'))
 
 async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_user.id) != ADMIN_ID: return
     text = update.message.text.replace('/broadcast', '').strip()
-    if not text:
-        await update.message.reply_text("⚠️ الطريقة: `/broadcast التعميم هنا`", parse_mode='Markdown')
-        return
-    stats = load_json(STATS_FILE)
-    users = stats.get("users_list", [])
-    await update.message.reply_text(f"📢 جاري إرسال التعميم لـ {len(users)} متدرب...")
-    success = 0
+    if not text: return await update.message.reply_text("⚠️ الطريقة: `/broadcast التعميم هنا`", parse_mode='Markdown')
+    users = load_json(STATS_FILE).get("users_list", [])
+    await update.message.reply_text(f"📢 جاري الإرسال لـ {len(users)}...")
     for u in users:
-        try:
-            await context.bot.send_message(chat_id=u, text=f"📢 **إعلان إداري هام:**\n{SEP}\n{text}", parse_mode='Markdown')
-            success += 1
+        try: await context.bot.send_message(chat_id=u, text=f"📢 **إعلان إداري هام:**\n{SEP}\n{text}", parse_mode='Markdown')
         except: pass
-    await update.message.reply_text(f"✅ تم إرسال التعميم بنجاح لـ {success} متدرب.", parse_mode='Markdown')
+    await update.message.reply_text("✅ تم إرسال التعميم.")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     stats = load_json(STATS_FILE)
-    users = stats.get("users_list", [])
-    if user_id not in users: 
-        users.append(user_id)
-        stats["users_list"] = users
+    if user_id not in stats.get("users_list", []): 
+        stats.setdefault("users_list", []).append(user_id)
         save_json(STATS_FILE, stats)
-    ai_sessions[user_id] = False
+    
+    # تفريغ حالة المستخدم عند ضغط ستارت
+    if user_id in user_states: del user_states[user_id]
     
     welcome_msg = (f"أهلاً بك يا {update.effective_user.first_name} في المساعد الذكي لقسم الحاسب الآلي 💻✨\n{SEP}\n"
                    f"أنا نظامك الرقمي المتكامل. تم تصميمي لتوفير وقتك وتسهيل رحلتك التدريبية.\n\n"
                    f"👇 **الرجاء اختيار الخدمة المطلوبة من القائمة السفلية:**")
     try:
-        if os.path.exists('IMG_1058.jpeg'):
-            await update.message.reply_photo(photo=open('IMG_1058.jpeg', 'rb'), caption=welcome_msg, reply_markup=get_main_menu())
-        else:
-            logo_url = "https://pbs.twimg.com/profile_images/1684496035272658944/p02_gM0p_400x400.jpg"
-            await update.message.reply_photo(photo=logo_url, caption=welcome_msg, reply_markup=get_main_menu())
-    except:
-        await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
+        if os.path.exists('IMG_1058.jpeg'): await update.message.reply_photo(photo=open('IMG_1058.jpeg', 'rb'), caption=welcome_msg, reply_markup=get_main_menu())
+        else: await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
+    except: await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
 
-# --- 🌟 محرك الاستجابة الشامل للمتدربين 🌟 ---
+# --- 🌟 المحرك الصارم للاستجابة 🌟 ---
 async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = str(update.effective_user.id)
+    
     trans_table = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
     clean_text = text.translate(trans_table).strip()
 
-    # 1. نظام التعهد الآلي للغياب
-    if user_id in interrogation_sessions:
-        session = interrogation_sessions[user_id]
-        step = session['step']
-        if step == 1:
-            session['aware_answer'] = text; session['step'] = 2
-            await update.message.reply_text("2️⃣ **ما هو العذر الرئيسي لغياباتك؟**", parse_mode='Markdown')
-            return
-        elif step == 2:
-            session['excuse_answer'] = text; session['step'] = 3
-            await update.message.reply_text("3️⃣ **هل تتعهد بالانضباط لتفادي الحرمان (20%)؟**\n(أجب بنعم)", parse_mode='Markdown')
-            return
-        elif step == 3:
-            session['pledge_answer'] = text
-            completed = load_json(INTERROGATIONS_FILE)
-            if session['stu_num'] not in completed: completed[session['stu_num']] = []
-            completed[session['stu_num']].append(session['subject'])
-            save_json(INTERROGATIONS_FILE, completed)
-            
-            report = f"🚨 **تعهد (إنذار 15%)** 🚨\n👤 **المتدرب:** {session['stu_nam']} ({session['stu_num']})\n📖 **المادة:** {session['subject']}\n❓ **العذر:** {session['excuse_answer']}\n✍️ **الإقرار:** {session['pledge_answer']}"
-            try: await context.bot.send_message(chat_id=GROUP_ID, text=report, parse_mode='Markdown')
-            except: pass
-            
-            del interrogation_sessions[user_id]
-            await update.message.reply_text("✅ **تم توثيق إقرارك للإدارة.**", reply_markup=get_main_menu(), parse_mode='Markdown')
+    # 1. فحص هل المستخدم محتجز داخل مسار إجباري؟
+    if user_id in user_states:
+        state = user_states[user_id]
+        
+        # إذا طلب الإلغاء في أي وقت
+        if text in ["❌ إلغاء العملية", "🔙 الرجوع للقائمة الرئيسية"]:
+            del user_states[user_id]
+            await update.message.reply_text("تم إلغاء العملية، والعودة للقائمة الرئيسية 🏠", reply_markup=get_main_menu())
             return
 
-    if text == "🔙 الرجوع للقائمة الرئيسية":
-        ai_sessions[user_id] = False
-        await update.message.reply_text("🏠 **تم العودة للقائمة الرئيسية.**", reply_markup=get_main_menu())
+        # 🚨 مسار التعهد الصارم
+        if state['flow'] == 'pledge':
+            step = state['step']
+            if step == 1:
+                if len(text) < 2: return await update.message.reply_text("⚠️ إجابة غير واضحة، أرجو الإجابة بشكل صحيح:", reply_markup=get_cancel_menu())
+                user_states[user_id]['aware'] = text
+                user_states[user_id]['step'] = 2
+                return await update.message.reply_text("2️⃣ **ما هو العذر الرئيسي لكثرة غياباتك؟**\n(نرجو التفصيل لرفعه للإدارة)", parse_mode='Markdown', reply_markup=get_cancel_menu())
+            
+            elif step == 2:
+                if len(text) < 10: return await update.message.reply_text("⚠️ **العذر قصير جداً وغير مقنع!**\nالرجاء كتابة العذر بالتفصيل لكي تأخذه الإدارة بعين الاعتبار:", parse_mode='Markdown', reply_markup=get_cancel_menu())
+                user_states[user_id]['excuse'] = text
+                user_states[user_id]['step'] = 3
+                return await update.message.reply_text("3️⃣ **هل تتعهد بالانضباط والالتزام لتفادي الحرمان النهائي (20%)؟**\n🛑 *(يجب أن تكتب كلمة: نعم ، أو كلمة: أتعهد)*", parse_mode='Markdown', reply_markup=get_cancel_menu())
+            
+            elif step == 3:
+                if "نعم" not in text and "تعهد" not in text:
+                    return await update.message.reply_text("⚠️ **لم يتم قبول إقرارك!**\nالرجاء كتابة (نعم) أو (أتعهد) للموافقة والالتزام:", parse_mode='Markdown', reply_markup=get_cancel_menu())
+                
+                # نجاح التعهد
+                completed = load_json(INTERROGATIONS_FILE)
+                completed.setdefault(state['stu_num'], []).append(state['subject'])
+                save_json(INTERROGATIONS_FILE, completed)
+                
+                report = f"🚨 **تعهد (إنذار 15%)** 🚨\n👤 **المتدرب:** {state['stu_nam']} ({state['stu_num']})\n📖 **المادة:** {state['subject']}\n❓ **العذر:** {state['excuse']}\n✍️ **الإقرار:** {text}"
+                try: await context.bot.send_message(chat_id=GROUP_ID, text=report, parse_mode='Markdown')
+                except: pass
+                
+                del user_states[user_id]
+                await update.message.reply_text("✅ **تم توثيق إقرارك رسمياً لدى الإدارة.**\nاحرص على الحضور لتفادي طي القيد.", reply_markup=get_main_menu(), parse_mode='Markdown')
+                return
+
+        # 📬 مسار الشكاوى الصارم
+        if state['flow'] == 'feedback':
+            if len(text) < 15:
+                return await update.message.reply_text("⚠️ **الرسالة قصيرة جداً!**\nالرجاء كتابة رسالتك بالتفصيل (أكثر من 15 حرف) لكي نأخذها بجدية.", parse_mode='Markdown', reply_markup=get_cancel_menu())
+            try:
+                await context.bot.send_message(chat_id=GROUP_ID, text=f"💡 **شكوى/مقترح:**\nالمرسل: {update.effective_user.first_name}\nالنص: {text}")
+                del user_states[user_id]
+                return await update.message.reply_text("✅ **تم إرسال رسالتك للإدارة بسرية تامة.**", reply_markup=get_main_menu(), parse_mode='Markdown')
+            except: 
+                del user_states[user_id]
+                return await update.message.reply_text("⚠️ فشل الإرسال، حاول لاحقاً.", reply_markup=get_main_menu())
+
+        # 🤖 مسار المعلم الذكي
+        if state['flow'] == 'ai':
+            if not ai_model:
+                del user_states[user_id]
+                return await update.message.reply_text("⚠️ المعلم غير متصل حالياً.", reply_markup=get_main_menu())
+            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+            try:
+                response = await ai_model.generate_content_async(f"{AI_KNOWLEDGE}\nسؤال: {text}")
+                return await update.message.reply_text(f"📝 رد المعلم الذكي:\n\n{response.text}", reply_markup=get_back_menu())
+            except: return await update.message.reply_text("⚠️ خطأ تقني بالذكاء الاصطناعي.", reply_markup=get_back_menu())
+
+        # 📝 مسار رفع الأعذار (إذا أرسل نصاً بدلاً من الصورة)
+        if state['flow'] == 'excuse':
+            return await update.message.reply_text("⚠️ **هذا نص! الرجاء إرسال (صورة أو ملف PDF) للعذر الطبي مع كتابة رقمك في الوصف الخاص بالصورة.**", parse_mode='Markdown', reply_markup=get_cancel_menu())
+
+    # ==================================================
+    # 2. القوائم الرئيسية (بداية المسارات)
+    # ==================================================
+    
+    if text == "📝 رفع الغياب والأعذار": 
+        user_states[user_id] = {'flow': 'excuse'}
+        await update.message.reply_text("📝 **نظام رفع الأعذار الصارم:**\nالرجاء إرفاق (صورة العذر) الآن، **ويجب** كتابة (رقمك واسمك) في خانة الوصف (Caption) الخاصة بالصورة لكي يقبلها النظام.", parse_mode='Markdown', reply_markup=get_cancel_menu())
+        return
+
+    if text == "📬 الاقتراحات والشكاوى":
+        user_states[user_id] = {'flow': 'feedback'}
+        await update.message.reply_text("📬 **صندوق الإدارة:**\nاكتب رسالتك، اقتراحك، أو شكواك الآن بالتفصيل وسوف تصل للإدارة بسرية تامة...", parse_mode='Markdown', reply_markup=get_cancel_menu())
+        return
+
+    if text == "🤖 المعلم الذكي (الدليل الشامل)":
+        user_states[user_id] = {'flow': 'ai'}
+        await update.message.reply_text("🤖 **المعلم الذكي!**\n💬 أنا جاهز، اكتب أي سؤال تقني أو إداري وسأجيبك فوراً...", parse_mode='Markdown', reply_markup=get_back_menu())
         return
 
     if text == "📊 استعلام الغياب":
-        await update.message.reply_text("🔎 **استعلام الغياب**\n👇 **أرسل رقمك التدريبي...**", parse_mode='Markdown')
+        await update.message.reply_text("🔎 **استعلام الغياب**\n👇 **أرسل رقمك التدريبي الآن (أرقام فقط)...**", parse_mode='Markdown')
         return
 
-    # 2. الاستعلام عن الرقم التدريبي مع البطاقة الأكاديمية الفخمة
+    # 3. الاستعلام عن السجل الأكاديمي للغياب
     if clean_text.isdigit() and len(clean_text) > 4: 
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
         try:
             if not os.path.exists('data.xlsx'):
-                await update.message.reply_text("⚠️ **قاعدة البيانات فارغة.**", parse_mode='Markdown')
-                return
+                return await update.message.reply_text("⚠️ **قاعدة البيانات فارغة.**", parse_mode='Markdown')
+
             df = pd.read_excel('data.xlsx', dtype=str)
             df['stu_num'] = df['stu_num'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True) 
             res = df[df['stu_num'] == clean_text]
@@ -294,7 +330,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     raw_val = str(r.get('parsnt', '0')).replace('%', '').strip()
                     parsnt_no = str(r.get('parsnt_no', '0')).replace('%', '').strip()
                     hrs = str(r.get('hrs', '0')).replace('.0', '').strip()
-                    
                     if raw_val == 'nan' or raw_val == '': raw_val = '0'
                     
                     if raw_val == 'ح' or 'حرمان' in raw_val:
@@ -328,13 +363,13 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     day_val = str(r.get('day', 'غير محدد')).replace(' 00:00:00', '').strip()
                     m += f"📖 **{c_name_text}**\n▫️ النتيجة: {display_val}\n📅 التحديث: {day_val}\n\n"
                 
-                m += f"{SEP}\n💡 *الإنذار يبدأ عند 15%، والحرمان المؤكد عند 20%.*"
+                m += f"{SEP}\n💡 *الإنذار يبدأ عند 15%، والحرمان عند 20%.*"
 
+                # 🚨 احتجاز المستخدم وتفعيل مسار التعهد 🚨
                 if subject_to_interrogate:
-                    interrogation_sessions[user_id] = {'step': 1, 'stu_num': clean_text, 'stu_nam': stu_nam, 'subject': subject_to_interrogate}
-                    warning_msg = f"⚠️ **تنبيه إداري قبل الحرمان!** ⚠️\nلقد وصلت غياباتك إلى الخطر (15% فأكثر) في مقرر:\n**{subject_to_interrogate}**\n\n🛑 **للإطلاع على سجلك، أجب:**\n1️⃣ هل تعلم أنك اقتربت من الحرمان؟"
-                    await update.message.reply_text(warning_msg, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())
-                    return
+                    user_states[user_id] = {'flow': 'pledge', 'step': 1, 'stu_num': clean_text, 'stu_nam': stu_nam, 'subject': subject_to_interrogate}
+                    warning_msg = f"⚠️ **تنبيه إداري عاجل!** ⚠️\nلقد وصلت غياباتك إلى مرحلة الخطر (15% فأكثر) في مقرر:\n**{subject_to_interrogate}**\n\n🛑 **النظام مغلق حتى تُكمل الإقرار!**\n1️⃣ هل تعلم أنك اقتربت من الحرمان؟"
+                    return await update.message.reply_text(warning_msg, parse_mode='Markdown', reply_markup=get_cancel_menu())
                 
                 if has_deprivation: m += f"\n\n🛑 **تنبيه إداري:** أنت محروم في مقرر أو أكثر. راجع الإدارة."
                 await update.message.reply_text(m, parse_mode='Markdown')
@@ -344,75 +379,34 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"⚠️ **حدث خطأ:** `{str(e)}`", parse_mode='Markdown')
         return
 
-    # 3. كافة القوائم الخدمية المستعادة
-    if text == "📝 رفع الغياب والأعذار": 
-        await update.message.reply_text("📝 **رفع الأعذار**\nصور العذر واكتب رقمك بالوصف ثم أرسله ليتم ختمه آلياً.", parse_mode='Markdown')
-        return
+    # 4. الردود الثابتة
     if text == "📚 الحقائب التدريبية": 
-        await update.message.reply_text("📚 **الحقائب التدريبية:**", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📥 الدخول للمستودع", url=DRIVE_LINK)]]), parse_mode='Markdown')
-        return
+        return await update.message.reply_text("📚 **الحقائب التدريبية:**", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📥 الدخول للمستودع", url=DRIVE_LINK)]]), parse_mode='Markdown')
     if text == "🔗 المنصات الإلكترونية": 
         kb = [[InlineKeyboardButton("رايات", url="https://rayat.tvtc.gov.sa")], [InlineKeyboardButton("تقني", url="https://tvtclms.edu.sa")], [InlineKeyboardButton("بلاك بورد", url="https://lms.elearning.edu.sa/")]]
-        await update.message.reply_text("🌐 **المنصات الإلكترونية:**", reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
-        return
+        return await update.message.reply_text("🌐 **المنصات الإلكترونية:**", reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
     if text == "📍 موقع القسم": 
-        await update.message.reply_text("📍 **موقع قسم الحاسب:**", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🗺️ خرائط جوجل", url="http://googleusercontent.com/maps.google.com/3")]]), parse_mode='Markdown')
-        return
+        return await update.message.reply_text("📍 **موقع قسم الحاسب:**", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🗺️ خرائط جوجل", url="http://googleusercontent.com/maps.google.com/3")]]), parse_mode='Markdown')
     if text == "📰 أخبار القسم والمعهد": 
-        await update.message.reply_text("📰 **أخبار المعهد:**", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📱 حساب منصة X", url=TVTC_X_LINK)]]), parse_mode='Markdown')
-        return
+        return await update.message.reply_text("📰 **أخبار المعهد:**", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📱 حساب منصة X", url=TVTC_X_LINK)]]), parse_mode='Markdown')
     if text == "📅 التقويم التدريبي":
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
-        if os.path.exists('calendar.jpg'): await update.message.reply_photo(photo=open('calendar.jpg', 'rb'))
-        else: await update.message.reply_text("⚠️ ملف التقويم قيد التحديث من الإدارة.")
-        return
+        if os.path.exists('calendar.jpg'): return await update.message.reply_photo(photo=open('calendar.jpg', 'rb'))
+        else: return await update.message.reply_text("⚠️ ملف التقويم قيد التحديث.")
     if text == "📘 دليل المتدرب الرسمي":
-        if os.path.exists("trainee_guide.pdf"): await update.message.reply_document(document=open("trainee_guide.pdf", 'rb'), caption="📘 **دليل المتدرب الرسمي**", parse_mode='Markdown')
-        else: await update.message.reply_text("⚠️ **جاري تحديث ملف الدليل من قبل الإدارة.**", parse_mode='Markdown')
-        return
+        if os.path.exists("trainee_guide.pdf"): return await update.message.reply_document(document=open("trainee_guide.pdf", 'rb'), caption="📘 **دليل المتدرب الرسمي**", parse_mode='Markdown')
+        else: return await update.message.reply_text("⚠️ **جاري التحديث من قبل الإدارة.**", parse_mode='Markdown')
     if text == "❓ الأسئلة الشائعة":
-        faq_msg = f"❓ **الأسئلة الشائعة:**\n🔹 **الحرمان؟** عند غياب (20%).\n🔹 **المكافأة؟** 800 ريال وتتوقف لمعدل تحت 2.00.\n🔹 **درجة النجاح؟** 50 للمعاهد."
-        await update.message.reply_text(faq_msg, parse_mode='Markdown')
-        return
-    if text == "🤖 المعلم الذكي (الدليل الشامل)":
-        ai_sessions[user_id] = True
-        await update.message.reply_text("🤖 **المعلم الذكي!**\n💬 **اكتب سؤالك التقني أو الإداري وسأجيبك فوراً...**", reply_markup=get_back_menu(), parse_mode='Markdown')
-        return
-    if ai_sessions.get(user_id) == True:
-        if not ai_model:
-            await update.message.reply_text("⚠️ المعلم غير متصل حالياً.", reply_markup=get_back_menu())
-            return
-        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-        try:
-            response = await ai_model.generate_content_async(f"{AI_KNOWLEDGE}\nسؤال: {text}")
-            await update.message.reply_text(f"📝 رد المعلم الذكي:\n\n{response.text}", reply_markup=get_back_menu())
-        except: pass
-        return
-    if text == "📬 الاقتراحات والشكاوى":
-        feedback_sessions[user_id] = True
-        await update.message.reply_text("📬 **اكتب رسالتك الآن وستصل للإدارة بسرية...**", reply_markup=get_back_menu(), parse_mode='Markdown')
-        return
-    if feedback_sessions.get(user_id) == True:
-        try:
-            await context.bot.send_message(chat_id=GROUP_ID, text=f"💡 **شكوى/مقترح:**\nالمرسل: {update.effective_user.first_name}\nالنص: {text}")
-            feedback_sessions[user_id] = False
-            await update.message.reply_text("✅ **تم استلام رسالتك.**", reply_markup=get_main_menu(), parse_mode='Markdown')
-        except: pass
-        return
+        return await update.message.reply_text(f"❓ **الأسئلة الشائعة:**\n🔹 **الحرمان؟** غياب (20%).\n🔹 **المكافأة؟** 800 ريال وتتوقف لمعدل تحت 2.00.\n🔹 **النجاح؟** 50 للمعاهد.", parse_mode='Markdown')
     if text in ["1️⃣ الفصل الأول", "2️⃣ الفصل الثاني", "3️⃣ الفصل الثالث", "4️⃣ الفصل الرابع", "5️⃣ الفصل الخامس", "6️⃣ الفصل السادس", "🖥️ برامج فصلية"]:
         plans = load_json("plans.json")
-        reply_msg = f"{plans.get(text, 'جاري التحديث')}\n{SEP}\n🔗 **لتحميل المنهج اضغط الزر:**"
-        await update.message.reply_text(reply_msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📥 تحميل", url=DRIVE_LINK)]]), parse_mode='Markdown')
-        return
+        return await update.message.reply_text(f"{plans.get(text, 'جاري التحديث')}\n{SEP}\n🔗 **لتحميل المنهج:**", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📥 تحميل", url=DRIVE_LINK)]]), parse_mode='Markdown')
     if text == "📄 الخطط التدريبية":
-        await update.message.reply_text("📄 **اختر الفصل:**", reply_markup=get_plans_menu(), parse_mode='Markdown')
-        return
+        return await update.message.reply_text("📄 **اختر الفصل:**", reply_markup=get_plans_menu(), parse_mode='Markdown')
     if text == "🕹️ قسم الألعاب والإضافات":
-        await update.message.reply_text("🕹️ **اختر النشاط:**", reply_markup=get_games_menu(), parse_mode='Markdown')
-        return
+        return await update.message.reply_text("🕹️ **اختر النشاط:**", reply_markup=get_games_menu(), parse_mode='Markdown')
     if text == "💡 نصيحة تقنية":
-        await update.message.reply_text(random.choice(TECH_TIPS), parse_mode='Markdown')
-        return
+        return await update.message.reply_text(random.choice(TECH_TIPS), parse_mode='Markdown')
     if text == "🌐 أخبار التقنية":
         try:
             req = urllib.request.Request("https://www.tech-wd.com/wd/feed/", headers={'User-Agent': 'Mozilla/5.0'})
@@ -422,34 +416,28 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for i, item in enumerate(root.findall('.//item')):
                 if i >= 3: break
                 news_msg += f"🔹 [{item.find('title').text}]({item.find('link').text})\n\n"
-            await update.message.reply_text(news_msg, parse_mode='Markdown', disable_web_page_preview=True)
+            return await update.message.reply_text(news_msg, parse_mode='Markdown', disable_web_page_preview=True)
         except: pass
-        return
     if text == "🎮 تحدي الأسبوع":
         update_stat("quiz_attempts")
         q = random.choice(QUESTIONS)
         active_challenges[user_id] = time.time()
         kb = [[InlineKeyboardButton(o, callback_data=f"ans_{QUESTIONS.index(q)}_{i}")] for i, o in enumerate(q['options'])]
-        await update.message.reply_text(f"❓ **تحدي الأسبوع:**\n\n{q['q']}\n\n⚠️ أمامك 15 ثانية:", reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
-        return
+        return await update.message.reply_text(f"❓ **تحدي الأسبوع:**\n\n{q['q']}\n\n⚠️ أمامك 15 ثانية:", reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
     if text == "🏆 بطل الأسبوع":
         sc = load_json(SCORES_FILE)
-        if not sc: 
-            await update.message.reply_text("📉 لا يوجد نقاط مسجلة.", parse_mode='Markdown')
-            return
+        if not sc: return await update.message.reply_text("📉 لا يوجد نقاط مسجلة.", parse_mode='Markdown')
         top = sorted(sc.items(), key=lambda x: x[1]['score'], reverse=True)[0][1]
-        await update.message.reply_text(f"🏆 **بطل الأسبوع:** {top['name']}\n🌟 **النقاط:** {top['score']}", parse_mode='Markdown')
-        return
+        return await update.message.reply_text(f"🏆 **بطل الأسبوع:** {top['name']}\n🌟 **النقاط:** {top['score']}", parse_mode='Markdown')
 
-    if not ai_sessions.get(user_id):
-        await update.message.reply_text("⚠️ **الرجاء اختيار خدمة من الأسفل 👇**", reply_markup=get_main_menu())
+    await update.message.reply_text("⚠️ **الرجاء اختيار خدمة من الأسفل 👇**", reply_markup=get_main_menu())
 
 
-# --- 🌟 محرك الإدارة ومعالجة الملفات والصور 🌟 ---
+# --- 🌟 محرك سحب رايات والأعذار الصارم 🌟 ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     
-    # 1. سحب بيانات رايات (للمدير فقط)
+    # 1. الإدارة (رايات)
     if user_id == ADMIN_ID and update.message.document:
         doc = update.message.document
         if doc.file_name.endswith(('.xlsx', '.xls', '.csv')):
@@ -462,23 +450,18 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     temp_file = "temp_rayat.csv"
                     await file.download_to_drive(temp_file)
                     
-                    # 🌟 كاشف الترميز الذكي للغة العربية 🌟
-                    with open(temp_file, 'rb') as f:
-                        raw_bytes = f.read()
-                        
+                    with open(temp_file, 'rb') as f: raw_bytes = f.read()
                     best_enc = 'utf-8-sig' 
                     for enc in ['utf-8-sig', 'windows-1256', 'cp1256', 'utf-8', 'iso-8859-6']:
                         try:
                             text = raw_bytes.decode(enc)
-                            if 'المتدرب' in text or 'المقرر' in text or 'الغياب' in text or 'رقم' in text:
-                                best_enc = enc
-                                break 
+                            if 'المتدرب' in text or 'المقرر' in text or 'الغياب' in text:
+                                best_enc = enc; break 
                         except: pass
                             
                     df_raw = pd.read_csv(io.StringIO(raw_bytes.decode(best_enc)), dtype=str, sep=',', on_bad_lines='skip')
                     df_clean = pd.DataFrame()
                     
-                    # 🌟 باحث الأعمدة المرن 🌟
                     col_map = {'c_course': -1, 'c_id': -1, 'c_name': -1, 'c_perc': -1, 'c_perc_no': -1, 'c_hrs': -1}
                     for i, col in enumerate(df_raw.columns):
                         clean_col = str(col).replace(' ', '').replace('أ', 'ا').replace('إ', 'ا').replace('"', '')
@@ -500,48 +483,43 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     df_clean['stu_num'] = df_raw.iloc[:, col_map['c_id']].astype(str)
                     df_clean['stu_nam'] = df_raw.iloc[:, col_map['c_name']].astype(str)
                     df_clean['parsnt'] = df_raw.iloc[:, col_map['c_perc']].astype(str)
-                    
-                    if col_map['c_perc_no'] != -1: df_clean['parsnt_no'] = df_raw.iloc[:, col_map['c_perc_no']].astype(str)
-                    else: df_clean['parsnt_no'] = ""
-                        
-                    if col_map['c_hrs'] != -1: df_clean['hrs'] = df_raw.iloc[:, col_map['c_hrs']].astype(str)
-                    else: df_clean['hrs'] = ""
+                    df_clean['parsnt_no'] = df_raw.iloc[:, col_map['c_perc_no']].astype(str) if col_map['c_perc_no'] != -1 else ""
+                    df_clean['hrs'] = df_raw.iloc[:, col_map['c_hrs']].astype(str) if col_map['c_hrs'] != -1 else ""
                     
                     df_clean['stu_num'] = df_clean['stu_num'].str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
                     df_clean = df_clean[df_clean['stu_num'].str.len() >= 5] 
-                    
                     for col in df_clean.columns: df_clean[col] = df_clean[col].replace('nan', '').str.strip()
                         
                     df_clean['day'] = datetime.now().strftime("%Y-%m-%d")
                     df_clean.to_excel("data.xlsx", index=False)
                     records_count = len(df_clean)
                     os.remove(temp_file)
-                    
                 else:
                     await file.download_to_drive("data.xlsx")
                     df_clean = pd.read_excel('data.xlsx')
                     records_count = len(df_clean)
                 
                 github_status = backup_to_github("data.xlsx")
-                await status_msg.edit_text(f"✅ **نجاح ساحق!**\n📊 **النتيجة:** تم قراءة وحفظ `{records_count}` متدرب بنجاح تام.\n🌐 **النسخة الاحتياطية:** {github_status}", parse_mode='Markdown')
+                await status_msg.edit_text(f"✅ **نجاح ساحق!**\n📊 **النتيجة:** حفظ `{records_count}` متدرب.\n🌐 **السحابة:** {github_status}", parse_mode='Markdown')
             except Exception as e:
                 await status_msg.edit_text(f"⚠️ **فشل التحديث:** `{e}`", parse_mode='Markdown')
             return
 
-    # 2. استقبال الأعذار من المتدربين (لجميع المستخدمين)
+    # 2. استقبال الأعذار مع الفحص الصارم للوصف
     if update.message.photo or update.message.document:
-        if not update.message.caption: 
-            await update.message.reply_text("⚠️ **الرجاء إرفاق الصورة أو الملف مع كتابة رقمك واسمك في الوصف أسفل الصورة.**", parse_mode='Markdown')
-            return
+        state = user_states.get(user_id, {})
+        caption_text = update.message.caption
+        
+        # إذا لم يكن هناك وصف أو وصف لا يحتوي على أرقام
+        stu_id = ''.join(filter(str.isdigit, str(caption_text)))
+        if not caption_text or len(stu_id) < 5:
+            return await update.message.reply_text("🛑 **مرفوض: وصف غير مكتمل!**\nيجب أن تقوم بإرفاق الصورة مرة أخرى وتأكد من كتابة **رقمك التدريبي** في الوصف لكي يتم ربطه بملفك.", parse_mode='Markdown', reply_markup=get_cancel_menu() if state.get('flow') == 'excuse' else get_main_menu())
             
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
-        status_msg = await update.message.reply_text("⏳ جاري المعالجة والختم الآلي...")
+        status_msg = await update.message.reply_text("⏳ جاري الختم الآلي...")
         
         try:
-            caption_text = update.message.caption
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            stu_id = ''.join(filter(str.isdigit, caption_text)) or "UNKNOWN"
-            
             if update.message.photo and HAS_PIL:
                 photo = update.message.photo[-1]
                 file = await context.bot.get_file(photo.file_id)
@@ -559,14 +537,17 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 output = io.BytesIO()
                 img.save(output, format='JPEG')
                 output.seek(0)
-                await context.bot.send_photo(chat_id=GROUP_ID, photo=output, caption=f"📥 **عذر مختوم رسمياً:**\n{caption_text}\n⏱️ {timestamp}", parse_mode='Markdown')
+                await context.bot.send_photo(chat_id=GROUP_ID, photo=output, caption=f"📥 **عذر مختوم:**\n{caption_text}\n⏱️ {timestamp}", parse_mode='Markdown')
             else:
                 await context.bot.send_message(chat_id=GROUP_ID, text=f"📥 **عذر مرفق:**\n{caption_text}\n{timestamp}")
                 await update.message.copy(chat_id=GROUP_ID)
                 
-            await status_msg.edit_text("✅ **تم الختم والإرسال للإدارة بنجاح.**\nسيتم مراجعة عذرك قريباً.", parse_mode='Markdown')
+            # إنهاء مسار العذر بنجاح
+            if user_id in user_states: del user_states[user_id]
+            await status_msg.edit_text("✅ **تم الختم والإرسال للإدارة بنجاح.**", parse_mode='Markdown')
+            await update.message.reply_text("العودة للقائمة الرئيسية 🏠", reply_markup=get_main_menu())
         except:
-            await status_msg.edit_text("⚠️ **حدث خطأ فني أثناء الإرسال.**", parse_mode='Markdown')
+            await status_msg.edit_text("⚠️ **خطأ فني أثناء الإرسال.**", parse_mode='Markdown')
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -588,7 +569,6 @@ def main():
     
     app = Application.builder().token(TOKEN).build()
     
-    # تسجيل جميع الأوامر الإدارية والخدمية
     app.add_handler(CommandHandler("db", db_status_command)) 
     app.add_handler(CommandHandler("backup", backup_command))
     app.add_handler(CommandHandler("broadcast", broadcast_command))
@@ -598,7 +578,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل النسخة الذهبية المتكاملة (محرك رايات + الأوامر الإدارية + القوائم كاملة)...")
+    print("🚀 تشغيل النظام العسكري الصارم (Strict State Machine)...")
     app.run_polling()
 
 if __name__ == '__main__': 
