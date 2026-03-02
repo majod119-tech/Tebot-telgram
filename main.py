@@ -23,6 +23,7 @@ try:
 except ImportError:
     HAS_PIL = False
 
+# --- 🌟 دوال مساعدة لضمان استقرار السيرفر ---
 def load_json(f): 
     if os.path.exists(f):
         try:
@@ -59,6 +60,21 @@ def update_stat(cat):
     s = load_json(STATS_FILE)
     s[cat] = s.get(cat, 0) + 1
     save_json(STATS_FILE, s)
+
+# 🌟 الدالة التي تسببت في الخطأ تم استعادتها هنا 🌟
+def auto_reset_scores():
+    while True:
+        try:
+            now = datetime.now()
+            if now.weekday() == 6: 
+                today_str = now.strftime("%Y-%m-%d")
+                stats = load_json(STATS_FILE)
+                if stats.get("last_reset_date") != today_str:
+                    save_json(SCORES_FILE, {}) 
+                    stats["last_reset_date"] = today_str 
+                    save_json(STATS_FILE, stats)
+        except Exception: pass
+        time.sleep(3600)
 
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -166,7 +182,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🔎 **استعلام الغياب**\n👇 **أرسل رقمك التدريبي...**", parse_mode='Markdown')
         return
 
-    # 🌟 التنسيق الأكاديمي الفخم + كاشف التفاصيل المخفية 🌟
     if clean_text.isdigit() and len(clean_text) > 4: 
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
         try:
@@ -195,13 +210,11 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     parsnt_no = str(r.get('parsnt_no', '')).replace('%', '').strip()
                     hrs = str(r.get('hrs', '')).strip()
                     
-                    # إذا مسح رايات النسبة وكتب (ح)
                     if raw_val == 'ح' or 'حرمان' in raw_val:
                         icon = "🔴 حرمان مؤكد"
                         display_val = f"**حرمان (ح)** {icon}"
                         has_deprivation = True
                         
-                        # سحب البيانات المخفية لإظهارها للطالب
                         extras = []
                         if parsnt_no and parsnt_no.lower() not in ['ح', 'nan', '', 'none']:
                             extras.append(f"بدون عذر: {parsnt_no}%")
@@ -230,7 +243,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 
                             display_val = f"**{val}%** {icon}"
                             
-                            # إضافة ساعات الغياب إذا كانت موجودة ليعرف الطالب كم غاب
                             extras = []
                             if hrs and hrs.lower() not in ['nan', '', 'none', '0']:
                                 extras.append(f"الغياب: {hrs} ساعة")
@@ -362,7 +374,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ **اختر من القائمة 👇**", reply_markup=get_main_menu())
 
 
-# --- 🌟 محرك سحب ملفات رايات مع سحب البيانات المخفية 🌟 ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     
@@ -479,7 +490,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل النسخة الأكاديمية (كاشف تفاصيل الحرمان)...")
+    print("🚀 تشغيل النسخة المستقرة...")
     app.run_polling()
 
 if __name__ == '__main__': 
