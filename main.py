@@ -24,6 +24,7 @@ try:
 except ImportError:
     HAS_PIL = False
 
+# --- 🌟 دوال مساعدة وإعدادات 🌟 ---
 def load_json(f): 
     if os.path.exists(f):
         try:
@@ -44,6 +45,14 @@ try:
     from questions_bank import QUESTIONS
 except Exception as e:
     QUESTIONS = [{"q": "ما هو عنوان الـ IP لـ (Localhost)؟", "options": ["192.168.1.1", "127.0.0.1", "8.8.8.8", "255.255.255.0"], "answer": 1}]
+
+TECH_TIPS = [
+    "💡 **نصيحة أمنية:** استخدم `Win + L` لقفل جهازك فوراً عند الابتعاد عنه.",
+    "🛡️ **نصيحة تقنية:** احرص دائماً على تحديث نظام التشغيل لديك لسد الثغرات.",
+    "🚀 **نصيحة برمجية:** التنسيق والمسافات البادئة في لغة بايثون هي أساس عمل الكود.",
+    "💾 **نصيحة:** احرص دائماً على أخذ نسخة احتياطية لملفاتك المهمة.",
+    "🌐 **نصيحة:** تجنب الاتصال بشبكات الواي فاي العامة المفتوحة بدون VPN."
+]
 
 TOKEN = os.environ.get("TOKEN") 
 GROUP_ID = "-5193577198"
@@ -86,35 +95,29 @@ def run_web_server():
     server = HTTPServer(("0.0.0.0", port), SimpleHandler)
     server.serve_forever()
 
-# --- 🌟 أداة رفع الملفات الدائمة إلى GitHub 🌟 ---
+# --- 🌟 أداة الرفع لـ GitHub ---
 def backup_to_github(file_path="data.xlsx"):
     github_token = os.environ.get("GITHUB_TOKEN")
     github_repo = os.environ.get("GITHUB_REPO")
-    
     if not github_token or not github_repo:
-        return "⚠️ (لم يتم ربط GitHub، الحفظ محلي مؤقت)."
+        return "⚠️ (حفظ محلي مؤقت، السحابة غير مربوطة)."
         
     url = f"https://api.github.com/repos/{github_repo}/contents/{file_path}"
     headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
-    
     try:
         sha = None
         resp = requests.get(url, headers=headers)
         if resp.status_code == 200: sha = resp.json().get("sha")
-            
         with open(file_path, "rb") as f:
             content = base64.b64encode(f.read()).decode("utf-8")
-            
-        data = {"message": f"تحديث الغياب التلقائي - {datetime.now().strftime('%Y-%m-%d %H:%M')}", "content": content}
+        data = {"message": f"تحديث قاعدة البيانات - {datetime.now().strftime('%Y-%m-%d %H:%M')}", "content": content}
         if sha: data["sha"] = sha
-            
         put_resp = requests.put(url, headers=headers, json=data)
         if put_resp.status_code in [200, 201]: return "✅ **تم التثبيت الدائم في GitHub!**"
-        else: return f"⚠️ فشل الرفع لـ GitHub."
-    except Exception: return "⚠️ خطأ في الاتصال بـ GitHub."
+        else: return "⚠️ فشل الرفع لـ GitHub."
+    except: return "⚠️ خطأ بالاتصال بـ GitHub."
 
-AI_KNOWLEDGE = f"أنت المعلم الذكي. الغياب إنذار 15% حرمان 20%. الحقائب: {DRIVE_LINK}"
-
+AI_KNOWLEDGE = f"أنت المعلم الذكي لقسم الحاسب الآلي ببريدة. الغياب إنذار 15% وحرمان 20%. الحقائب: {DRIVE_LINK}"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 ai_model = None
 if GEMINI_API_KEY:
@@ -124,10 +127,11 @@ if GEMINI_API_KEY:
             if 'generateContent' in m.supported_generation_methods and 'flash' in m.name.lower():
                 ai_model = genai.GenerativeModel(m.name.replace('models/', ''))
                 break
-    except Exception: pass
+    except: pass
 
 ai_sessions, feedback_sessions, active_challenges, interrogation_sessions = {}, {}, {}, {}
 
+# --- 🌟 تصميم القوائم 🌟 ---
 def get_main_menu():
     return ReplyKeyboardMarkup([
         ["🤖 المعلم الذكي (الدليل الشامل)"], 
@@ -139,12 +143,27 @@ def get_main_menu():
         ["📬 الاقتراحات والشكاوى", "🕹️ قسم الألعاب والإضافات"]
     ], resize_keyboard=True, is_persistent=True)
 
+def get_plans_menu():
+    return ReplyKeyboardMarkup([
+        ["1️⃣ الفصل الأول", "2️⃣ الفصل الثاني"],
+        ["3️⃣ الفصل الثالث", "4️⃣ الفصل الرابع"],
+        ["5️⃣ الفصل الخامس", "6️⃣ الفصل السادس"],
+        ["🖥️ برامج فصلية", "🔙 الرجوع للقائمة الرئيسية"]
+    ], resize_keyboard=True)
+
+def get_games_menu():
+    return ReplyKeyboardMarkup([
+        ["🎮 تحدي الأسبوع", "🏆 بطل الأسبوع"],
+        ["💡 نصيحة تقنية", "🌐 أخبار التقنية"],
+        ["🔙 الرجوع للقائمة الرئيسية"]
+    ], resize_keyboard=True)
+
 def get_back_menu(): 
     return ReplyKeyboardMarkup([["🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
 
+# --- 🌟 أوامر المدير السرية المكتملة 🌟 ---
 async def db_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    if user_id != ADMIN_ID: return
+    if str(update.effective_user.id) != ADMIN_ID: return
     try:
         if not os.path.exists('data.xlsx'):
             await update.message.reply_text("⚠️ لا يوجد ملف بيانات.")
@@ -156,6 +175,36 @@ async def db_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطأ: {e}")
 
+async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if str(update.effective_user.id) != ADMIN_ID: return
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_DOCUMENT)
+    await update.message.reply_text("⏳ جاري تجهيز النسخة الاحتياطية...")
+    files = ['data.xlsx', 'scores.json', 'interrogations.json', 'stats.json', 'plans.json']
+    sent = False
+    for f in files:
+        if os.path.exists(f):
+            await context.bot.send_document(chat_id=update.effective_chat.id, document=open(f, 'rb'))
+            sent = True
+    if sent: await update.message.reply_text("✅ تم إرسال النسخة الاحتياطية.", parse_mode='Markdown')
+    else: await update.message.reply_text("⚠️ لا توجد ملفات للنسخ الاحتياطي.")
+
+async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if str(update.effective_user.id) != ADMIN_ID: return
+    text = update.message.text.replace('/broadcast', '').strip()
+    if not text:
+        await update.message.reply_text("⚠️ الطريقة: `/broadcast التعميم هنا`", parse_mode='Markdown')
+        return
+    stats = load_json(STATS_FILE)
+    users = stats.get("users_list", [])
+    await update.message.reply_text(f"📢 جاري إرسال التعميم لـ {len(users)} متدرب...")
+    success = 0
+    for u in users:
+        try:
+            await context.bot.send_message(chat_id=u, text=f"📢 **إعلان إداري هام:**\n{SEP}\n{text}", parse_mode='Markdown')
+            success += 1
+        except: pass
+    await update.message.reply_text(f"✅ تم إرسال التعميم بنجاح لـ {success} متدرب.", parse_mode='Markdown')
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     stats = load_json(STATS_FILE)
@@ -165,14 +214,27 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         stats["users_list"] = users
         save_json(STATS_FILE, stats)
     ai_sessions[user_id] = False
-    await update.message.reply_text(f"أهلاً بك {update.effective_user.first_name} 💻✨", reply_markup=get_main_menu())
+    
+    welcome_msg = (f"أهلاً بك يا {update.effective_user.first_name} في المساعد الذكي لقسم الحاسب الآلي 💻✨\n{SEP}\n"
+                   f"أنا نظامك الرقمي المتكامل. تم تصميمي لتوفير وقتك وتسهيل رحلتك التدريبية.\n\n"
+                   f"👇 **الرجاء اختيار الخدمة المطلوبة من القائمة السفلية:**")
+    try:
+        if os.path.exists('IMG_1058.jpeg'):
+            await update.message.reply_photo(photo=open('IMG_1058.jpeg', 'rb'), caption=welcome_msg, reply_markup=get_main_menu())
+        else:
+            logo_url = "https://pbs.twimg.com/profile_images/1684496035272658944/p02_gM0p_400x400.jpg"
+            await update.message.reply_photo(photo=logo_url, caption=welcome_msg, reply_markup=get_main_menu())
+    except:
+        await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
 
+# --- 🌟 محرك الاستجابة الشامل للمتدربين 🌟 ---
 async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = str(update.effective_user.id)
     trans_table = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
     clean_text = text.translate(trans_table).strip()
 
+    # 1. نظام التعهد الآلي للغياب
     if user_id in interrogation_sessions:
         session = interrogation_sessions[user_id]
         step = session['step']
@@ -208,14 +270,13 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🔎 **استعلام الغياب**\n👇 **أرسل رقمك التدريبي...**", parse_mode='Markdown')
         return
 
-    # 🌟 التنسيق الأكاديمي الفخم + كاشف التفاصيل المخفية 🌟
+    # 2. الاستعلام عن الرقم التدريبي مع البطاقة الأكاديمية الفخمة
     if clean_text.isdigit() and len(clean_text) > 4: 
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
         try:
             if not os.path.exists('data.xlsx'):
                 await update.message.reply_text("⚠️ **قاعدة البيانات فارغة.**", parse_mode='Markdown')
                 return
-
             df = pd.read_excel('data.xlsx', dtype=str)
             df['stu_num'] = df['stu_num'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True) 
             res = df[df['stu_num'] == clean_text]
@@ -226,10 +287,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 subject_to_interrogate = None
                 has_deprivation = False
                 
-                m = f"🎓 **السجل الأكاديمي للغياب** 🎓\n{SEP}\n"
-                m += f"👤 **المتدرب:** `{stu_nam}`\n"
-                m += f"🔢 **الرقم التدريبي:** `{clean_text}`\n{SEP}\n"
-                m += f"📊 **تفاصيل المقررات:**\n\n"
+                m = f"🎓 **السجل الأكاديمي للغياب** 🎓\n{SEP}\n👤 **المتدرب:** `{stu_nam}`\n🔢 **الرقم التدريبي:** `{clean_text}`\n{SEP}\n📊 **تفاصيل المقررات:**\n\n"
                 
                 for _, r in res.iterrows():
                     c_name_text = str(r.get('c_nam', 'غير معروف')).strip()
@@ -243,16 +301,10 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         icon = "🔴 حرمان مؤكد"
                         display_val = f"**حرمان (ح)** {icon}"
                         has_deprivation = True
-                        
                         extras = []
-                        if parsnt_no and parsnt_no.lower() not in ['nan', 'none', '', '0']:
-                            extras.append(f"بدون عذر: {parsnt_no}%")
-                        if hrs and hrs.lower() not in ['nan', 'none', '', '0']:
-                            extras.append(f"ساعات الغياب: {hrs} ساعة")
-                            
-                        if extras:
-                            display_val += f"\n   ↳ 🔍 *التفاصيل:* {' | '.join(extras)}"
-                            
+                        if parsnt_no and parsnt_no.lower() not in ['nan', 'none', '', '0']: extras.append(f"بدون عذر: {parsnt_no}%")
+                        if hrs and hrs.lower() not in ['nan', 'none', '', '0']: extras.append(f"الغياب: {hrs} ساعة")
+                        if extras: display_val += f"\n   ↳ 🔍 *التفاصيل:* {' | '.join(extras)}"
                     elif raw_val == 'ط' or 'طي' in raw_val:
                         icon = "⚫ طي قيد"
                         display_val = f"**طي قيد (ط)** {icon}"
@@ -265,40 +317,26 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 has_deprivation = True
                             elif val >= 15:
                                 icon = "⚠️ إنذار (مهدد بالحرمان)"
-                                if c_name_text not in completed_interrogations:
-                                    subject_to_interrogate = c_name_text
-                            else:
-                                icon = "🟢 منتظم"
-                                
+                                if c_name_text not in completed_interrogations: subject_to_interrogate = c_name_text
+                            else: icon = "🟢 منتظم"
                             display_val = f"**{val}%** {icon}"
-                            
                             extras = []
-                            if hrs and hrs.lower() not in ['nan', 'none', '', '0']:
-                                extras.append(f"الغياب: {hrs} ساعة")
-                                
-                            if extras:
-                                display_val += f" `({', '.join(extras)})`"
-                                
-                        except Exception:
-                            display_val = f"**{raw_val}** ⚠️ (بيانات غير مقروءة)"
+                            if hrs and hrs.lower() not in ['nan', 'none', '', '0']: extras.append(f"الغياب: {hrs} ساعة")
+                            if extras: display_val += f" `({', '.join(extras)})`"
+                        except: display_val = f"**{raw_val}** ⚠️ (بيانات غير مقروءة)"
                     
                     day_val = str(r.get('day', 'غير محدد')).replace(' 00:00:00', '').strip()
-                    
-                    m += f"📖 **{c_name_text}**\n"
-                    m += f"▫️ النتيجة: {display_val}\n"
-                    m += f"📅 التحديث: {day_val}\n\n"
+                    m += f"📖 **{c_name_text}**\n▫️ النتيجة: {display_val}\n📅 التحديث: {day_val}\n\n"
                 
                 m += f"{SEP}\n💡 *الإنذار يبدأ عند 15%، والحرمان المؤكد عند 20%.*"
 
                 if subject_to_interrogate:
                     interrogation_sessions[user_id] = {'step': 1, 'stu_num': clean_text, 'stu_nam': stu_nam, 'subject': subject_to_interrogate}
-                    warning_msg = f"⚠️ **تنبيه إداري قبل الحرمان!** ⚠️\nلقد وصلت غياباتك إلى مرحلة الخطر (15% فأكثر) في مقرر:\n**{subject_to_interrogate}**\n\n🛑 **للإطلاع على سجلك الكامل، يجب الإجابة أولاً:**\n1️⃣ هل تعلم أنك اقتربت من الحرمان؟"
+                    warning_msg = f"⚠️ **تنبيه إداري قبل الحرمان!** ⚠️\nلقد وصلت غياباتك إلى الخطر (15% فأكثر) في مقرر:\n**{subject_to_interrogate}**\n\n🛑 **للإطلاع على سجلك، أجب:**\n1️⃣ هل تعلم أنك اقتربت من الحرمان؟"
                     await update.message.reply_text(warning_msg, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())
                     return
                 
-                if has_deprivation: 
-                    m += f"\n\n🛑 **تنبيه إداري هام:**\nأنت محروم في مقرر أو أكثر. نأمل مراجعة الإدارة."
-                
+                if has_deprivation: m += f"\n\n🛑 **تنبيه إداري:** أنت محروم في مقرر أو أكثر. راجع الإدارة."
                 await update.message.reply_text(m, parse_mode='Markdown')
             else: 
                 await update.message.reply_text("❌ **الرقم التدريبي غير مسجل أو لا توجد غيابات.**", parse_mode='Markdown')
@@ -306,6 +344,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"⚠️ **حدث خطأ:** `{str(e)}`", parse_mode='Markdown')
         return
 
+    # 3. كافة القوائم الخدمية المستعادة
     if text == "📝 رفع الغياب والأعذار": 
         await update.message.reply_text("📝 **رفع الأعذار**\nصور العذر واكتب رقمك بالوصف ثم أرسله ليتم ختمه آلياً.", parse_mode='Markdown')
         return
@@ -322,23 +361,26 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "📰 أخبار القسم والمعهد": 
         await update.message.reply_text("📰 **أخبار المعهد:**", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📱 حساب منصة X", url=TVTC_X_LINK)]]), parse_mode='Markdown')
         return
+    if text == "📅 التقويم التدريبي":
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
+        if os.path.exists('calendar.jpg'): await update.message.reply_photo(photo=open('calendar.jpg', 'rb'))
+        else: await update.message.reply_text("⚠️ ملف التقويم قيد التحديث من الإدارة.")
+        return
     if text == "📘 دليل المتدرب الرسمي":
-        if os.path.exists("trainee_guide.pdf"):
-            await update.message.reply_document(document=open("trainee_guide.pdf", 'rb'), caption="📘 **دليل المتدرب الرسمي**", parse_mode='Markdown')
-        else:
-            await update.message.reply_text("⚠️ **عذراً، جاري تحديث ملف الدليل من قبل الإدارة.**", parse_mode='Markdown')
+        if os.path.exists("trainee_guide.pdf"): await update.message.reply_document(document=open("trainee_guide.pdf", 'rb'), caption="📘 **دليل المتدرب الرسمي**", parse_mode='Markdown')
+        else: await update.message.reply_text("⚠️ **جاري تحديث ملف الدليل من قبل الإدارة.**", parse_mode='Markdown')
         return
     if text == "❓ الأسئلة الشائعة":
-        faq_msg = f"❓ **الأسئلة الشائعة:**\n🔹 **متى يقع الحرمان؟** عند غياب (20%).\n🔹 **المكافأة؟** 800 ريال للمعاهد ותتوقف إذا قل المعدل عن 2.00.\n🔹 **درجة النجاح؟** 50 للمعاهد."
+        faq_msg = f"❓ **الأسئلة الشائعة:**\n🔹 **الحرمان؟** عند غياب (20%).\n🔹 **المكافأة؟** 800 ريال وتتوقف لمعدل تحت 2.00.\n🔹 **درجة النجاح؟** 50 للمعاهد."
         await update.message.reply_text(faq_msg, parse_mode='Markdown')
         return
     if text == "🤖 المعلم الذكي (الدليل الشامل)":
         ai_sessions[user_id] = True
-        await update.message.reply_text("🤖 **المعلم الذكي!**\n💬 **اكتب سؤالك...**", reply_markup=get_back_menu(), parse_mode='Markdown')
+        await update.message.reply_text("🤖 **المعلم الذكي!**\n💬 **اكتب سؤالك التقني أو الإداري وسأجيبك فوراً...**", reply_markup=get_back_menu(), parse_mode='Markdown')
         return
     if ai_sessions.get(user_id) == True:
         if not ai_model:
-            await update.message.reply_text("⚠️ المعلم غير متصل.", reply_markup=get_back_menu())
+            await update.message.reply_text("⚠️ المعلم غير متصل حالياً.", reply_markup=get_back_menu())
             return
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
         try:
@@ -348,7 +390,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if text == "📬 الاقتراحات والشكاوى":
         feedback_sessions[user_id] = True
-        await update.message.reply_text("📬 **اكتب رسالتك الآن...**", reply_markup=get_back_menu(), parse_mode='Markdown')
+        await update.message.reply_text("📬 **اكتب رسالتك الآن وستصل للإدارة بسرية...**", reply_markup=get_back_menu(), parse_mode='Markdown')
         return
     if feedback_sessions.get(user_id) == True:
         try:
@@ -400,13 +442,14 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not ai_sessions.get(user_id):
-        await update.message.reply_text("⚠️ **اختر من القائمة 👇**", reply_markup=get_main_menu())
+        await update.message.reply_text("⚠️ **الرجاء اختيار خدمة من الأسفل 👇**", reply_markup=get_main_menu())
 
 
-# --- 🌟 محرك سحب ملفات رايات المباشر (إصدار النخبة باللغة العربية) 🌟 ---
+# --- 🌟 محرك الإدارة ومعالجة الملفات والصور 🌟 ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     
+    # 1. سحب بيانات رايات (للمدير فقط)
     if user_id == ADMIN_ID and update.message.document:
         doc = update.message.document
         if doc.file_name.endswith(('.xlsx', '.xls', '.csv')):
@@ -419,26 +462,23 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     temp_file = "temp_rayat.csv"
                     await file.download_to_drive(temp_file)
                     
-                    # 🌟 كاشف الترميز الذكي (لن يعتمد الترميز إلا إذا وجد كلمات عربية صحيحة) 🌟
+                    # 🌟 كاشف الترميز الذكي للغة العربية 🌟
                     with open(temp_file, 'rb') as f:
                         raw_bytes = f.read()
                         
-                    best_enc = 'utf-8-sig' # الافتراضي
+                    best_enc = 'utf-8-sig' 
                     for enc in ['utf-8-sig', 'windows-1256', 'cp1256', 'utf-8', 'iso-8859-6']:
                         try:
                             text = raw_bytes.decode(enc)
                             if 'المتدرب' in text or 'المقرر' in text or 'الغياب' in text or 'رقم' in text:
                                 best_enc = enc
-                                break # وجدنا الترميز الصحيح للغة العربية!
-                        except:
-                            pass
+                                break 
+                        except: pass
                             
-                    # قراءة النص بالترميز الصحيح 100% وتحويله إلى جدول
                     df_raw = pd.read_csv(io.StringIO(raw_bytes.decode(best_enc)), dtype=str, sep=',', on_bad_lines='skip')
-                        
                     df_clean = pd.DataFrame()
                     
-                    # 🌟 باحث الأعمدة المرن (لتفادي أي خطأ List index out of range) 🌟
+                    # 🌟 باحث الأعمدة المرن 🌟
                     col_map = {'c_course': -1, 'c_id': -1, 'c_name': -1, 'c_perc': -1, 'c_perc_no': -1, 'c_hrs': -1}
                     for i, col in enumerate(df_raw.columns):
                         clean_col = str(col).replace(' ', '').replace('أ', 'ا').replace('إ', 'ا').replace('"', '')
@@ -449,7 +489,6 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         elif 'بدونعذر' in clean_col and 'نسبه' in clean_col and 'بعذروبدون' not in clean_col: col_map['c_perc_no'] = i
                         elif 'ساعات' in clean_col and 'بعذروبدون' in clean_col: col_map['c_hrs'] = i
 
-                    # خطة الطوارئ في حال تغيّر اسم عمود في رايات
                     if col_map['c_course'] == -1: col_map['c_course'] = 14 if len(df_raw.columns) > 14 else 0
                     if col_map['c_id'] == -1: col_map['c_id'] = 16 if len(df_raw.columns) > 16 else 0
                     if col_map['c_name'] == -1: col_map['c_name'] = 17 if len(df_raw.columns) > 17 else 0
@@ -471,8 +510,7 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     df_clean['stu_num'] = df_clean['stu_num'].str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
                     df_clean = df_clean[df_clean['stu_num'].str.len() >= 5] 
                     
-                    for col in df_clean.columns:
-                        df_clean[col] = df_clean[col].replace('nan', '').str.strip()
+                    for col in df_clean.columns: df_clean[col] = df_clean[col].replace('nan', '').str.strip()
                         
                     df_clean['day'] = datetime.now().strftime("%Y-%m-%d")
                     df_clean.to_excel("data.xlsx", index=False)
@@ -484,22 +522,51 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     df_clean = pd.read_excel('data.xlsx')
                     records_count = len(df_clean)
                 
-                # 🌟 الرفع لـ GitHub للتوثيق الدائم 🌟
                 github_status = backup_to_github("data.xlsx")
-                    
                 await status_msg.edit_text(f"✅ **نجاح ساحق!**\n📊 **النتيجة:** تم قراءة وحفظ `{records_count}` متدرب بنجاح تام.\n🌐 **النسخة الاحتياطية:** {github_status}", parse_mode='Markdown')
             except Exception as e:
                 await status_msg.edit_text(f"⚠️ **فشل التحديث:** `{e}`", parse_mode='Markdown')
             return
 
-    if not update.message.caption: 
-        return
-    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
-    try:
-        await context.bot.send_message(chat_id=GROUP_ID, text=f"📥 **عذر:**\n{update.message.caption}")
-        await update.message.copy(chat_id=GROUP_ID)
-        await update.message.reply_text("✅ **تم الإرسال.**", parse_mode='Markdown')
-    except: pass
+    # 2. استقبال الأعذار من المتدربين (لجميع المستخدمين)
+    if update.message.photo or update.message.document:
+        if not update.message.caption: 
+            await update.message.reply_text("⚠️ **الرجاء إرفاق الصورة أو الملف مع كتابة رقمك واسمك في الوصف أسفل الصورة.**", parse_mode='Markdown')
+            return
+            
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
+        status_msg = await update.message.reply_text("⏳ جاري المعالجة والختم الآلي...")
+        
+        try:
+            caption_text = update.message.caption
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            stu_id = ''.join(filter(str.isdigit, caption_text)) or "UNKNOWN"
+            
+            if update.message.photo and HAS_PIL:
+                photo = update.message.photo[-1]
+                file = await context.bot.get_file(photo.file_id)
+                in_memory_img = io.BytesIO()
+                await file.download_to_memory(in_memory_img)
+                in_memory_img.seek(0)
+                
+                img = Image.open(in_memory_img)
+                width, height = img.size
+                txt_img = Image.new('RGB', (1000, 50), color='#1e3a8a')
+                ImageDraw.Draw(txt_img).text((20, 15), f"TVTC OFFICIAL | ID: {stu_id} | DATE: {timestamp}", fill="white")
+                txt_img = txt_img.resize((width, int(width * 50 / 1000)))
+                img.paste(txt_img, (0, height - txt_img.height)) 
+                
+                output = io.BytesIO()
+                img.save(output, format='JPEG')
+                output.seek(0)
+                await context.bot.send_photo(chat_id=GROUP_ID, photo=output, caption=f"📥 **عذر مختوم رسمياً:**\n{caption_text}\n⏱️ {timestamp}", parse_mode='Markdown')
+            else:
+                await context.bot.send_message(chat_id=GROUP_ID, text=f"📥 **عذر مرفق:**\n{caption_text}\n{timestamp}")
+                await update.message.copy(chat_id=GROUP_ID)
+                
+            await status_msg.edit_text("✅ **تم الختم والإرسال للإدارة بنجاح.**\nسيتم مراجعة عذرك قريباً.", parse_mode='Markdown')
+        except:
+            await status_msg.edit_text("⚠️ **حدث خطأ فني أثناء الإرسال.**", parse_mode='Markdown')
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -521,13 +588,17 @@ def main():
     
     app = Application.builder().token(TOKEN).build()
     
+    # تسجيل جميع الأوامر الإدارية والخدمية
     app.add_handler(CommandHandler("db", db_status_command)) 
+    app.add_handler(CommandHandler("backup", backup_command))
+    app.add_handler(CommandHandler("broadcast", broadcast_command))
     app.add_handler(CommandHandler("start", start))
+    
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_logic))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل النسخة الكاملة والنهائية (كاشف اللغة العربية)...")
+    print("🚀 تشغيل النسخة الذهبية المتكاملة (محرك رايات + الأوامر الإدارية + القوائم كاملة)...")
     app.run_polling()
 
 if __name__ == '__main__': 
