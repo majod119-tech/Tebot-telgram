@@ -1,6 +1,8 @@
 import os
 import io
 import csv
+import base64
+import requests
 import pandas as pd
 import json
 import random
@@ -23,7 +25,6 @@ try:
 except ImportError:
     HAS_PIL = False
 
-# --- 🌟 دوال مساعدة لضمان استقرار السيرفر ---
 def load_json(f): 
     if os.path.exists(f):
         try:
@@ -61,7 +62,6 @@ def update_stat(cat):
     s[cat] = s.get(cat, 0) + 1
     save_json(STATS_FILE, s)
 
-# 🌟 الدالة التي تسببت في الخطأ تم استعادتها هنا 🌟
 def auto_reset_scores():
     while True:
         try:
@@ -86,6 +86,47 @@ def run_web_server():
     port = int(os.environ.get("PORT", 10000))
     server = HTTPServer(("0.0.0.0", port), SimpleHandler)
     server.serve_forever()
+
+# --- 🌟 أداة رفع الملفات الدائمة إلى GitHub 🌟 ---
+def backup_to_github(file_path="data.xlsx"):
+    github_token = os.environ.get("GITHUB_TOKEN")
+    github_repo = os.environ.get("GITHUB_REPO")
+    
+    if not github_token or not github_repo:
+        return "⚠️ (لم يتم ربط GitHub، الحفظ محلي ومؤقت فقط)."
+        
+    url = f"https://api.github.com/repos/{github_repo}/contents/{file_path}"
+    headers = {
+        "Authorization": f"token {github_token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    
+    try:
+        # 1. جلب رقم الـ SHA للملف القديم (مطلوب لاستبداله)
+        sha = None
+        resp = requests.get(url, headers=headers)
+        if resp.status_code == 200:
+            sha = resp.json().get("sha")
+            
+        # 2. قراءة الملف وتشفيره
+        with open(file_path, "rb") as f:
+            content = base64.b64encode(f.read()).decode("utf-8")
+            
+        # 3. إرسال الملف الجديد
+        data = {
+            "message": f"أتمتة البوت: تحديث الغياب التلقائي - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+            "content": content
+        }
+        if sha:
+            data["sha"] = sha
+            
+        put_resp = requests.put(url, headers=headers, json=data)
+        if put_resp.status_code in [200, 201]:
+            return "✅ **تم رفع القاعدة وتثبيتها بشكل دائم في GitHub!**"
+        else:
+            return f"⚠️ فشل الرفع لـ GitHub: {put_resp.json().get('message')}"
+    except Exception as e:
+        return f"⚠️ خطأ في الاتصال بـ GitHub: {str(e)}"
 
 AI_KNOWLEDGE = f"أنت المعلم الذكي. الغياب إنذار 15% حرمان 20%. الحقائب: {DRIVE_LINK}"
 
@@ -373,7 +414,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not ai_sessions.get(user_id):
         await update.message.reply_text("⚠️ **اختر من القائمة 👇**", reply_markup=get_main_menu())
 
-
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     
@@ -381,7 +421,7 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         doc = update.message.document
         if doc.file_name.endswith(('.xlsx', '.xls', '.csv')):
             await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-            status_msg = await update.message.reply_text("⏳ **جاري التحديث وسحب البيانات المخفية...**", parse_mode='Markdown')
+            status_msg = await update.message.reply_text("⏳ **جاري تفريغ البيانات والرفع الدائم لـ GitHub...**", parse_mode='Markdown')
             
             try:
                 file = await context.bot.get_file(doc.file_id)
@@ -449,8 +489,11 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await file.download_to_drive("data.xlsx")
                     df_clean = pd.read_excel('data.xlsx')
                     records_count = len(df_clean)
+                
+                # 🌟 استدعاء أداة الرفع لـ GitHub 🌟
+                github_status = backup_to_github("data.xlsx")
                     
-                await status_msg.edit_text(f"✅ **نجاح التحديث!**\n📊 **النتيجة:** تم حفظ `{records_count}` متدرب.", parse_mode='Markdown')
+                await status_msg.edit_text(f"✅ **نجاح التحديث!**\n📊 **النتيجة:** تم حفظ `{records_count}` متدرب.\n🌐 **حالة السحابة:** {github_status}", parse_mode='Markdown')
             except Exception as e:
                 await status_msg.edit_text(f"⚠️ **فشل التحديث:** `{e}`", parse_mode='Markdown')
             return
@@ -490,7 +533,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل النسخة المستقرة...")
+    print("🚀 تشغيل النسخة الملكية (مزودة بالربط المباشر مع GitHub)...")
     app.run_polling()
 
 if __name__ == '__main__': 
