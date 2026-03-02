@@ -1,6 +1,5 @@
 import os
 import io
-import csv
 import base64
 import requests
 import pandas as pd
@@ -93,40 +92,26 @@ def backup_to_github(file_path="data.xlsx"):
     github_repo = os.environ.get("GITHUB_REPO")
     
     if not github_token or not github_repo:
-        return "⚠️ (لم يتم ربط GitHub، الحفظ محلي ومؤقت فقط)."
+        return "⚠️ (لم يتم ربط GitHub، الحفظ محلي مؤقت)."
         
     url = f"https://api.github.com/repos/{github_repo}/contents/{file_path}"
-    headers = {
-        "Authorization": f"token {github_token}",
-        "Accept": "application/vnd.github.v3+json"
-    }
+    headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
     
     try:
-        # 1. جلب رقم الـ SHA للملف القديم (مطلوب لاستبداله)
         sha = None
         resp = requests.get(url, headers=headers)
-        if resp.status_code == 200:
-            sha = resp.json().get("sha")
+        if resp.status_code == 200: sha = resp.json().get("sha")
             
-        # 2. قراءة الملف وتشفيره
         with open(file_path, "rb") as f:
             content = base64.b64encode(f.read()).decode("utf-8")
             
-        # 3. إرسال الملف الجديد
-        data = {
-            "message": f"أتمتة البوت: تحديث الغياب التلقائي - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-            "content": content
-        }
-        if sha:
-            data["sha"] = sha
+        data = {"message": f"تحديث الغياب التلقائي - {datetime.now().strftime('%Y-%m-%d %H:%M')}", "content": content}
+        if sha: data["sha"] = sha
             
         put_resp = requests.put(url, headers=headers, json=data)
-        if put_resp.status_code in [200, 201]:
-            return "✅ **تم رفع القاعدة وتثبيتها بشكل دائم في GitHub!**"
-        else:
-            return f"⚠️ فشل الرفع لـ GitHub: {put_resp.json().get('message')}"
-    except Exception as e:
-        return f"⚠️ خطأ في الاتصال بـ GitHub: {str(e)}"
+        if put_resp.status_code in [200, 201]: return "✅ **تم التثبيت الدائم في GitHub!**"
+        else: return f"⚠️ فشل الرفع لـ GitHub."
+    except Exception: return "⚠️ خطأ في الاتصال بـ GitHub."
 
 AI_KNOWLEDGE = f"أنت المعلم الذكي. الغياب إنذار 15% حرمان 20%. الحقائب: {DRIVE_LINK}"
 
@@ -166,7 +151,7 @@ async def db_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         df = pd.read_excel('data.xlsx', dtype=str)
         sample = df['stu_num'].dropna().unique()[:5]
-        msg = f"📊 **كشاف البيانات:**\n✅ تم حفظ: {len(df)} سجل.\n🔍 عينة أرقام: `{', '.join(sample)}`"
+        msg = f"📊 **كشاف البيانات:**\n✅ تم حفظ: {len(df)} سجل.\n🔍 عينة أرقام:\n`{', '.join(sample)}`"
         await update.message.reply_text(msg, parse_mode='Markdown')
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطأ: {e}")
@@ -223,6 +208,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🔎 **استعلام الغياب**\n👇 **أرسل رقمك التدريبي...**", parse_mode='Markdown')
         return
 
+    # 🌟 التنسيق الأكاديمي الفخم + كاشف التفاصيل المخفية 🌟
     if clean_text.isdigit() and len(clean_text) > 4: 
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
         try:
@@ -248,8 +234,10 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 for _, r in res.iterrows():
                     c_name_text = str(r.get('c_nam', 'غير معروف')).strip()
                     raw_val = str(r.get('parsnt', '0')).replace('%', '').strip()
-                    parsnt_no = str(r.get('parsnt_no', '')).replace('%', '').strip()
-                    hrs = str(r.get('hrs', '')).strip()
+                    parsnt_no = str(r.get('parsnt_no', '0')).replace('%', '').strip()
+                    hrs = str(r.get('hrs', '0')).replace('.0', '').strip()
+                    
+                    if raw_val == 'nan' or raw_val == '': raw_val = '0'
                     
                     if raw_val == 'ح' or 'حرمان' in raw_val:
                         icon = "🔴 حرمان مؤكد"
@@ -257,9 +245,9 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         has_deprivation = True
                         
                         extras = []
-                        if parsnt_no and parsnt_no.lower() not in ['ح', 'nan', '', 'none']:
+                        if parsnt_no and parsnt_no.lower() not in ['nan', 'none', '', '0']:
                             extras.append(f"بدون عذر: {parsnt_no}%")
-                        if hrs and hrs.lower() not in ['nan', '', 'none', '0']:
+                        if hrs and hrs.lower() not in ['nan', 'none', '', '0']:
                             extras.append(f"ساعات الغياب: {hrs} ساعة")
                             
                         if extras:
@@ -285,14 +273,14 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             display_val = f"**{val}%** {icon}"
                             
                             extras = []
-                            if hrs and hrs.lower() not in ['nan', '', 'none', '0']:
+                            if hrs and hrs.lower() not in ['nan', 'none', '', '0']:
                                 extras.append(f"الغياب: {hrs} ساعة")
                                 
                             if extras:
                                 display_val += f" `({', '.join(extras)})`"
                                 
                         except Exception:
-                            display_val = f"**{raw_val}** ⚠️ (بيانات غير واضحة)"
+                            display_val = f"**{raw_val}** ⚠️ (بيانات غير مقروءة)"
                     
                     day_val = str(r.get('day', 'غير محدد')).replace(' 00:00:00', '').strip()
                     
@@ -414,6 +402,8 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not ai_sessions.get(user_id):
         await update.message.reply_text("⚠️ **اختر من القائمة 👇**", reply_markup=get_main_menu())
 
+
+# --- 🌟 محرك سحب ملفات رايات المباشر (إصدار النخبة) 🌟 ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     
@@ -421,7 +411,7 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         doc = update.message.document
         if doc.file_name.endswith(('.xlsx', '.xls', '.csv')):
             await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-            status_msg = await update.message.reply_text("⏳ **جاري تفريغ البيانات والرفع الدائم لـ GitHub...**", parse_mode='Markdown')
+            status_msg = await update.message.reply_text("⏳ **جاري السحب عبر المحرك المباشر...**", parse_mode='Markdown')
             
             try:
                 file = await context.bot.get_file(doc.file_id)
@@ -429,58 +419,41 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     temp_file = "temp_rayat.csv"
                     await file.download_to_drive(temp_file)
                     
-                    with open(temp_file, 'rb') as f:
-                        raw_bytes = f.read()
-                        
-                    decoded_text = None
-                    for enc in ['utf-8-sig', 'windows-1256', 'cp1256', 'utf-8']:
+                    df_raw = None
+                    # تجربة التشفيرات المعتادة للغة العربية وتخطي أي سطر تالف (on_bad_lines='skip')
+                    for enc in ['windows-1256', 'cp1256', 'utf-8-sig', 'utf-8', 'iso-8859-6']:
                         try:
-                            decoded_text = raw_bytes.decode(enc)
-                            if 'المتدرب' in decoded_text or 'المقرر' in decoded_text:
+                            temp_df = pd.read_csv(temp_file, encoding=enc, dtype=str, sep=',', on_bad_lines='skip')
+                            # التأكد من أن الملف به أكثر من 25 عمود كما هو في رايات
+                            if len(temp_df.columns) >= 25:
+                                df_raw = temp_df
                                 break
                         except Exception:
-                            continue
+                            pass
                             
-                    if not decoded_text:
-                        raise Exception("فشل التعرف على لغة الملف.")
+                    if df_raw is None:
+                        raise Exception("فشل في تفكيك الملف. تأكد أن الملف مستخرج حديثاً من رايات بصيغة CSV.")
                         
-                    parsed_data = []
-                    reader = csv.reader(io.StringIO(decoded_text), delimiter=',', quotechar='"')
-                    rows = list(reader)
+                    df_clean = pd.DataFrame()
                     
-                    header = rows[0]
-                    c_course, c_id, c_name, c_perc, c_perc_no, c_hrs = -1, -1, -1, -1, -1, -1
+                    # 🌟 السحب المباشر بواسطة أرقام الأعمدة الدقيقة التي استخرجناها من ملفك 🌟
+                    # 14=اسم المقرر | 16=رقم المتدرب | 17=اسم المتدرب | 18=نسبة كلية | 22=نسبة بدون عذر | 25=الساعات
+                    df_clean['c_nam'] = df_raw.iloc[:, 14].astype(str)
+                    df_clean['stu_num'] = df_raw.iloc[:, 16].astype(str)
+                    df_clean['stu_nam'] = df_raw.iloc[:, 17].astype(str)
+                    df_clean['parsnt'] = df_raw.iloc[:, 18].astype(str)
+                    df_clean['parsnt_no'] = df_raw.iloc[:, 22].astype(str)
+                    df_clean['hrs'] = df_raw.iloc[:, 25].astype(str)
                     
-                    for i, col in enumerate(header):
-                        clean_col = str(col).replace(' ', '').replace('أ', 'ا').replace('إ', 'ا').replace('"', '')
-                        if 'اسمالمقرر' in clean_col: c_course = i
-                        elif 'رقمالمتدرب' in clean_col: c_id = i
-                        elif 'اسمالمتدرب' in clean_col: c_name = i
-                        elif 'بعذروبدون' in clean_col and 'نسبه' in clean_col: c_perc = i
-                        elif 'بدونعذر' in clean_col and 'نسبه' in clean_col and 'بعذروبدون' not in clean_col: c_perc_no = i
-                        elif 'ساعات' in clean_col and 'بعذروبدون' in clean_col: c_hrs = i
-                            
-                    if c_id == -1 or c_course == -1:
-                        if len(header) >= 26:
-                            c_course, c_id, c_name, c_perc, c_perc_no, c_hrs = 14, 16, 17, 18, 22, 25
-                        else:
-                            raise Exception("لم يتم العثور على الأعمدة.")
-                            
-                    for row in rows[1:]:
-                        if len(row) > max(c_course, c_id, c_name, c_perc):
-                            stu_num_clean = "".join(filter(str.isdigit, str(row[c_id])))
-                            if stu_num_clean: 
-                                parsed_data.append({
-                                    'c_nam': str(row[c_course]).strip(),
-                                    'stu_num': stu_num_clean,
-                                    'stu_nam': str(row[c_name]).strip(),
-                                    'parsnt': str(row[c_perc]).strip(),
-                                    'parsnt_no': str(row[c_perc_no]).strip() if c_perc_no != -1 and len(row) > c_perc_no else "",
-                                    'hrs': str(row[c_hrs]).strip() if c_hrs != -1 and len(row) > c_hrs else "",
-                                    'day': datetime.now().strftime("%Y-%m-%d")
-                                })
-                                
-                    df_clean = pd.DataFrame(parsed_data)
+                    # 🌟 التنظيف الصارم وإلغاء أي سطر لا يحمل رقماً تدريبياً حقيقياً 🌟
+                    df_clean['stu_num'] = df_clean['stu_num'].str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
+                    df_clean = df_clean[df_clean['stu_num'].str.len() >= 5] # الإبقاء على الأرقام التدريبية الطويلة فقط
+                    
+                    # تنظيف النصوص من كلمة nan للمظهر الجمالي
+                    for col in df_clean.columns:
+                        df_clean[col] = df_clean[col].replace('nan', '').str.strip()
+                        
+                    df_clean['day'] = datetime.now().strftime("%Y-%m-%d")
                     df_clean.to_excel("data.xlsx", index=False)
                     records_count = len(df_clean)
                     os.remove(temp_file)
@@ -490,10 +463,10 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     df_clean = pd.read_excel('data.xlsx')
                     records_count = len(df_clean)
                 
-                # 🌟 استدعاء أداة الرفع لـ GitHub 🌟
+                # 🌟 الرفع لـ GitHub للتوثيق الدائم 🌟
                 github_status = backup_to_github("data.xlsx")
                     
-                await status_msg.edit_text(f"✅ **نجاح التحديث!**\n📊 **النتيجة:** تم حفظ `{records_count}` متدرب.\n🌐 **حالة السحابة:** {github_status}", parse_mode='Markdown')
+                await status_msg.edit_text(f"✅ **نجاح ساحق في السحب المباشر!**\n📊 **النتيجة:** تم قراءة وحفظ `{records_count}` متدرب بنجاح تام.\n🌐 **النسخة الاحتياطية:** {github_status}", parse_mode='Markdown')
             except Exception as e:
                 await status_msg.edit_text(f"⚠️ **فشل التحديث:** `{e}`", parse_mode='Markdown')
             return
@@ -533,7 +506,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل النسخة الملكية (مزودة بالربط المباشر مع GitHub)...")
+    print("🚀 تشغيل النسخة الكاملة والنهائية (المسار المباشر)...")
     app.run_polling()
 
 if __name__ == '__main__': 
