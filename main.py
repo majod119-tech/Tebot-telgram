@@ -1,5 +1,6 @@
 import os
 import io
+import csv
 import pandas as pd
 import json
 import random
@@ -22,6 +23,7 @@ try:
 except ImportError:
     HAS_PIL = False
 
+# --- 🌟 دوال مساعدة لضمان استقرار السيرفر ---
 def load_json(f): 
     if os.path.exists(f):
         try:
@@ -36,7 +38,7 @@ def save_json(f, d):
         with open(f, "w", encoding="utf-8") as file:
             json.dump(d, file, ensure_ascii=False)
     except Exception as e:
-        pass
+        print(f"Error saving JSON: {e}")
 
 try:
     from questions_bank import QUESTIONS
@@ -58,6 +60,20 @@ def update_stat(cat):
     s = load_json(STATS_FILE)
     s[cat] = s.get(cat, 0) + 1
     save_json(STATS_FILE, s)
+
+def auto_reset_scores():
+    while True:
+        try:
+            now = datetime.now()
+            if now.weekday() == 6: 
+                today_str = now.strftime("%Y-%m-%d")
+                stats = load_json(STATS_FILE)
+                if stats.get("last_reset_date") != today_str:
+                    save_json(SCORES_FILE, {}) 
+                    stats["last_reset_date"] = today_str 
+                    save_json(STATS_FILE, stats)
+        except Exception: pass
+        time.sleep(3600)
 
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -175,7 +191,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ **اختر من القائمة 👇**", reply_markup=get_main_menu())
 
 
-# --- 🌟 محرك رايات المطلق (مبني على تحليل ملفك الحقيقي) 🌟 ---
+# --- 🌟 محرك سحب ملفات رايات المبني على فكرتك (الفواصل ,) 🌟 ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     
@@ -183,7 +199,7 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         doc = update.message.document
         if doc.file_name.endswith(('.xlsx', '.xls', '.csv')):
             await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-            status_msg = await update.message.reply_text("⏳ **جاري قراءة ملف رايات الأصلي...**", parse_mode='Markdown')
+            status_msg = await update.message.reply_text("⏳ **جاري تفكيك الملف عبر الفواصل (,) بناءً على الهندسة الجديدة...**", parse_mode='Markdown')
             
             try:
                 file = await context.bot.get_file(doc.file_id)
@@ -191,57 +207,87 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     temp_file = "temp_rayat.csv"
                     await file.download_to_drive(temp_file)
                     
-                    df_raw = None
-                    # التشفير الخاص بنظام رايات للمنطقة العربية هو windows-1256
-                    for enc in ['windows-1256', 'utf-8-sig', 'cp1256', 'utf-8']:
+                    # 1. قراءة الملف كنص خام للتأكد من الترميز
+                    with open(temp_file, 'rb') as f:
+                        raw_bytes = f.read()
+                        
+                    decoded_text = None
+                    for enc in ['utf-8-sig', 'windows-1256', 'cp1256', 'utf-8']:
                         try:
-                            temp_df = pd.read_csv(temp_file, encoding=enc, dtype=str)
-                            # تنظيف عناوين الأعمدة من مسافات وعلامات التنصيص المزعجة
-                            temp_df.columns = temp_df.columns.astype(str).str.replace('"', '').str.strip()
-                            cols_str = "".join(temp_df.columns)
-                            if 'رقم المتدرب' in cols_str or 'رقمالمتدرب' in cols_str.replace(' ', ''):
-                                df_raw = temp_df
+                            decoded_text = raw_bytes.decode(enc)
+                            if 'المتدرب' in decoded_text or 'المقرر' in decoded_text:
                                 break
                         except Exception:
-                            pass
+                            continue
+                            
+                    if not decoded_text:
+                        raise Exception("فشل التعرف على لغة الملف. الرجاء التأكد من ترميز الملف.")
+                        
+                    # 2. تطبيق الفكرة: التفكيك الحرفي بناءً على الفاصلة (,) وتجاهل علامات التنصيص (")
+                    parsed_data = []
+                    reader = csv.reader(io.StringIO(decoded_text), delimiter=',', quotechar='"')
+                    rows = list(reader)
                     
-                    if df_raw is None:
-                        raise Exception("فشل في قراءة الملف، تأكد من تصدير رايات بشكل صحيح.")
-
-                    df_clean = pd.DataFrame()
+                    if len(rows) < 2:
+                        raise Exception("الملف فارغ أو لا يحتوي على بيانات مقسمة بفواصل.")
+                        
+                    header = rows[0]
                     
-                    # 🌟 استخراج دقيق مبني على ما رأيته في ملفك 🌟
-                    c_course = [c for c in df_raw.columns if 'المقرر' in c and 'اسم' in c][0]
-                    c_id = [c for c in df_raw.columns if 'رقم' in c and 'المتدرب' in c][0]
-                    c_name = [c for c in df_raw.columns if 'اسم' in c and 'المتدرب' in c][0]
-                    c_perc = [c for c in df_raw.columns if 'إجمالي نسبة الغياب بعذر وبدون' in c or 'نسبة الغياب' in c][0]
+                    # 3. تحديد أرقام الأعمدة من خلال البحث داخل الفواصل
+                    c_course, c_id, c_name, c_perc = -1, -1, -1, -1
                     
-                    df_clean['c_nam'] = df_raw[c_course]
-                    df_clean['stu_num'] = df_raw[c_id]
-                    df_clean['stu_nam'] = df_raw[c_name]
-                    df_clean['parsnt'] = df_raw[c_perc]
-
-                    # 🌟 التنظيف الحاسم لأرقام المتدربين 🌟
-                    df_clean['stu_num'] = df_clean['stu_num'].astype(str).str.replace(r'\D', '', regex=True)
-                    df_clean = df_clean[df_clean['stu_num'] != ''] # مسح الفراغات
-                    
-                    df_clean['day'] = datetime.now().strftime("%Y-%m-%d")
+                    for i, col in enumerate(header):
+                        clean_col = str(col).replace(' ', '').replace('أ', 'ا').replace('إ', 'ا').replace('"', '')
+                        if 'اسمالمقرر' in clean_col: c_course = i
+                        elif 'رقمالمتدرب' in clean_col: c_id = i
+                        elif 'اسمالمتدرب' in clean_col: c_name = i
+                        elif 'نسبهالغياب' in clean_col or 'اجمالينسبه' in clean_col: c_perc = i
+                            
+                    # 4. خطة الحماية: إذا لم يجد العناوين، نستخدم أرقام أعمدة رايات القياسية
+                    if c_id == -1 or c_course == -1:
+                        if len(header) >= 19:
+                            c_course, c_id, c_name, c_perc = 14, 16, 17, 18
+                        else:
+                            raise Exception(f"لم يتم العثور على الفواصل المطلوبة. عدد الأعمدة هو {len(header)}")
+                            
+                    # 5. سحب البيانات وتخزينها
+                    for row in rows[1:]:
+                        # نضمن أن السطر طويل بما يكفي وبه فواصل كافية
+                        if len(row) > max(c_course, c_id, c_name, c_perc):
+                            stu_num_clean = "".join(filter(str.isdigit, str(row[c_id])))
+                            if stu_num_clean: # إذا الخلية تحتوي على رقم فعلاً
+                                parsed_data.append({
+                                    'c_nam': str(row[c_course]).strip(),
+                                    'stu_num': stu_num_clean,
+                                    'stu_nam': str(row[c_name]).strip(),
+                                    'parsnt': str(row[c_perc]).strip(),
+                                    'day': datetime.now().strftime("%Y-%m-%d")
+                                })
+                                
+                    if not parsed_data:
+                        raise Exception("تمت قراءة الفواصل، لكن جميع أرقام الطلاب كانت فارغة!")
+                        
+                    # 6. الحفظ كإكسل لكي يقرأه البوت
+                    df_clean = pd.DataFrame(parsed_data)
                     df_clean.to_excel("data.xlsx", index=False)
                     records_count = len(df_clean)
-                    os.remove(temp_file) 
+                    os.remove(temp_file)
                     
                 else:
+                    # إذا كان ملف Excel جاهز
                     await file.download_to_drive("data.xlsx")
                     df_clean = pd.read_excel('data.xlsx')
                     records_count = len(df_clean)
                     
-                await status_msg.edit_text(f"✅ **تم اختراق نظام رايات وسحب البيانات!**\n📊 **النتيجة:** تم حفظ `{records_count}` متدرب بنجاح.\n*(ارسل أمر /db الآن للتأكد بنفسك)* 🚀", parse_mode='Markdown')
+                await status_msg.edit_text(f"✅ **نجاح التحديث بقوة الفواصل!**\n📊 **النتيجة:** تم حفظ `{records_count}` متدرب بنجاح.\n*(اكتب الأمر /db الآن للتأكد)* 🚀", parse_mode='Markdown')
             except Exception as e:
                 await status_msg.edit_text(f"⚠️ **فشل التحديث:** `{e}`", parse_mode='Markdown')
             return
 
 def main():
+    Thread(target=auto_reset_scores, daemon=True).start()
     Thread(target=run_web_server, daemon=True).start()
+    
     app = Application.builder().token(TOKEN).build()
     
     app.add_handler(CommandHandler("db", db_status_command)) 
@@ -249,7 +295,7 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_logic))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     
-    print("🚀 تشغيل النسخة الكاملة...")
+    print("🚀 تشغيل النسخة المبنية على تفكيك الفواصل (المدمرة)...")
     app.run_polling()
 
 if __name__ == '__main__': 
