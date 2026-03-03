@@ -122,7 +122,6 @@ if GEMINI_API_KEY:
                 break
     except: pass
 
-# 🌟 نظام الحجر الذكي (لإدارة حالات المستخدمين الصارمة) 🌟
 user_states = {}
 active_challenges = {}
 
@@ -159,6 +158,7 @@ def get_games_menu():
 def get_back_menu(): 
     return ReplyKeyboardMarkup([["🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
 
+# --- 🌟 أوامر الإدارة 🌟 ---
 async def db_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_user.id) != ADMIN_ID: return
     try:
@@ -188,6 +188,53 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except: pass
     await update.message.reply_text("✅ تم إرسال التعميم.")
 
+# 🌟 الأمر الجديد: تقرير التميز المؤسسي 🌟
+async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if str(update.effective_user.id) != ADMIN_ID: return
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+    
+    stats = load_json(STATS_FILE)
+    interrogations = load_json(INTERROGATIONS_FILE)
+    
+    # حساب المؤشرات
+    users_count = len(stats.get("users_list", []))
+    ai_queries = stats.get("ai_questions", 0)
+    quiz_attempts = stats.get("quiz_attempts", 0)
+    
+    db_records = 0
+    if os.path.exists('data.xlsx'):
+        try: db_records = len(pd.read_excel('data.xlsx'))
+        except: pass
+        
+    pledges_count = sum(len(subjects) for subjects in interrogations.values())
+    
+    # حساب توفير الوقت (ROI) للتميز المؤسسي
+    # نفترض أن كل سؤال للذكاء الاصطناعي يوفر 3 دقائق من وقت الإدارة للرد
+    # ونفترض أن كل تعهد آلي يوفر 15 دقيقة من الاستدعاء والطباعة والتوقيع
+    saved_minutes_ai = ai_queries * 3
+    saved_minutes_pledges = pledges_count * 15
+    total_hours_saved = round((saved_minutes_ai + saved_minutes_pledges) / 60, 1)
+    
+    report_msg = f"""
+📈 **تقرير الأداء المؤسسي (التغذية الراجعة)** 📈
+{SEP}
+👥 **المستخدمون والبيانات:**
+🔹 إجمالي المستخدمين للبوت: `{users_count}` متدرب
+🔹 السجلات المحفوظة بالنظام: `{db_records}` سجل
+
+🤖 **التفاعل والأتمتة:**
+🔹 استفسارات أجاب عليها الذكاء الاصطناعي: `{ai_queries}` استفسار
+🔹 التعهدات الإلكترونية التي تم أخذها آلياً: `{pledges_count}` تعهد
+🔹 المشاركات في تحديات التقنية: `{quiz_attempts}` مشاركة
+
+⏳ **مؤشرات الكفاءة التشغيلية (ROI):**
+*(تُحسب بناءً على الوقت الموفر للإدارة بدلاً من العمل اليدوي)*
+✅ ساعات العمل الموفرة بفضل الأتمتة: **{total_hours_saved} ساعة عمل!**
+{SEP}
+💡 *هذه الأرقام تعكس مدى التحول الرقمي الفعلي في القسم.*
+"""
+    await update.message.reply_text(report_msg, parse_mode='Markdown')
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     stats = load_json(STATS_FILE)
@@ -195,7 +242,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         stats.setdefault("users_list", []).append(user_id)
         save_json(STATS_FILE, stats)
     
-    # تفريغ حالة المستخدم عند ضغط ستارت
     if user_id in user_states: del user_states[user_id]
     
     welcome_msg = (f"أهلاً بك يا {update.effective_user.first_name} في المساعد الذكي لقسم الحاسب الآلي 💻✨\n{SEP}\n"
@@ -206,7 +252,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else: await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
     except: await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
 
-# --- 🌟 المحرك الصارم للاستجابة 🌟 ---
 async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = str(update.effective_user.id)
@@ -214,17 +259,14 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     trans_table = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
     clean_text = text.translate(trans_table).strip()
 
-    # 1. فحص هل المستخدم محتجز داخل مسار إجباري؟
     if user_id in user_states:
         state = user_states[user_id]
         
-        # إذا طلب الإلغاء في أي وقت
         if text in ["❌ إلغاء العملية", "🔙 الرجوع للقائمة الرئيسية"]:
             del user_states[user_id]
             await update.message.reply_text("تم إلغاء العملية، والعودة للقائمة الرئيسية 🏠", reply_markup=get_main_menu())
             return
 
-        # 🚨 مسار التعهد الصارم
         if state['flow'] == 'pledge':
             step = state['step']
             if step == 1:
@@ -243,7 +285,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if "نعم" not in text and "تعهد" not in text:
                     return await update.message.reply_text("⚠️ **لم يتم قبول إقرارك!**\nالرجاء كتابة (نعم) أو (أتعهد) للموافقة والالتزام:", parse_mode='Markdown', reply_markup=get_cancel_menu())
                 
-                # نجاح التعهد
                 completed = load_json(INTERROGATIONS_FILE)
                 completed.setdefault(state['stu_num'], []).append(state['subject'])
                 save_json(INTERROGATIONS_FILE, completed)
@@ -256,7 +297,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("✅ **تم توثيق إقرارك رسمياً لدى الإدارة.**\nاحرص على الحضور لتفادي طي القيد.", reply_markup=get_main_menu(), parse_mode='Markdown')
                 return
 
-        # 📬 مسار الشكاوى الصارم
         if state['flow'] == 'feedback':
             if len(text) < 15:
                 return await update.message.reply_text("⚠️ **الرسالة قصيرة جداً!**\nالرجاء كتابة رسالتك بالتفصيل (أكثر من 15 حرف) لكي نأخذها بجدية.", parse_mode='Markdown', reply_markup=get_cancel_menu())
@@ -268,25 +308,20 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 del user_states[user_id]
                 return await update.message.reply_text("⚠️ فشل الإرسال، حاول لاحقاً.", reply_markup=get_main_menu())
 
-        # 🤖 مسار المعلم الذكي
         if state['flow'] == 'ai':
             if not ai_model:
                 del user_states[user_id]
                 return await update.message.reply_text("⚠️ المعلم غير متصل حالياً.", reply_markup=get_main_menu())
             await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+            update_stat("ai_questions") # تحديث إحصائيات الذكاء الاصطناعي
             try:
                 response = await ai_model.generate_content_async(f"{AI_KNOWLEDGE}\nسؤال: {text}")
                 return await update.message.reply_text(f"📝 رد المعلم الذكي:\n\n{response.text}", reply_markup=get_back_menu())
             except: return await update.message.reply_text("⚠️ خطأ تقني بالذكاء الاصطناعي.", reply_markup=get_back_menu())
 
-        # 📝 مسار رفع الأعذار (إذا أرسل نصاً بدلاً من الصورة)
         if state['flow'] == 'excuse':
             return await update.message.reply_text("⚠️ **هذا نص! الرجاء إرسال (صورة أو ملف PDF) للعذر الطبي مع كتابة رقمك في الوصف الخاص بالصورة.**", parse_mode='Markdown', reply_markup=get_cancel_menu())
 
-    # ==================================================
-    # 2. القوائم الرئيسية (بداية المسارات)
-    # ==================================================
-    
     if text == "📝 رفع الغياب والأعذار": 
         user_states[user_id] = {'flow': 'excuse'}
         await update.message.reply_text("📝 **نظام رفع الأعذار الصارم:**\nالرجاء إرفاق (صورة العذر) الآن، **ويجب** كتابة (رقمك واسمك) في خانة الوصف (Caption) الخاصة بالصورة لكي يقبلها النظام.", parse_mode='Markdown', reply_markup=get_cancel_menu())
@@ -306,7 +341,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🔎 **استعلام الغياب**\n👇 **أرسل رقمك التدريبي الآن (أرقام فقط)...**", parse_mode='Markdown')
         return
 
-    # 3. الاستعلام عن السجل الأكاديمي للغياب
     if clean_text.isdigit() and len(clean_text) > 4: 
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
         try:
@@ -365,7 +399,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 m += f"{SEP}\n💡 *الإنذار يبدأ عند 15%، والحرمان عند 20%.*"
 
-                # 🚨 احتجاز المستخدم وتفعيل مسار التعهد 🚨
                 if subject_to_interrogate:
                     user_states[user_id] = {'flow': 'pledge', 'step': 1, 'stu_num': clean_text, 'stu_nam': stu_nam, 'subject': subject_to_interrogate}
                     warning_msg = f"⚠️ **تنبيه إداري عاجل!** ⚠️\nلقد وصلت غياباتك إلى مرحلة الخطر (15% فأكثر) في مقرر:\n**{subject_to_interrogate}**\n\n🛑 **النظام مغلق حتى تُكمل الإقرار!**\n1️⃣ هل تعلم أنك اقتربت من الحرمان؟"
@@ -379,7 +412,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"⚠️ **حدث خطأ:** `{str(e)}`", parse_mode='Markdown')
         return
 
-    # 4. الردود الثابتة
     if text == "📚 الحقائب التدريبية": 
         return await update.message.reply_text("📚 **الحقائب التدريبية:**", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📥 الدخول للمستودع", url=DRIVE_LINK)]]), parse_mode='Markdown')
     if text == "🔗 المنصات الإلكترونية": 
@@ -432,12 +464,9 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("⚠️ **الرجاء اختيار خدمة من الأسفل 👇**", reply_markup=get_main_menu())
 
-
-# --- 🌟 محرك سحب رايات والأعذار الصارم 🌟 ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     
-    # 1. الإدارة (رايات)
     if user_id == ADMIN_ID and update.message.document:
         doc = update.message.document
         if doc.file_name.endswith(('.xlsx', '.xls', '.csv')):
@@ -505,12 +534,10 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await status_msg.edit_text(f"⚠️ **فشل التحديث:** `{e}`", parse_mode='Markdown')
             return
 
-    # 2. استقبال الأعذار مع الفحص الصارم للوصف
     if update.message.photo or update.message.document:
         state = user_states.get(user_id, {})
         caption_text = update.message.caption
         
-        # إذا لم يكن هناك وصف أو وصف لا يحتوي على أرقام
         stu_id = ''.join(filter(str.isdigit, str(caption_text)))
         if not caption_text or len(stu_id) < 5:
             return await update.message.reply_text("🛑 **مرفوض: وصف غير مكتمل!**\nيجب أن تقوم بإرفاق الصورة مرة أخرى وتأكد من كتابة **رقمك التدريبي** في الوصف لكي يتم ربطه بملفك.", parse_mode='Markdown', reply_markup=get_cancel_menu() if state.get('flow') == 'excuse' else get_main_menu())
@@ -542,7 +569,6 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_message(chat_id=GROUP_ID, text=f"📥 **عذر مرفق:**\n{caption_text}\n{timestamp}")
                 await update.message.copy(chat_id=GROUP_ID)
                 
-            # إنهاء مسار العذر بنجاح
             if user_id in user_states: del user_states[user_id]
             await status_msg.edit_text("✅ **تم الختم والإرسال للإدارة بنجاح.**", parse_mode='Markdown')
             await update.message.reply_text("العودة للقائمة الرئيسية 🏠", reply_markup=get_main_menu())
@@ -572,13 +598,14 @@ def main():
     app.add_handler(CommandHandler("db", db_status_command)) 
     app.add_handler(CommandHandler("backup", backup_command))
     app.add_handler(CommandHandler("broadcast", broadcast_command))
+    app.add_handler(CommandHandler("report", report_command)) # 🌟 الأمر الجديد للإحصائيات 🌟
     app.add_handler(CommandHandler("start", start))
     
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_logic))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل النظام العسكري الصارم (Strict State Machine)...")
+    print("🚀 تشغيل النظام المزود بلوحة قياس الأداء للتميز المؤسسي...")
     app.run_polling()
 
 if __name__ == '__main__': 
