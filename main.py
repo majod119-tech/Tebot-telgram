@@ -8,7 +8,6 @@ import random
 import time
 import urllib.request
 import xml.etree.ElementTree as ET
-import re
 from datetime import datetime
 import google.generativeai as genai
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
@@ -24,18 +23,17 @@ try:
 except ImportError:
     HAS_PIL = False
 
+# --- 🌟 دوال مساعدة لإدارة الملفات ---
 def load_json(f): 
     if os.path.exists(f):
         try:
-            with open(f, "r", encoding="utf-8") as file:
-                return json.load(file)
+            with open(f, "r", encoding="utf-8") as file: return json.load(file)
         except: return {}
     return {}
 
 def save_json(f, d): 
     try:
-        with open(f, "w", encoding="utf-8") as file:
-            json.dump(d, file, ensure_ascii=False)
+        with open(f, "w", encoding="utf-8") as file: json.dump(d, file, ensure_ascii=False)
     except: pass
 
 try:
@@ -51,6 +49,7 @@ TECH_TIPS = [
     "🌐 **نصيحة:** تجنب الاتصال بشبكات الواي فاي العامة المفتوحة بدون VPN."
 ]
 
+# --- 🌟 إعدادات النظام ---
 TOKEN = os.environ.get("TOKEN") 
 GROUP_ID = "-5193577198"
 DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
@@ -92,10 +91,12 @@ def run_web_server():
     server = HTTPServer(("0.0.0.0", port), SimpleHandler)
     server.serve_forever()
 
+# --- 🌟 أداة الرفع السحابي لـ GitHub ---
 def backup_to_github(file_path="data.xlsx"):
     github_token = os.environ.get("GITHUB_TOKEN")
     github_repo = os.environ.get("GITHUB_REPO")
     if not github_token or not github_repo: return "⚠️ (حفظ محلي مؤقت، السحابة غير مربوطة)."
+    
     url = f"https://api.github.com/repos/{github_repo}/contents/{file_path}"
     headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
     try:
@@ -110,7 +111,16 @@ def backup_to_github(file_path="data.xlsx"):
         else: return "⚠️ فشل الرفع لـ GitHub."
     except: return "⚠️ خطأ بالاتصال بـ GitHub."
 
-AI_KNOWLEDGE = f"أنت المعلم الذكي. الغياب إنذار 15% وحرمان 20%. الحقائب: {DRIVE_LINK}"
+# --- 🌟 قيود المعلم الذكي (الصارمة والمخصصة للمؤسسة) 🌟 ---
+AI_KNOWLEDGE = (
+    "أنت 'المعلم الذكي'، مساعد رقمي رسمي وأكاديمي لقسم الحاسب الآلي بالإدارة العامة للتدريب التقني والمهني بمنطقة القصيم. "
+    "مهمتك الوحيدة والأساسية هي الإجابة على استفسارات المتدربين حول أنظمة ولوائح التدريب فقط.\n"
+    "اللوائح الثابتة: الإنذار يبدأ عند غياب 15%، والحرمان وطي القيد عند 20%. المكافأة 800 ريال وتتوقف إذا نزل المعدل عن 2.00. درجة الاجتياز 50 للمعاهد.\n"
+    f"رابط الحقائب التدريبية: {DRIVE_LINK}\n"
+    "🚨 تعليمات صارمة جداً: يُمنع منعاً باتاً الإجابة على أي سؤال عام أو خارج النطاق التقني أو التدريبي للمؤسسة. إذا سألك المستخدم عن شيء خارج هذا النطاق، قل حرفياً: "
+    "عذراً، أنا مخصص لخدمة متدربي المؤسسة العامة للتدريب التقني والمهني للإجابة على الاستفسارات الأكاديمية والتدريبية فقط."
+)
+
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 ai_model = None
 if GEMINI_API_KEY:
@@ -118,7 +128,8 @@ if GEMINI_API_KEY:
         genai.configure(api_key=GEMINI_API_KEY)
         for m in genai.list_models():
             if 'generateContent' in m.supported_generation_methods and 'flash' in m.name.lower():
-                ai_model = genai.GenerativeModel(m.name.replace('models/', ''))
+                # إعدادات لتقليل الخيال وجعل البوت أكثر رسمية
+                ai_model = genai.GenerativeModel(m.name.replace('models/', ''), generation_config={"temperature": 0.2})
                 break
     except: pass
 
@@ -188,6 +199,7 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except: pass
     await update.message.reply_text("✅ تم إرسال التعميم.")
 
+# --- 🌟 تقرير التميز المؤسسي المتوافق مع معايير الجائزة 🌟 ---
 async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_user.id) != ADMIN_ID: return
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
@@ -211,25 +223,29 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_hours_saved = round((saved_minutes_ai + saved_minutes_pledges) / 60, 1)
     
     report_msg = f"""
-📈 **تقرير الأداء المؤسسي (التغذية الراجعة)** 📈
+🏆 **تقرير الأداء لجائزة التميز بمنطقة القصيم** 🏆
 {SEP}
-👥 **المستخدمون والبيانات:**
-🔹 إجمالي المستخدمين للبوت: `{users_count}` متدرب
-🔹 السجلات المحفوظة بالنظام: `{db_records}` سجل
+📱 **معيار التحول الرقمي:**
+🔹 إجمالي المتدربين المستفيدين: `{users_count}` متدرب
+🔹 السجلات المؤتمتة بالنظام: `{db_records}` سجل
 
-🤖 **التفاعل والأتمتة:**
-🔹 استفسارات أجاب عليها الذكاء الاصطناعي: `{ai_queries}` استفسار
-🔹 التعهدات الإلكترونية التي تم أخذها آلياً: `{pledges_count}` تعهد
-🔹 المشاركات في تحديات التقنية: `{quiz_attempts}` مشاركة
+📊 **معيار الأثر الفعلي:**
+🔹 استفسارات عولجت بالذكاء الاصطناعي: `{ai_queries}` استفسار
+🔹 إقرارات وتعهدات غياب نُفذت آلياً: `{pledges_count}` تعهد
+🔹 مشاركات التثقيف التقني (التحديات): `{quiz_attempts}` مشاركة
 
-⏳ **مؤشرات الكفاءة التشغيلية (ROI):**
-*(تُحسب بناءً على الوقت الموفر للإدارة بدلاً من العمل اليدوي)*
-✅ ساعات العمل الموفرة بفضل الأتمتة: **{total_hours_saved} ساعة عمل!**
+⏳ **معيار الكفاءة التشغيلية:**
+*(الجهد الإداري المُوفر بفضل الأتمتة)*
+✅ توفير وقت الإدارة بمقدار: **{total_hours_saved} ساعة عمل!**
+
+♻️ **معيار الاستدامة:**
+✅ ربط سحابي (GitHub) وحفظ دائم (24/7).
 {SEP}
-💡 *هذه الأرقام تعكس مدى التحول الرقمي الفعلي في القسم.*
+💡 *تتوافق هذه المؤشرات مع أهداف التميز للمؤسسة العامة للتدريب التقني والمهني.*
 """
     await update.message.reply_text(report_msg, parse_mode='Markdown')
 
+# --- 🌟 محرك الاستجابة الشامل 🌟 ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     stats = load_json(STATS_FILE)
@@ -254,6 +270,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     trans_table = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
     clean_text = text.translate(trans_table).strip()
 
+    # 1. نظام الحجر الذكي (لإدارة حالات المستخدمين الصارمة)
     if user_id in user_states:
         state = user_states[user_id]
         
@@ -317,6 +334,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if state['flow'] == 'excuse':
             return await update.message.reply_text("⚠️ **هذا نص! الرجاء إرسال (صورة أو ملف PDF) للعذر الطبي مع كتابة رقمك في الوصف الخاص بالصورة.**", parse_mode='Markdown', reply_markup=get_cancel_menu())
 
+    # 2. القوائم التفاعلية
     if text == "📝 رفع الغياب والأعذار": 
         user_states[user_id] = {'flow': 'excuse'}
         await update.message.reply_text("📝 **نظام رفع الأعذار الصارم:**\nالرجاء إرفاق (صورة العذر) الآن، **ويجب** كتابة (رقمك واسمك) في خانة الوصف (Caption) الخاصة بالصورة لكي يقبلها النظام.", parse_mode='Markdown', reply_markup=get_cancel_menu())
@@ -407,6 +425,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"⚠️ **حدث خطأ:** `{str(e)}`", parse_mode='Markdown')
         return
 
+    # 3. الردود الثابتة
     if text == "📚 الحقائب التدريبية": 
         return await update.message.reply_text("📚 **الحقائب التدريبية:**", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📥 الدخول للمستودع", url=DRIVE_LINK)]]), parse_mode='Markdown')
     if text == "🔗 المنصات الإلكترونية": 
@@ -424,7 +443,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists("trainee_guide.pdf"): return await update.message.reply_document(document=open("trainee_guide.pdf", 'rb'), caption="📘 **دليل المتدرب الرسمي**", parse_mode='Markdown')
         else: return await update.message.reply_text("⚠️ **جاري التحديث من قبل الإدارة.**", parse_mode='Markdown')
     
-    # --- 🌟 تحديث نص الأسئلة الشائعة الأكاديمي 🌟 ---
     if text == "❓ الأسئلة الشائعة":
         faq_msg = (
             "🏛️ **اللوائح والأنظمة التدريبية الشائعة** 🏛️\n"
@@ -474,6 +492,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("⚠️ **الرجاء اختيار خدمة من الأسفل 👇**", reply_markup=get_main_menu())
 
+# --- 🌟 محرك سحب رايات والأعذار 🌟 ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     
@@ -615,7 +634,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل النسخة الماسية النهائية (أعلى معايير الإدارة والموثوقية)...")
+    print("🚀 تشغيل النسخة الماسية النهائية (Ultimate Diamond Edition)...")
     app.run_polling()
 
 if __name__ == '__main__': 
