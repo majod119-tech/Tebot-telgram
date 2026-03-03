@@ -188,7 +188,6 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except: pass
     await update.message.reply_text("✅ تم إرسال التعميم.")
 
-# 🌟 الأمر الجديد: تقرير التميز المؤسسي 🌟
 async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_user.id) != ADMIN_ID: return
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
@@ -196,7 +195,6 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     stats = load_json(STATS_FILE)
     interrogations = load_json(INTERROGATIONS_FILE)
     
-    # حساب المؤشرات
     users_count = len(stats.get("users_list", []))
     ai_queries = stats.get("ai_questions", 0)
     quiz_attempts = stats.get("quiz_attempts", 0)
@@ -208,9 +206,6 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     pledges_count = sum(len(subjects) for subjects in interrogations.values())
     
-    # حساب توفير الوقت (ROI) للتميز المؤسسي
-    # نفترض أن كل سؤال للذكاء الاصطناعي يوفر 3 دقائق من وقت الإدارة للرد
-    # ونفترض أن كل تعهد آلي يوفر 15 دقيقة من الاستدعاء والطباعة والتوقيع
     saved_minutes_ai = ai_queries * 3
     saved_minutes_pledges = pledges_count * 15
     total_hours_saved = round((saved_minutes_ai + saved_minutes_pledges) / 60, 1)
@@ -313,7 +308,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 del user_states[user_id]
                 return await update.message.reply_text("⚠️ المعلم غير متصل حالياً.", reply_markup=get_main_menu())
             await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-            update_stat("ai_questions") # تحديث إحصائيات الذكاء الاصطناعي
+            update_stat("ai_questions") 
             try:
                 response = await ai_model.generate_content_async(f"{AI_KNOWLEDGE}\nسؤال: {text}")
                 return await update.message.reply_text(f"📝 رد المعلم الذكي:\n\n{response.text}", reply_markup=get_back_menu())
@@ -428,8 +423,23 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "📘 دليل المتدرب الرسمي":
         if os.path.exists("trainee_guide.pdf"): return await update.message.reply_document(document=open("trainee_guide.pdf", 'rb'), caption="📘 **دليل المتدرب الرسمي**", parse_mode='Markdown')
         else: return await update.message.reply_text("⚠️ **جاري التحديث من قبل الإدارة.**", parse_mode='Markdown')
+    
+    # --- 🌟 تحديث نص الأسئلة الشائعة الأكاديمي 🌟 ---
     if text == "❓ الأسئلة الشائعة":
-        return await update.message.reply_text(f"❓ **الأسئلة الشائعة:**\n🔹 **الحرمان؟** غياب (20%).\n🔹 **المكافأة؟** 800 ريال وتتوقف لمعدل تحت 2.00.\n🔹 **النجاح؟** 50 للمعاهد.", parse_mode='Markdown')
+        faq_msg = (
+            "🏛️ **اللوائح والأنظمة التدريبية الشائعة** 🏛️\n"
+            f"{SEP}\n"
+            "📌 **لائحة الحرمان وطي القيد:**\n"
+            "يُحرم المتدرب من المقرر التدريبي ويُطوى قيده نظامياً في حال بلوغ نسبة الغياب حد الـ (20%).\n\n"
+            "💳 **ضوابط المكافأة الشهرية:**\n"
+            "تُصرف للمتدرب مكافأة مالية قدرها (800 ريال)، ويُعلق صرفها آلياً في حال انخفاض المعدل التراكمي عن (2.00).\n\n"
+            "🎓 **درجة الاجتياز الأكاديمي:**\n"
+            "الحد الأدنى لاجتياز المقررات التدريبية واعتبار المتدرب ناجحاً في نظام المعاهد هو الحصول على (50) درجة.\n"
+            f"{SEP}\n"
+            "💡 *للاطلاع على اللوائح كاملة، يرجى تصفح (دليل المتدرب الرسمي) من القائمة.*"
+        )
+        return await update.message.reply_text(faq_msg, parse_mode='Markdown')
+        
     if text in ["1️⃣ الفصل الأول", "2️⃣ الفصل الثاني", "3️⃣ الفصل الثالث", "4️⃣ الفصل الرابع", "5️⃣ الفصل الخامس", "6️⃣ الفصل السادس", "🖥️ برامج فصلية"]:
         plans = load_json("plans.json")
         return await update.message.reply_text(f"{plans.get(text, 'جاري التحديث')}\n{SEP}\n🔗 **لتحميل المنهج:**", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📥 تحميل", url=DRIVE_LINK)]]), parse_mode='Markdown')
@@ -598,14 +608,14 @@ def main():
     app.add_handler(CommandHandler("db", db_status_command)) 
     app.add_handler(CommandHandler("backup", backup_command))
     app.add_handler(CommandHandler("broadcast", broadcast_command))
-    app.add_handler(CommandHandler("report", report_command)) # 🌟 الأمر الجديد للإحصائيات 🌟
+    app.add_handler(CommandHandler("report", report_command))
     app.add_handler(CommandHandler("start", start))
     
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_logic))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل النظام المزود بلوحة قياس الأداء للتميز المؤسسي...")
+    print("🚀 تشغيل النسخة الماسية النهائية (أعلى معايير الإدارة والموثوقية)...")
     app.run_polling()
 
 if __name__ == '__main__': 
