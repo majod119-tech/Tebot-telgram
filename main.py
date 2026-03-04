@@ -50,7 +50,8 @@ TECH_TIPS = [
 
 # --- 🌟 إعدادات النظام ---
 TOKEN = os.environ.get("TOKEN") 
-GROUP_ID = "-5193577198" # تأكد من إضافة البوت كأدمن في هذا القروب
+GROUP_ID = "-1005193577198"
+" # تأكد من إضافة البوت كأدمن في هذا القروب
 DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
 ADMIN_ID = "10073498"
 SEP = "━━━━━━━━━━━━━━"
