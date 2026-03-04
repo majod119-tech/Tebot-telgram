@@ -50,8 +50,8 @@ TECH_TIPS = [
 
 # --- 🌟 إعدادات النظام ---
 TOKEN = os.environ.get("TOKEN") 
-# 👇 ضع الرقم السري للقروب هنا (الذي يبدأ بـ 100-) 👇
-GROUP_ID = "-1005193577198" 
+# 👇 الرقم السري الحقيقي والنهائي لقروب الإدارة 👇
+GROUP_ID = "-1003701324722" 
 DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
 ADMIN_ID = "10073498"
 SEP = "━━━━━━━━━━━━━━"
@@ -133,6 +133,7 @@ if GEMINI_API_KEY:
 user_states = {}
 active_challenges = {}
 
+# --- 🌟 القوائم التفاعلية 🌟 ---
 def get_main_menu():
     return ReplyKeyboardMarkup([
         ["🤖 المعلم الذكي"], 
@@ -178,8 +179,9 @@ def get_pledge_step2_menu():
 def get_pledge_step3_menu():
     return ReplyKeyboardMarkup([["✍️ أقر وأتعهد بالانضباط للحفاظ على مستقبلي التدريبي"]], resize_keyboard=True)
 
+# --- 🌟 أوامر الإدارة والمنافسة 🌟 ---
 async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.type != 'private': return # يمنع استجابة البوت للأوامر في القروب
+    if update.effective_chat.type != 'private': return # قانون الصمت في القروب
     msg = f"""
 🏆 **نبذة عن المبادرة (جائزة التميز بمنطقة القصيم)** 🏆
 {SEP}
@@ -311,6 +313,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     trans_table = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
     clean_text = text.translate(trans_table).strip()
 
+    # 1. نظام الحجر الذكي والتعهدات التفاعلي
     if user_id in user_states:
         state = user_states[user_id]
         if text in ["❌ إلغاء العملية", "🔙 الرجوع للقائمة الرئيسية"]:
@@ -374,6 +377,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if state['flow'] == 'excuse':
             return await update.message.reply_text("⚠️ هذا نص! الرجاء إرسال (صورة أو ملف PDF) للعذر الطبي مع كتابة رقمك في الوصف الخاص بالصورة.", reply_markup=get_cancel_menu())
 
+    # --- 🌟 الردود الثابتة والمنسقة 🌟 ---
     if text == "📝 رفع الغياب والأعذار": 
         user_states[user_id] = {'flow': 'excuse'}
         msg = "📝 *نظام رفع الأعذار:*\nالرجاء إرفاق (صورة العذر) الآن، ويجب كتابة (رقمك واسمك) في خانة الوصف (Caption).\n\n⚠️ *تُقبل الأعذار الرسمية والطبية فقط بعد الغياب خلال 3 إلى 5 أيام.*"
@@ -441,6 +445,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return await update.message.reply_text(msg, reply_markup=get_games_menu(), parse_mode='Markdown')
 
+    # --- 🌟 محرك الاستعلام الأكاديمي 🌟 ---
     if clean_text.isdigit() and len(clean_text) > 4: 
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
         try:
@@ -561,8 +566,9 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("⚠️ الرجاء اختيار خدمة من الأسفل 👇", reply_markup=get_main_menu())
 
+# --- 🌟 محرك رفع الملفات والأعذار 🌟 ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.type != 'private': return # قانون الصمت: يمنع تكرار أو تفاعل البوت مع الصور المرفوعة في القروب
+    if update.effective_chat.type != 'private': return # قانون الصمت: يمنع تكرار أو تفاعل البوت مع الصور في القروب
     user_id = str(update.effective_user.id)
     
     if user_id == ADMIN_ID and update.message.document:
@@ -671,7 +677,7 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await status_msg.edit_text("✅ *تم الختم والإرسال للإدارة بنجاح.*", parse_mode='Markdown')
             await update.message.reply_text("العودة للقائمة الرئيسية 🏠", reply_markup=get_main_menu())
         except Exception as e:
-            await status_msg.edit_text(f"⚠️ خطأ فني مباشر من السيرفر:\n`{str(e)}`", parse_mode='Markdown')
+            await status_msg.edit_text(f"⚠️ خطأ فني مباشر من السيرفر:\n`{str(e)}`\n\n*(تأكد من رقم القروب وصلاحيات البوت)*", parse_mode='Markdown')
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return # قانون الصمت
@@ -705,7 +711,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل النظام (جاهز تماماً لجائزة القصيم - مع تفعيل وضع الصمت في المجموعات)...")
+    print("🚀 تشغيل النظام الماسي (جاهز تماماً لجائزة القصيم - مع حل مشكلة القروبات)...")
     app.run_polling()
 
 if __name__ == '__main__': 
