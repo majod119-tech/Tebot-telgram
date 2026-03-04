@@ -50,7 +50,8 @@ TECH_TIPS = [
 
 # --- 🌟 إعدادات النظام ---
 TOKEN = os.environ.get("TOKEN") 
-GROUP_ID = "-1005193577198" # 🌟 تم التعديل النهائي لإرسال الأعذار بنجاح (Supergroup) 🌟
+# 👇 ضع الرقم السري للقروب هنا (الذي يبدأ بـ 100-) 👇
+GROUP_ID = "-1005193577198" 
 DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
 ADMIN_ID = "10073498"
 SEP = "━━━━━━━━━━━━━━"
@@ -132,7 +133,6 @@ if GEMINI_API_KEY:
 user_states = {}
 active_challenges = {}
 
-# --- 🌟 القوائم المحدثة والتفاعلية 🌟 ---
 def get_main_menu():
     return ReplyKeyboardMarkup([
         ["🤖 المعلم الذكي"], 
@@ -165,7 +165,6 @@ def get_games_menu():
 def get_back_menu(): 
     return ReplyKeyboardMarkup([["🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
 
-# 🌟 قوائم التعهدات الجديدة (أزرار بدلاً من الكتابة) 🌟
 def get_pledge_step1_menu():
     return ReplyKeyboardMarkup([["✅ نعم، أطلعت على نسبة الغياب"]], resize_keyboard=True)
 
@@ -179,8 +178,8 @@ def get_pledge_step2_menu():
 def get_pledge_step3_menu():
     return ReplyKeyboardMarkup([["✍️ أقر وأتعهد بالانضباط للحفاظ على مستقبلي التدريبي"]], resize_keyboard=True)
 
-# --- 🌟 أوامر الإدارة والمنافسة 🌟 ---
 async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != 'private': return # يمنع استجابة البوت للأوامر في القروب
     msg = f"""
 🏆 **نبذة عن المبادرة (جائزة التميز بمنطقة القصيم)** 🏆
 {SEP}
@@ -195,6 +194,7 @@ async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, parse_mode='Markdown')
 
 async def db_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != 'private': return
     if str(update.effective_user.id) != ADMIN_ID: return
     try:
         if not os.path.exists('data.xlsx'):
@@ -207,12 +207,14 @@ async def db_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except: pass
 
 async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != 'private': return
     if str(update.effective_user.id) != ADMIN_ID: return
     await update.message.reply_text("⏳ جاري التجهيز...")
     for f in ['data.xlsx', 'scores.json', 'interrogations.json', 'stats.json', 'plans.json']:
         if os.path.exists(f): await context.bot.send_document(chat_id=update.effective_chat.id, document=open(f, 'rb'))
 
 async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != 'private': return
     if str(update.effective_user.id) != ADMIN_ID: return
     text = update.message.text.replace('/broadcast', '').strip()
     if not text: return await update.message.reply_text("⚠️ الطريقة: `/broadcast التعميم هنا`", parse_mode='Markdown')
@@ -223,8 +225,8 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except: pass
     await update.message.reply_text("✅ تم إرسال التعميم.")
 
-# 🌟 تقرير الإحصائيات مع الحسابات الذكية الجديدة 🌟
 async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != 'private': return
     if str(update.effective_user.id) != ADMIN_ID: return
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
     
@@ -244,12 +246,8 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try: 
             df = pd.read_excel('data.xlsx', dtype=str)
             db_records = len(df)
-            
-            # 1️⃣ حساب عدد الطلاب بدون تكرار وباستبعاد المحرومين وطي القيد
             active_rows = df[~df['parsnt'].astype(str).str.contains('ح|ط|حرمان|طي', na=False)]
             active_students_count = active_rows['stu_num'].nunique()
-            
-            # 2️⃣ حساب نسبة الحضور الأسبوعية (100 - متوسط الغياب)
             valid_absence = pd.to_numeric(df['parsnt'].astype(str).str.replace('%', ''), errors='coerce')
             valid_absence = valid_absence.dropna()
             if not valid_absence.empty:
@@ -287,6 +285,7 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(report_msg, parse_mode='Markdown')
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != 'private': return # قانون الصمت في القروب
     user_id = str(update.effective_user.id)
     stats = load_json(STATS_FILE)
     if user_id not in stats.get("users_list", []): 
@@ -304,6 +303,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except: await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
 
 async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # 🌟 قانون الصمت: إذا كانت الرسالة في القروب، تجاهلها تماماً 🌟
+    if update.effective_chat.type != 'private': return 
+
     text = update.message.text.strip()
     user_id = str(update.effective_user.id)
     trans_table = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
@@ -372,7 +374,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if state['flow'] == 'excuse':
             return await update.message.reply_text("⚠️ هذا نص! الرجاء إرسال (صورة أو ملف PDF) للعذر الطبي مع كتابة رقمك في الوصف الخاص بالصورة.", reply_markup=get_cancel_menu())
 
-    # --- 🌟 الردود الثابتة 🌟 ---
     if text == "📝 رفع الغياب والأعذار": 
         user_states[user_id] = {'flow': 'excuse'}
         msg = "📝 *نظام رفع الأعذار:*\nالرجاء إرفاق (صورة العذر) الآن، ويجب كتابة (رقمك واسمك) في خانة الوصف (Caption).\n\n⚠️ *تُقبل الأعذار الرسمية والطبية فقط بعد الغياب خلال 3 إلى 5 أيام.*"
@@ -560,8 +561,8 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("⚠️ الرجاء اختيار خدمة من الأسفل 👇", reply_markup=get_main_menu())
 
-# --- 🌟 محرك سحب رايات 🌟 ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != 'private': return # قانون الصمت: يمنع تكرار أو تفاعل البوت مع الصور المرفوعة في القروب
     user_id = str(update.effective_user.id)
     
     if user_id == ADMIN_ID and update.message.document:
@@ -576,7 +577,6 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     temp_file = "temp_rayat.csv"
                     await file.download_to_drive(temp_file)
                     
-                    # 🌟 كود فك التشفير الحديث والطلاسم 🌟
                     with open(temp_file, 'rb') as f: raw_bytes = f.read()
                     best_enc = 'utf-8' 
                     for enc in ['utf-8', 'utf-8-sig', 'windows-1256', 'cp1256', 'iso-8859-6']:
@@ -674,6 +674,7 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await status_msg.edit_text(f"⚠️ خطأ فني مباشر من السيرفر:\n`{str(e)}`", parse_mode='Markdown')
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != 'private': return # قانون الصمت
     query = update.callback_query
     user_id = str(query.from_user.id)
     await query.answer()
@@ -704,7 +705,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل النظام (جاهز تماماً لجائزة القصيم مع إحصائيات ذكية)...")
+    print("🚀 تشغيل النظام (جاهز تماماً لجائزة القصيم - مع تفعيل وضع الصمت في المجموعات)...")
     app.run_polling()
 
 if __name__ == '__main__': 
