@@ -16,7 +16,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-# --- 🌟 استدعاء مكتبة الصور ---
+# --- 🌟 استدعاء مكتبة الصور للختم الآلي ---
 try:
     from PIL import Image, ImageDraw, ImageFont
     HAS_PIL = True
@@ -50,7 +50,7 @@ TECH_TIPS = [
 
 # --- 🌟 إعدادات النظام ---
 TOKEN = os.environ.get("TOKEN") 
-GROUP_ID = "-1003701324722" # قروب الإدارة
+GROUP_ID = "-1003701324722" 
 DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
 ADMIN_ID = "10073498"
 SEP = "━━━━━━━━━━━━━━"
@@ -132,6 +132,7 @@ if GEMINI_API_KEY:
 user_states = {}
 active_challenges = {}
 
+# --- 🌟 القوائم التفاعلية 🌟 ---
 def get_main_menu():
     return ReplyKeyboardMarkup([
         ["🤖 المعلم الذكي"], 
@@ -177,6 +178,7 @@ def get_pledge_step2_menu():
 def get_pledge_step3_menu():
     return ReplyKeyboardMarkup([["✍️ أقر وأتعهد بالانضباط للحفاظ على مستقبلي التدريبي"]], resize_keyboard=True)
 
+# --- 🌟 أوامر الإدارة 🌟 ---
 async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return 
     msg = f"""
@@ -185,7 +187,7 @@ async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ابتكار تقني يخدم منظومة التدريب التقني والمهني، مصمم خصيصاً لتحقيق معايير التميز المؤسسي من خلال:
 
 1️⃣ **التحول الرقمي:** أتمتة كاملة للاستعلامات الإدارية ورفع الأعذار إلكترونياً.
-2️⃣ **الكفاءة التشغيلية:** تقليص وقت معالجة طلبات المتدربين، وأتمتة تقارير الجودة الأسبوعية.
+2️⃣ **الكفاءة التشغيلية:** تقليص وقت معالجة طلبات المتدربين من ساعات إلى ثوانٍ، وأتمتة تقارير الجودة الأسبوعية.
 3️⃣ **الاستدامة:** نظام سحابي يعمل 24/7 دون أعباء تشغيلية، مع أخذ إقرارات الحرمان آلياً.
 
 💡 *صُنع خصيصاً لدعم مسيرة التميز والإبداع في المعهد الصناعي الثانوي ببريدة.*
@@ -335,9 +337,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 completed.setdefault(state['stu_num'], []).append(state['subject'])
                 save_json(INTERROGATIONS_FILE, completed)
                 
-                # --- 🌟 مولد الوثيقة الرسمية للتعهد 🌟 ---
                 timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                
                 official_document = f"""
 🏛️ **المؤسسة العامة للتدريب التقني والمهني**
 📍 **المعهد الصناعي الثانوي ببريدة - قسم الحاسب**
@@ -358,16 +358,12 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 {SEP}
 *(نسخة إلكترونية معتمدة - قسم شؤون المتدربين)*
 """
-                
-                # 1. إرسال الوثيقة الرسمية لقروب الإدارة للأرشفة
                 try: 
                     await context.bot.send_message(chat_id=GROUP_ID, text=official_document, parse_mode='Markdown')
                 except Exception as e: 
                     pass 
                 
                 del user_states[user_id]
-                
-                # 2. إرسال الوثيقة الرسمية للمتدرب ليحتفظ بها
                 await update.message.reply_text(official_document, parse_mode='Markdown')
                 await update.message.reply_text("✅ *تم توثيق إقرارك رسمياً ورفع نسخة للإدارة.*\nاحرص على الحضور لتفادي طي القيد.", parse_mode='Markdown', reply_markup=get_main_menu())
                 return
@@ -584,6 +580,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("⚠️ الرجاء اختيار خدمة من الأسفل 👇", reply_markup=get_main_menu())
 
+# --- 🌟 محرك الإدارة (المحرك المزدوج لرفع الملفات وتقارير الجودة) 🌟 ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return 
     user_id = str(update.effective_user.id)
@@ -614,27 +611,46 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     is_quality_report = any('نسبة التحضير' in str(c) for c in df_raw.columns) and any('اسم المدرب' in str(c) for c in df_raw.columns)
 
                     if is_quality_report:
-                        col_prep_name = [c for c in df_raw.columns if 'نسبة التحضير' in str(c)][0]
+                        col_prep_percent = [c for c in df_raw.columns if 'نسبة التحضير' in str(c)][0]
                         col_trainer_name = [c for c in df_raw.columns if 'اسم المدرب' in str(c)][0]
-                        
-                        df_raw[col_prep_name] = pd.to_numeric(df_raw[col_prep_name].astype(str).str.replace('%', '').str.strip(), errors='coerce').fillna(0)
-                        
+                        col_total_prep = [c for c in df_raw.columns if 'إجمالي التحضير' in str(c)][0]
+                        col_present = [c for c in df_raw.columns if 'تحضير مسجل' in str(c)][0]
+
+                        df_raw[col_prep_percent] = pd.to_numeric(df_raw[col_prep_percent].astype(str).str.replace('%', '').str.strip(), errors='coerce').fillna(0)
+                        df_raw[col_total_prep] = pd.to_numeric(df_raw[col_total_prep], errors='coerce').fillna(0)
+                        df_raw[col_present] = pd.to_numeric(df_raw[col_present], errors='coerce').fillna(0)
+
                         total_sections = len(df_raw)
-                        unrecorded_df = df_raw[df_raw[col_prep_name] < 100]
+                        unrecorded_df = df_raw[df_raw[col_prep_percent] < 100]
                         unrecorded_sections_count = len(unrecorded_df)
                         recorded_sections_count = total_sections - unrecorded_sections_count
-                        
+
+                        total_trainers = df_raw[col_trainer_name].nunique()
                         trainers_not_recorded = unrecorded_df[col_trainer_name].dropna().unique()
-                        
-                        recorded_percentage = int(round((recorded_sections_count / total_sections) * 100, 0)) if total_sections > 0 else 0
+                        unrecorded_trainers_count = len(trainers_not_recorded)
+                        recorded_trainers_count = total_trainers - unrecorded_trainers_count
+
+                        total_expected_hits = df_raw[col_total_prep].sum()
+                        total_present_hits = df_raw[col_present].sum()
+                        attendance_rate = round((total_present_hits / total_expected_hits) * 100, 2) if total_expected_hits > 0 else 0
                         
                         report_quality_msg = f"""
-📑 *تقرير الجودة الأسبوعي الآلي (رصد الغياب)* 📑
+📑 *تقرير متابعة سير العملية التدريبية الأسبوعية* 📑
 {SEP}
-📝 *إجمالي الشعب:* `{total_sections}` شعبة
-✅ *الشعب المحضرة:* `{recorded_sections_count}` شعبة
-⚠️ *الشعب غير المحضرة:* `{unrecorded_sections_count}` شعبة
-📈 *نسبة الإنجاز:* `{recorded_percentage}%`
+👥 *إحصائيات المتدربين والحضور:*
+▫️ إجمالي المتدربين (التحضير): `{int(total_expected_hits)}`
+▫️ المتدربين الحاضرين: `{int(total_present_hits)}`
+📈 نسبة الحضور: `{attendance_rate}%`
+
+📝 *إحصائيات الشعب التدريبية:*
+▫️ إجمالي عدد الشعب: `{total_sections}`
+✅ الشعب المحضرة: `{recorded_sections_count}`
+⚠️ الشعب غير المحضرة: `{unrecorded_sections_count}`
+
+👨‍🏫 *إحصائيات المدربين:*
+▫️ إجمالي عدد المدربين: `{total_trainers}`
+✅ المدربين المحضرين: `{recorded_trainers_count}`
+⚠️ المدربين غير المحضرين: `{unrecorded_trainers_count}`
 """
                         if unrecorded_sections_count > 0:
                             report_quality_msg += f"\n{SEP}\n📋 *المدربين المتأخرين بالرصد:*"
@@ -766,7 +782,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل النظام (جاهز لجائزة القصيم مع وثيقة التعهد الرسمية)...")
+    print("🚀 تشغيل النظام (مع تقارير الجودة الأسبوعية الاحترافية)...")
     app.run_polling()
 
 if __name__ == '__main__': 
