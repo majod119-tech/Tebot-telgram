@@ -50,8 +50,7 @@ TECH_TIPS = [
 
 # --- 🌟 إعدادات النظام ---
 TOKEN = os.environ.get("TOKEN") 
-GROUP_ID = "-1005193577198"
-" # تأكد من إضافة البوت كأدمن في هذا القروب
+GROUP_ID = "-1005193577198" # 🌟 تم التعديل النهائي لإرسال الأعذار بنجاح (Supergroup) 🌟
 DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
 ADMIN_ID = "10073498"
 SEP = "━━━━━━━━━━━━━━"
@@ -224,6 +223,7 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except: pass
     await update.message.reply_text("✅ تم إرسال التعميم.")
 
+# 🌟 تقرير الإحصائيات مع الحسابات الذكية الجديدة 🌟
 async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_user.id) != ADMIN_ID: return
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
@@ -234,9 +234,29 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     users_count = len(stats.get("users_list", []))
     ai_queries = stats.get("ai_questions", 0)
     quiz_attempts = stats.get("quiz_attempts", 0)
-    db_records = len(pd.read_excel('data.xlsx')) if os.path.exists('data.xlsx') else 0
     pledges_count = sum(len(subjects) for subjects in interrogations.values())
     
+    db_records = 0
+    active_students_count = 0
+    weekly_attendance_rate = 100.0
+    
+    if os.path.exists('data.xlsx'):
+        try: 
+            df = pd.read_excel('data.xlsx', dtype=str)
+            db_records = len(df)
+            
+            # 1️⃣ حساب عدد الطلاب بدون تكرار وباستبعاد المحرومين وطي القيد
+            active_rows = df[~df['parsnt'].astype(str).str.contains('ح|ط|حرمان|طي', na=False)]
+            active_students_count = active_rows['stu_num'].nunique()
+            
+            # 2️⃣ حساب نسبة الحضور الأسبوعية (100 - متوسط الغياب)
+            valid_absence = pd.to_numeric(df['parsnt'].astype(str).str.replace('%', ''), errors='coerce')
+            valid_absence = valid_absence.dropna()
+            if not valid_absence.empty:
+                avg_absence = valid_absence.mean()
+                weekly_attendance_rate = round(100 - avg_absence, 2)
+        except: pass
+        
     saved_minutes_ai = ai_queries * 3
     saved_minutes_pledges = pledges_count * 15
     total_hours_saved = round((saved_minutes_ai + saved_minutes_pledges) / 60, 1)
@@ -244,8 +264,13 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     report_msg = f"""
 🏆 *تقرير الأداء لجائزة التميز بمنطقة القصيم* 🏆
 {SEP}
+👥 *المؤشرات الأكاديمية (محدثة آلياً):*
+🔹 المتدربين المنتظمين بالقسم: `{active_students_count}` متدرب
+*(بدون تكرار وبإستبعاد طي القيد والحرمان)*
+🔹 نسبة الحضور الأسبوعية العامة: `{weekly_attendance_rate}%` 📈
+
 📱 *معيار التحول الرقمي:*
-🔹 إجمالي المتدربين المستفيدين: `{users_count}` متدرب
+🔹 المتدربين المسجلين بالبوت: `{users_count}` متدرب
 🔹 السجلات المؤتمتة بالنظام: `{db_records}` سجل
 
 📊 *معيار الأثر الفعلي:*
@@ -284,7 +309,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     trans_table = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
     clean_text = text.translate(trans_table).strip()
 
-    # 1. نظام الحجر الذكي والتعهدات التفاعلي الجديد
     if user_id in user_states:
         state = user_states[user_id]
         if text in ["❌ إلغاء العملية", "🔙 الرجوع للقائمة الرئيسية"]:
@@ -317,7 +341,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 try: 
                     await context.bot.send_message(chat_id=GROUP_ID, text=report, parse_mode='Markdown')
                 except Exception as e: 
-                    pass # يتم الحفظ حتى لو فشل الإرسال
+                    pass 
                 
                 del user_states[user_id]
                 await update.message.reply_text("✅ *تم توثيق إقرارك رسمياً لدى الإدارة.*\nاحرص على الحضور لتفادي طي القيد.", parse_mode='Markdown', reply_markup=get_main_menu())
@@ -332,7 +356,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return await update.message.reply_text("✅ تم إرسال رسالتك للإدارة بسرية تامة.", reply_markup=get_main_menu())
             except Exception as e: 
                 del user_states[user_id]
-                return await update.message.reply_text("⚠️ خطأ فني: يرجى التأكد من إضافة البوت كـ (مشرف) في قروب الإدارة.", reply_markup=get_main_menu())
+                return await update.message.reply_text("⚠️ حدث خطأ أثناء إرسال الشكوى. يرجى المحاولة لاحقاً.", reply_markup=get_main_menu())
 
         if state['flow'] == 'ai':
             if not ai_model:
@@ -348,7 +372,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if state['flow'] == 'excuse':
             return await update.message.reply_text("⚠️ هذا نص! الرجاء إرسال (صورة أو ملف PDF) للعذر الطبي مع كتابة رقمك في الوصف الخاص بالصورة.", reply_markup=get_cancel_menu())
 
-    # --- 🌟 الردود الجديدة المنسقة 🌟 ---
+    # --- 🌟 الردود الثابتة 🌟 ---
     if text == "📝 رفع الغياب والأعذار": 
         user_states[user_id] = {'flow': 'excuse'}
         msg = "📝 *نظام رفع الأعذار:*\nالرجاء إرفاق (صورة العذر) الآن، ويجب كتابة (رقمك واسمك) في خانة الوصف (Caption).\n\n⚠️ *تُقبل الأعذار الرسمية والطبية فقط بعد الغياب خلال 3 إلى 5 أيام.*"
@@ -416,7 +440,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return await update.message.reply_text(msg, reply_markup=get_games_menu(), parse_mode='Markdown')
 
-    # --- معالجة الاستعلام الأكاديمي ---
     if clean_text.isdigit() and len(clean_text) > 4: 
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
         try:
@@ -473,10 +496,8 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 m += f"{SEP}\n💡 *الإنذار يبدأ عند 15%، والحرمان عند 20%.*"
 
-                # إرسال السجل الأكاديمي كاملاً للمتدرب أولاً (تم حل المشكلة)
                 await update.message.reply_text(m, parse_mode='Markdown')
 
-                # ثم إرسال التعهد وحجز الطالب إذا استدعى الأمر
                 if subject_to_interrogate:
                     user_states[user_id] = {'flow': 'pledge', 'step': 1, 'stu_num': clean_text, 'stu_nam': stu_nam, 'subject': subject_to_interrogate}
                     warning_msg = f"⚠️ *تنبيه إداري عاجل!*\nلقد وصلت غياباتك إلى مرحلة الخطر (15% فأكثر) في مقرر:\n*{subject_to_interrogate}*\n\n🛑 *النظام مغلق حتى تُكمل الإقرار!*\n1️⃣ هل تعلم أنك اقتربت من الحرمان؟"
@@ -539,6 +560,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("⚠️ الرجاء اختيار خدمة من الأسفل 👇", reply_markup=get_main_menu())
 
+# --- 🌟 محرك سحب رايات 🌟 ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     
@@ -554,12 +576,13 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     temp_file = "temp_rayat.csv"
                     await file.download_to_drive(temp_file)
                     
+                    # 🌟 كود فك التشفير الحديث والطلاسم 🌟
                     with open(temp_file, 'rb') as f: raw_bytes = f.read()
-                    best_enc = 'utf-8-sig' 
-                    for enc in ['utf-8-sig', 'windows-1256', 'cp1256', 'utf-8', 'iso-8859-6']:
+                    best_enc = 'utf-8' 
+                    for enc in ['utf-8', 'utf-8-sig', 'windows-1256', 'cp1256', 'iso-8859-6']:
                         try:
                             text = raw_bytes.decode(enc)
-                            if 'المتدرب' in text or 'المقرر' in text or 'الغياب' in text:
+                            if 'المتدرب' in text or 'المقرر' in text or 'الغياب' in text or 'رقم' in text:
                                 best_enc = enc; break 
                         except: pass
                             
@@ -618,7 +641,7 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return await update.message.reply_text("🛑 *مرفوض: وصف غير مكتمل!*\nيجب أن تقوم بإرفاق الصورة مرة أخرى وتأكد من كتابة *رقمك التدريبي* في الوصف لكي يتم ربطه بملفك.", parse_mode='Markdown', reply_markup=get_cancel_menu() if state.get('flow') == 'excuse' else get_main_menu())
             
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
-        status_msg = await update.message.reply_text("⏳ جاري الختم الآلي...")
+        status_msg = await update.message.reply_text("⏳ جاري الختم الآلي والإرسال...")
         
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -648,7 +671,7 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await status_msg.edit_text("✅ *تم الختم والإرسال للإدارة بنجاح.*", parse_mode='Markdown')
             await update.message.reply_text("العودة للقائمة الرئيسية 🏠", reply_markup=get_main_menu())
         except Exception as e:
-            await status_msg.edit_text("⚠️ خطأ فني: يرجى التأكد من إضافة البوت كـ (مشرف) في قروب الإدارة.")
+            await status_msg.edit_text(f"⚠️ خطأ فني مباشر من السيرفر:\n`{str(e)}`", parse_mode='Markdown')
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -674,14 +697,14 @@ def main():
     app.add_handler(CommandHandler("backup", backup_command))
     app.add_handler(CommandHandler("broadcast", broadcast_command))
     app.add_handler(CommandHandler("report", report_command))
-    app.add_handler(CommandHandler("about", about_command)) # الأمر السري للجنة التحكيم 🏆
+    app.add_handler(CommandHandler("about", about_command))
     app.add_handler(CommandHandler("start", start))
     
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_logic))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل النظام (جاهز تماماً لجائزة القصيم)...")
+    print("🚀 تشغيل النظام (جاهز تماماً لجائزة القصيم مع إحصائيات ذكية)...")
     app.run_polling()
 
 if __name__ == '__main__': 
