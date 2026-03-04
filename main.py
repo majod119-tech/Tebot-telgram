@@ -50,7 +50,6 @@ TECH_TIPS = [
 
 # --- 🌟 إعدادات النظام ---
 TOKEN = os.environ.get("TOKEN") 
-# 👇 الرقم السري الحقيقي والنهائي لقروب الإدارة 👇
 GROUP_ID = "-1003701324722" 
 DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
 ADMIN_ID = "10073498"
@@ -179,16 +178,16 @@ def get_pledge_step2_menu():
 def get_pledge_step3_menu():
     return ReplyKeyboardMarkup([["✍️ أقر وأتعهد بالانضباط للحفاظ على مستقبلي التدريبي"]], resize_keyboard=True)
 
-# --- 🌟 أوامر الإدارة والمنافسة 🌟 ---
+# --- 🌟 أوامر الإدارة 🌟 ---
 async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.type != 'private': return # قانون الصمت في القروب
+    if update.effective_chat.type != 'private': return 
     msg = f"""
 🏆 **نبذة عن المبادرة (جائزة التميز بمنطقة القصيم)** 🏆
 {SEP}
 ابتكار تقني يخدم منظومة التدريب التقني والمهني، مصمم خصيصاً لتحقيق معايير التميز المؤسسي من خلال:
 
 1️⃣ **التحول الرقمي:** أتمتة كاملة للاستعلامات الإدارية ورفع الأعذار إلكترونياً.
-2️⃣ **الكفاءة التشغيلية:** تقليص وقت معالجة طلبات المتدربين من ساعات إلى ثوانٍ.
+2️⃣ **الكفاءة التشغيلية:** تقليص وقت معالجة طلبات المتدربين من ساعات إلى ثوانٍ، وأتمتة تقارير الجودة الأسبوعية.
 3️⃣ **الاستدامة:** نظام سحابي يعمل 24/7 دون أعباء تشغيلية، مع أخذ إقرارات الحرمان آلياً.
 
 💡 *صُنع خصيصاً لدعم مسيرة التميز والإبداع في المعهد الصناعي الثانوي ببريدة.*
@@ -287,7 +286,7 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(report_msg, parse_mode='Markdown')
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.type != 'private': return # قانون الصمت في القروب
+    if update.effective_chat.type != 'private': return 
     user_id = str(update.effective_user.id)
     stats = load_json(STATS_FILE)
     if user_id not in stats.get("users_list", []): 
@@ -305,7 +304,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except: await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
 
 async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 🌟 قانون الصمت: إذا كانت الرسالة في القروب، تجاهلها تماماً 🌟
     if update.effective_chat.type != 'private': return 
 
     text = update.message.text.strip()
@@ -313,7 +311,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     trans_table = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
     clean_text = text.translate(trans_table).strip()
 
-    # 1. نظام الحجر الذكي والتعهدات التفاعلي
     if user_id in user_states:
         state = user_states[user_id]
         if text in ["❌ إلغاء العملية", "🔙 الرجوع للقائمة الرئيسية"]:
@@ -377,7 +374,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if state['flow'] == 'excuse':
             return await update.message.reply_text("⚠️ هذا نص! الرجاء إرسال (صورة أو ملف PDF) للعذر الطبي مع كتابة رقمك في الوصف الخاص بالصورة.", reply_markup=get_cancel_menu())
 
-    # --- 🌟 الردود الثابتة والمنسقة 🌟 ---
     if text == "📝 رفع الغياب والأعذار": 
         user_states[user_id] = {'flow': 'excuse'}
         msg = "📝 *نظام رفع الأعذار:*\nالرجاء إرفاق (صورة العذر) الآن، ويجب كتابة (رقمك واسمك) في خانة الوصف (Caption).\n\n⚠️ *تُقبل الأعذار الرسمية والطبية فقط بعد الغياب خلال 3 إلى 5 أيام.*"
@@ -445,7 +441,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return await update.message.reply_text(msg, reply_markup=get_games_menu(), parse_mode='Markdown')
 
-    # --- 🌟 محرك الاستعلام الأكاديمي 🌟 ---
     if clean_text.isdigit() and len(clean_text) > 4: 
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
         try:
@@ -566,16 +561,16 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("⚠️ الرجاء اختيار خدمة من الأسفل 👇", reply_markup=get_main_menu())
 
-# --- 🌟 محرك رفع الملفات والأعذار 🌟 ---
+# --- 🌟 محرك الإدارة (المحرك المزدوج لرفع الملفات وتقارير الجودة) 🌟 ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.type != 'private': return # قانون الصمت: يمنع تكرار أو تفاعل البوت مع الصور في القروب
+    if update.effective_chat.type != 'private': return 
     user_id = str(update.effective_user.id)
     
     if user_id == ADMIN_ID and update.message.document:
         doc = update.message.document
         if doc.file_name.endswith(('.xlsx', '.xls', '.csv')):
             await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-            status_msg = await update.message.reply_text("⏳ جاري السحب وفك تشفير اللغة العربية...")
+            status_msg = await update.message.reply_text("⏳ جاري تحليل الملف وفك التشفير...")
             
             try:
                 file = await context.bot.get_file(doc.file_id)
@@ -588,13 +583,57 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     for enc in ['utf-8', 'utf-8-sig', 'windows-1256', 'cp1256', 'iso-8859-6']:
                         try:
                             text = raw_bytes.decode(enc)
-                            if 'المتدرب' in text or 'المقرر' in text or 'الغياب' in text or 'رقم' in text:
+                            if 'المتدرب' in text or 'المقرر' in text or 'الغياب' in text or 'رقم' in text or 'نسبة التحضير' in text:
                                 best_enc = enc; break 
                         except: pass
                             
                     df_raw = pd.read_csv(io.StringIO(raw_bytes.decode(best_enc)), dtype=str, sep=',', on_bad_lines='skip')
-                    df_clean = pd.DataFrame()
                     
+                    # 🌟 المحرك المزدوج: التعرف التلقائي على نوع الملف 🌟
+                    is_quality_report = any('نسبة التحضير' in str(c) for c in df_raw.columns) and any('اسم المدرب' in str(c) for c in df_raw.columns)
+
+                    if is_quality_report:
+                        # ------ تحليل ملف الجودة الأسبوعي ------
+                        col_prep_name = [c for c in df_raw.columns if 'نسبة التحضير' in str(c)][0]
+                        col_trainer_name = [c for c in df_raw.columns if 'اسم المدرب' in str(c)][0]
+                        
+                        df_raw[col_prep_name] = pd.to_numeric(df_raw[col_prep_name].astype(str).str.replace('%', '').str.strip(), errors='coerce').fillna(0)
+                        
+                        total_sections = len(df_raw)
+                        unrecorded_df = df_raw[df_raw[col_prep_name] < 100]
+                        unrecorded_sections_count = len(unrecorded_df)
+                        recorded_sections_count = total_sections - unrecorded_sections_count
+                        
+                        trainers_not_recorded = unrecorded_df[col_trainer_name].dropna().unique()
+                        
+                        # حساب النسبة المئوية للإنجاز
+                        recorded_percentage = int(round((recorded_sections_count / total_sections) * 100, 0)) if total_sections > 0 else 0
+                        
+                        # تنسيق الرسالة لتطابق الصورة المرفقة 100%
+                        report_quality_msg = f"""
+📑 *تقرير الجودة الأسبوعي الآلي (رصد الغياب)* 📑
+{SEP}
+📝 *إجمالي الشعب:* `{total_sections}` شعبة
+✅ *الشعب المحضرة:* `{recorded_sections_count}` شعبة
+⚠️ *الشعب غير المحضرة:* `{unrecorded_sections_count}` شعبة
+📈 *نسبة الإنجاز:* `{recorded_percentage}%`
+"""
+                        if unrecorded_sections_count > 0:
+                            report_quality_msg += f"\n{SEP}\n📋 *المدربين المتأخرين بالرصد:*"
+                            # إضافة اسم المدرب وعدد شعبه غير المحضرة بجانبه
+                            for trainer in trainers_not_recorded:
+                                trainer_sections = unrecorded_df[unrecorded_df[col_trainer_name] == trainer]
+                                sections_count = len(trainer_sections)
+                                report_quality_msg += f"\n▫️ {trainer} `({sections_count} شعب)`"
+                        else:
+                            report_quality_msg += f"\n{SEP}\n🎉 *عمل مميز! جميع الشعب مُحضرة بنسبة 100%.*"
+
+                        os.remove(temp_file)
+                        await status_msg.edit_text(report_quality_msg, parse_mode='Markdown')
+                        return
+                    
+                    # ------ تحليل ملف غياب الطلاب (الكود المعتاد) ------
+                    df_clean = pd.DataFrame()
                     col_map = {'c_course': -1, 'c_id': -1, 'c_name': -1, 'c_perc': -1, 'c_perc_no': -1, 'c_hrs': -1}
                     for i, col in enumerate(df_raw.columns):
                         clean_col = str(col).replace(' ', '').replace('أ', 'ا').replace('إ', 'ا').replace('"', '')
@@ -633,7 +672,7 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     records_count = len(df_clean)
                 
                 github_status = backup_to_github("data.xlsx")
-                await status_msg.edit_text(f"✅ *نجاح ساحق!*\n📊 *النتيجة:* حفظ `{records_count}` متدرب.\n🌐 *السحابة:* {github_status}", parse_mode='Markdown')
+                await status_msg.edit_text(f"✅ *نجاح ساحق (تحديث قاعدة الطلاب)!*\n📊 *النتيجة:* حفظ `{records_count}` متدرب.\n🌐 *السحابة:* {github_status}", parse_mode='Markdown')
             except Exception as e:
                 await status_msg.edit_text(f"⚠️ *فشل التحديث:* `{e}`", parse_mode='Markdown')
             return
@@ -711,7 +750,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل النظام الماسي (جاهز تماماً لجائزة القصيم - مع حل مشكلة القروبات)...")
+    print("🚀 تشغيل النظام (جاهز لجائزة القصيم مع محرك تقارير الجودة الأسبوعي)...")
     app.run_polling()
 
 if __name__ == '__main__': 
