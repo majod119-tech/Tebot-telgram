@@ -48,8 +48,9 @@ TECH_TIPS = [
     "🌐 نصيحة: تجنب الاتصال بشبكات الواي فاي العامة المفتوحة بدون VPN."
 ]
 
+# --- 🌟 إعدادات النظام ---
 TOKEN = os.environ.get("TOKEN") 
-GROUP_ID = "-5193577198"
+GROUP_ID = "-5193577198" # تأكد من إضافة البوت كأدمن في هذا القروب
 DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
 ADMIN_ID = "10073498"
 SEP = "━━━━━━━━━━━━━━"
@@ -131,7 +132,7 @@ if GEMINI_API_KEY:
 user_states = {}
 active_challenges = {}
 
-# --- 🌟 القوائم المحدثة 🌟 ---
+# --- 🌟 القوائم المحدثة والتفاعلية 🌟 ---
 def get_main_menu():
     return ReplyKeyboardMarkup([
         ["🤖 المعلم الذكي"], 
@@ -163,6 +164,20 @@ def get_games_menu():
 
 def get_back_menu(): 
     return ReplyKeyboardMarkup([["🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
+
+# 🌟 قوائم التعهدات الجديدة (أزرار بدلاً من الكتابة) 🌟
+def get_pledge_step1_menu():
+    return ReplyKeyboardMarkup([["✅ نعم، أطلعت على نسبة الغياب"]], resize_keyboard=True)
+
+def get_pledge_step2_menu():
+    return ReplyKeyboardMarkup([
+        ["🏥 عذر طبي", "👨‍👩‍👧‍👦 ظروف عائلية طارئة"],
+        ["🚗 مشكلة في المواصلات", "⚙️ أعطال تقنية/أخرى"],
+        ["❌ إلغاء العملية"]
+    ], resize_keyboard=True)
+
+def get_pledge_step3_menu():
+    return ReplyKeyboardMarkup([["✍️ أقر وأتعهد بالانضباط للحفاظ على مستقبلي التدريبي"]], resize_keyboard=True)
 
 # --- 🌟 أوامر الإدارة والمنافسة 🌟 ---
 async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -268,6 +283,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     trans_table = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
     clean_text = text.translate(trans_table).strip()
 
+    # 1. نظام الحجر الذكي والتعهدات التفاعلي الجديد
     if user_id in user_states:
         state = user_states[user_id]
         if text in ["❌ إلغاء العملية", "🔙 الرجوع للقائمة الرئيسية"]:
@@ -278,31 +294,32 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if state['flow'] == 'pledge':
             step = state['step']
             if step == 1:
-                if len(text) < 2: return await update.message.reply_text("⚠️ إجابة غير واضحة، أرجو الإجابة بشكل صحيح:", reply_markup=get_cancel_menu())
                 user_states[user_id]['aware'] = text
                 user_states[user_id]['step'] = 2
-                return await update.message.reply_text("2️⃣ ما هو العذر الرئيسي لكثرة غياباتك؟\n(نرجو التفصيل لرفعه للإدارة)", reply_markup=get_cancel_menu())
+                return await update.message.reply_text("2️⃣ *فضلاً، اختر العذر الرئيسي لكثرة غياباتك من القائمة بالأسفل:*\n(أو يمكنك كتابة عذرك يدوياً)", parse_mode='Markdown', reply_markup=get_pledge_step2_menu())
             
             elif step == 2:
-                if len(text) < 10: return await update.message.reply_text("⚠️ العذر قصير جداً وغير مقنع!\nالرجاء كتابة العذر بالتفصيل لكي تأخذه الإدارة بعين الاعتبار:", reply_markup=get_cancel_menu())
+                if len(text) < 4: return await update.message.reply_text("⚠️ العذر غير واضح، اختر من الأزرار بالأسفل أو اكتب عذراً مفصلاً:", reply_markup=get_pledge_step2_menu())
                 user_states[user_id]['excuse'] = text
                 user_states[user_id]['step'] = 3
-                return await update.message.reply_text("3️⃣ هل تتعهد بالانضباط والالتزام لتفادي الحرمان النهائي (20%)؟\n🛑 (يجب أن تكتب كلمة: نعم ، أو كلمة: أتعهد)", reply_markup=get_cancel_menu())
+                return await update.message.reply_text("3️⃣ *الإقرار النهائي:*\nهل تتعهد بالانضباط والالتزام لتفادي الحرمان النهائي (20%) وطي القيد؟\n*(اضغط على زر التعهد بالأسفل)*", parse_mode='Markdown', reply_markup=get_pledge_step3_menu())
             
             elif step == 3:
-                if "نعم" not in text and "تعهد" not in text:
-                    return await update.message.reply_text("⚠️ لم يتم قبول إقرارك!\nالرجاء كتابة (نعم) أو (أتعهد) للموافقة والالتزام:", reply_markup=get_cancel_menu())
+                if "تعهد" not in text and "أقر" not in text and "نعم" not in text:
+                    return await update.message.reply_text("⚠️ لم يتم قبول إقرارك!\nيرجى الضغط على زر الإقرار بالأسفل للموافقة:", reply_markup=get_pledge_step3_menu())
                 
                 completed = load_json(INTERROGATIONS_FILE)
                 completed.setdefault(state['stu_num'], []).append(state['subject'])
                 save_json(INTERROGATIONS_FILE, completed)
                 
                 report = f"🚨 *تعهد (إنذار 15%)* 🚨\n👤 *المتدرب:* {state['stu_nam']} ({state['stu_num']})\n📖 *المادة:* {state['subject']}\n❓ *العذر:* {state['excuse']}\n✍️ *الإقرار:* {text}"
-                try: await context.bot.send_message(chat_id=GROUP_ID, text=report, parse_mode='Markdown')
-                except: pass
+                try: 
+                    await context.bot.send_message(chat_id=GROUP_ID, text=report, parse_mode='Markdown')
+                except Exception as e: 
+                    pass # يتم الحفظ حتى لو فشل الإرسال
                 
                 del user_states[user_id]
-                await update.message.reply_text("✅ تم توثيق إقرارك رسمياً لدى الإدارة.\nاحرص على الحضور لتفادي طي القيد.", reply_markup=get_main_menu())
+                await update.message.reply_text("✅ *تم توثيق إقرارك رسمياً لدى الإدارة.*\nاحرص على الحضور لتفادي طي القيد.", parse_mode='Markdown', reply_markup=get_main_menu())
                 return
 
         if state['flow'] == 'feedback':
@@ -312,9 +329,9 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_message(chat_id=GROUP_ID, text=f"💡 *شكوى/مقترح:*\nالمرسل: {update.effective_user.first_name}\nالنص: {text}", parse_mode='Markdown')
                 del user_states[user_id]
                 return await update.message.reply_text("✅ تم إرسال رسالتك للإدارة بسرية تامة.", reply_markup=get_main_menu())
-            except: 
+            except Exception as e: 
                 del user_states[user_id]
-                return await update.message.reply_text("⚠️ فشل الإرسال، حاول لاحقاً.", reply_markup=get_main_menu())
+                return await update.message.reply_text("⚠️ خطأ فني: يرجى التأكد من إضافة البوت كـ (مشرف) في قروب الإدارة.", reply_markup=get_main_menu())
 
         if state['flow'] == 'ai':
             if not ai_model:
@@ -333,7 +350,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # --- 🌟 الردود الجديدة المنسقة 🌟 ---
     if text == "📝 رفع الغياب والأعذار": 
         user_states[user_id] = {'flow': 'excuse'}
-        msg = "📝 *نظام رفع الأعذار:*\nالرجاء إرفاق (صورة العذر) الآن، ويجب كتابة (رقمك واسمك) في خانة الوصف (Caption).\n\n⚠️ *تقبل الأعذار الرسمية والطبية فقط خلال 3 إلى 5 أيام من تاريخ الغياب.*"
+        msg = "📝 *نظام رفع الأعذار:*\nالرجاء إرفاق (صورة العذر) الآن، ويجب كتابة (رقمك واسمك) في خانة الوصف (Caption).\n\n⚠️ *تُقبل الأعذار الرسمية والطبية فقط بعد الغياب خلال 3 إلى 5 أيام.*"
         await update.message.reply_text(msg, parse_mode='Markdown', reply_markup=get_cancel_menu())
         return
 
@@ -455,13 +472,17 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 m += f"{SEP}\n💡 *الإنذار يبدأ عند 15%، والحرمان عند 20%.*"
 
+                # إرسال السجل الأكاديمي كاملاً للمتدرب أولاً (تم حل المشكلة)
+                await update.message.reply_text(m, parse_mode='Markdown')
+
+                # ثم إرسال التعهد وحجز الطالب إذا استدعى الأمر
                 if subject_to_interrogate:
                     user_states[user_id] = {'flow': 'pledge', 'step': 1, 'stu_num': clean_text, 'stu_nam': stu_nam, 'subject': subject_to_interrogate}
                     warning_msg = f"⚠️ *تنبيه إداري عاجل!*\nلقد وصلت غياباتك إلى مرحلة الخطر (15% فأكثر) في مقرر:\n*{subject_to_interrogate}*\n\n🛑 *النظام مغلق حتى تُكمل الإقرار!*\n1️⃣ هل تعلم أنك اقتربت من الحرمان؟"
-                    return await update.message.reply_text(warning_msg, parse_mode='Markdown', reply_markup=get_cancel_menu())
+                    return await update.message.reply_text(warning_msg, parse_mode='Markdown', reply_markup=get_pledge_step1_menu())
                 
-                if has_deprivation: m += f"\n\n🛑 *تنبيه إداري:* أنت محروم في مقرر أو أكثر. راجع الإدارة."
-                await update.message.reply_text(m, parse_mode='Markdown')
+                if has_deprivation: 
+                    await update.message.reply_text("🛑 *تنبيه إداري:* أنت محروم في مقرر أو أكثر. راجع الإدارة.", parse_mode='Markdown')
             else: 
                 await update.message.reply_text("❌ الرقم التدريبي غير مسجل أو لا توجد غيابات.")
         except Exception as e:
@@ -625,8 +646,8 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if user_id in user_states: del user_states[user_id]
             await status_msg.edit_text("✅ *تم الختم والإرسال للإدارة بنجاح.*", parse_mode='Markdown')
             await update.message.reply_text("العودة للقائمة الرئيسية 🏠", reply_markup=get_main_menu())
-        except:
-            await status_msg.edit_text("⚠️ خطأ فني أثناء الإرسال.")
+        except Exception as e:
+            await status_msg.edit_text("⚠️ خطأ فني: يرجى التأكد من إضافة البوت كـ (مشرف) في قروب الإدارة.")
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -659,7 +680,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل نسخة (جائزة التميز) المخصصة للمعهد الصناعي الثانوي...")
+    print("🚀 تشغيل النظام (جاهز تماماً لجائزة القصيم)...")
     app.run_polling()
 
 if __name__ == '__main__': 
