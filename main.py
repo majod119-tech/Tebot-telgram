@@ -407,7 +407,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if state['flow'] == 'openclaw_admin':
             await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
             try:
-                openclaw_url = "http://127.0.0.1:18789/api/chat"
+                openclaw_url = "https://openclaw-server-2j6r.onrender.com/api/chat"
                 headers = {"Content-Type": "application/json"}
                 payload = {"message": text, "session_id": "admin_session_1"}
                 response = requests.post(openclaw_url, json=payload, headers=headers, timeout=30)
