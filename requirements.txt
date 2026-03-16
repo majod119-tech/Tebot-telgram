@@ -7,3 +7,5 @@ openpyxl
 google-generativeai
 Pillow
 pymongo[srv]
+pyTelegramBotAPI
+requests
