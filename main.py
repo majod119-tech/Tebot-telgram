@@ -15,27 +15,20 @@ from telegram.constants import ChatAction
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
-
-import os
 from pymongo import MongoClient
 
-# سحب الرابط السري لقاعدة البيانات من منصة Render
+# --- 🌟 الاتصال بقاعدة البيانات السحابية (MongoDB) ---
 MONGO_URI = os.getenv("MONGODB_URI")
-
-# الاتصال بقاعدة البيانات السحابية
 try:
     if MONGO_URI:
         client = MongoClient(MONGO_URI)
-        # إنشاء أو اختيار قاعدة بيانات خاصة بقسم الحاسب
         db = client["computer_dept_db"] 
-        # إنشاء جدول/مجلد خاص لبيانات المتدربين
         trainees_collection = db["trainees"] 
         print("✅ تم الاتصال بعقل البوت السحابي (MongoDB) بنجاح!")
     else:
         print("⚠️ تحذير: لم يتم العثور على رابط MONGODB_URI في متغيرات البيئة.")
 except Exception as e:
     print(f"❌ خطأ في الاتصال بقاعدة البيانات: {e}")
-
 
 # --- 🌟 استدعاء مكتبة الصور للختم الآلي ---
 try:
@@ -141,7 +134,6 @@ AI_KNOWLEDGE = (
     "يجب عليك دائماً وبدون استثناء أن تختم إجابتك بهذه العبارة حرفياً:\n"
     "\n💡 *للمزيد من التفاصيل، يمكنك تحميل (دليل المتدرب الشامل) من خلال الضغط على زر 📘 دليل المتدرب في القائمة الرئيسية بالأسفل.*"
 )
-
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 ai_model = None
@@ -308,9 +300,16 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """
     await update.message.reply_text(report_msg, parse_mode='Markdown')
 
+# --- 🌟 دالة البداية المحدثة (مع الحفظ السحابي) 🌟 ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return 
-    user_id = str(update.effective_user.id)
+    
+    user = update.effective_user
+    user_id = str(user.id)
+    first_name = user.first_name
+    username = user.username
+
+    # 1. الحفظ في الملف المحلي
     stats = load_json(STATS_FILE)
     if user_id not in stats.get("users_list", []): 
         stats.setdefault("users_list", []).append(user_id)
@@ -318,7 +317,32 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if user_id in user_states: del user_states[user_id]
     
-    welcome_msg = (f"أهلاً بك يا {update.effective_user.first_name} في المساعد الذكي لقسم الحاسب الآلي 💻✨\n{SEP}\n"
+    # 2. الحفظ والتحقق في قاعدة البيانات السحابية (MongoDB)
+    welcome_prefix = f"أهلاً بك يا {first_name} في المساعد الذكي لقسم الحاسب الآلي 💻✨\n{SEP}\n"
+    
+    try:
+        if 'trainees_collection' in globals():
+            existing_user = trainees_collection.find_one({"telegram_id": user_id})
+            if not existing_user:
+                new_trainee = {
+                    "telegram_id": user_id,
+                    "name": first_name,
+                    "username": username,
+                    "role": "student",         
+                    "absence_percentage": 0,
+                    "pledges_count": 0,
+                    "join_date": datetime.now()
+                }
+                trainees_collection.insert_one(new_trainee)
+                welcome_prefix = f"🎉 أهلاً بك يا {first_name}! تم فتح ملف إلكتروني لك بنجاح في النظام.\n{SEP}\n"
+            else:
+                pledges = existing_user.get("pledges_count", 0)
+                welcome_prefix = f"أهلاً بعودتك يا {first_name}! (سجلك يحتوي على {pledges} تعهد).\n{SEP}\n"
+    except Exception as e:
+        print(f"MongoDB Error in start: {e}")
+
+    # 3. إرسال رسالة الترحيب مع الصورة
+    welcome_msg = (welcome_prefix +
                    f"أنا نظامك الرقمي المتكامل. تم تصميمي لتوفير وقتك وتسهيل رحلتك التدريبية.\n\n"
                    f"👇 الرجاء اختيار الخدمة المطلوبة من القائمة السفلية:")
     try:
@@ -326,6 +350,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else: await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
     except: await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
 
+# --- 🌟 العمليات المنطقية 🌟 ---
 async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return 
 
@@ -605,7 +630,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("⚠️ الرجاء اختيار خدمة من الأسفل 👇", reply_markup=get_main_menu())
 
-# --- 🌟 محرك الإدارة (المحرك المزدوج لرفع الملفات وتقارير الجودة) 🌟 ---
+# --- 🌟 محرك رفع الملفات وتقارير الجودة 🌟 ---
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return 
     user_id = str(update.effective_user.id)
@@ -807,7 +832,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل النظام (مع تقارير الجودة الأسبوعية الاحترافية)...")
+    print("🚀 تشغيل النظام (مع الحفظ السحابي MongoDB)...")
     app.run_polling()
 
 if __name__ == '__main__': 
