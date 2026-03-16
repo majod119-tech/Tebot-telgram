@@ -19,6 +19,23 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import os
 from pymongo import MongoClient
 
+# سحب الرابط السري لقاعدة البيانات من منصة Render
+MONGO_URI = os.getenv("MONGODB_URI")
+
+# الاتصال بقاعدة البيانات السحابية
+try:
+    if MONGO_URI:
+        client = MongoClient(MONGO_URI)
+        # إنشاء أو اختيار قاعدة بيانات خاصة بقسم الحاسب
+        db = client["computer_dept_db"] 
+        # إنشاء جدول/مجلد خاص لبيانات المتدربين
+        trainees_collection = db["trainees"] 
+        print("✅ تم الاتصال بعقل البوت السحابي (MongoDB) بنجاح!")
+    else:
+        print("⚠️ تحذير: لم يتم العثور على رابط MONGODB_URI في متغيرات البيئة.")
+except Exception as e:
+    print(f"❌ خطأ في الاتصال بقاعدة البيانات: {e}")
+
 
 # --- 🌟 استدعاء مكتبة الصور للختم الآلي ---
 try:
