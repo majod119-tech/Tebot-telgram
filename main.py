@@ -300,6 +300,26 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """
     await update.message.reply_text(report_msg, parse_mode='Markdown')
 
+async def admin_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """لوحة تحكم بأزرار تفاعلية مخصصة للمشرف فقط"""
+    if update.effective_chat.type != 'private': return
+    user_id = str(update.effective_user.id)
+    
+    if user_id != ADMIN_ID:
+        return await update.message.reply_text("⛔️ عذراً، هذه اللوحة مخصصة لرئيس القسم فقط.")
+
+    keyboard = [
+        [InlineKeyboardButton("📊 تقرير الأداء الشامل", callback_data="admin_report")],
+        [InlineKeyboardButton("📢 إرسال تعميم للكل", callback_data="admin_broadcast_init"),
+         InlineKeyboardButton("🔍 فحص البيانات", callback_data="admin_db")],
+        [InlineKeyboardButton("💾 سحب نسخة احتياطية", callback_data="admin_backup"),
+         InlineKeyboardButton("❌ إغلاق", callback_data="admin_close")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    msg = f"⚙️ *لوحة تحكم المشرف*\n{SEP}\nأهلاً بك، الرجاء اختيار الإجراء المطلوب من الأزرار بالأسفل:"
+    await update.message.reply_text(msg, reply_markup=reply_markup, parse_mode='Markdown')
+
 # --- 🌟 دالة البداية المحدثة (مع الحفظ السحابي) 🌟 ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return 
@@ -309,7 +329,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     first_name = user.first_name
     username = user.username
 
-    # 1. الحفظ في الملف المحلي
     stats = load_json(STATS_FILE)
     if user_id not in stats.get("users_list", []): 
         stats.setdefault("users_list", []).append(user_id)
@@ -317,7 +336,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if user_id in user_states: del user_states[user_id]
     
-    # 2. الحفظ والتحقق في قاعدة البيانات السحابية (MongoDB)
     welcome_prefix = f"أهلاً بك يا {first_name} في المساعد الذكي لقسم الحاسب الآلي 💻✨\n{SEP}\n"
     
     try:
@@ -341,7 +359,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print(f"MongoDB Error in start: {e}")
 
-    # 3. إرسال رسالة الترحيب مع الصورة
     welcome_msg = (welcome_prefix +
                    f"أنا نظامك الرقمي المتكامل. تم تصميمي لتوفير وقتك وتسهيل رحلتك التدريبية.\n\n"
                    f"👇 الرجاء اختيار الخدمة المطلوبة من القائمة السفلية:")
@@ -365,6 +382,23 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del user_states[user_id]
             await update.message.reply_text("تم إلغاء العملية، والعودة للقائمة الرئيسية 🏠", reply_markup=get_main_menu())
             return
+
+        if state['flow'] == 'admin_broadcast':
+            if len(text) < 5:
+                return await update.message.reply_text("⚠️ التعميم قصير جداً! أعد كتابته أو اضغط إلغاء.", reply_markup=get_cancel_menu())
+            
+            users = load_json(STATS_FILE).get("users_list", [])
+            await update.message.reply_text(f"⏳ جاري إرسال التعميم لـ {len(users)} مستخدم...")
+            
+            success_count = 0
+            for u in users:
+                try: 
+                    await context.bot.send_message(chat_id=u, text=f"📢 *تعميم إداري هام:*\n{SEP}\n{text}", parse_mode='Markdown')
+                    success_count += 1
+                except: pass
+                
+            del user_states[user_id]
+            return await update.message.reply_text(f"✅ تم إرسال التعميم بنجاح لـ {success_count} مستخدم.", reply_markup=get_main_menu())
 
         if state['flow'] == 'pledge':
             step = state['step']
@@ -815,6 +849,30 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(f"❓ *تحدي الأسبوع:*\n{actual_question['q']}\n{SEP}\n{m}", parse_mode='Markdown')
         except: pass
 
+    # --- 🌟 أوامر الإدارة التفاعلية 🌟 ---
+    if query.data.startswith("admin_"):
+        if user_id != ADMIN_ID:
+            return await query.answer("⛔️ ليس لديك صلاحية!", show_alert=True)
+            
+        if query.data == "admin_report":
+            update.message = query.message 
+            await report_command(update, context)
+            
+        elif query.data == "admin_db":
+            update.message = query.message
+            await db_status_command(update, context)
+            
+        elif query.data == "admin_backup":
+            update.message = query.message
+            await backup_command(update, context)
+            
+        elif query.data == "admin_broadcast_init":
+            user_states[user_id] = {'flow': 'admin_broadcast'}
+            await query.message.reply_text("📢 *نظام التعاميم الإدارية:*\nالرجاء كتابة نص التعميم الآن لإرساله لجميع المتدربين والمدربين المشتركين في البوت...", parse_mode='Markdown', reply_markup=get_cancel_menu())
+            
+        elif query.data == "admin_close":
+            await query.message.delete()
+
 def main():
     Thread(target=auto_reset_scores, daemon=True).start()
     Thread(target=run_web_server, daemon=True).start()
@@ -827,6 +885,7 @@ def main():
     app.add_handler(CommandHandler("report", report_command))
     app.add_handler(CommandHandler("about", about_command))
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("admin", admin_dashboard))
     
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_logic))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
