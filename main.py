@@ -195,7 +195,7 @@ def get_pledge_step2_menu():
 def get_pledge_step3_menu():
     return ReplyKeyboardMarkup([["✍️ أقر وأتعهد بالانضباط للحفاظ على مستقبلي التدريبي"]], resize_keyboard=True)
 
-# --- 🌟 أوامر الإدارة 🌟 ---
+# --- 🌟 أوامر الإدارة (المصححة للأزرار) 🌟 ---
 async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return 
     msg = f"""
@@ -209,25 +209,27 @@ async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 💡 *صُنع خصيصاً لدعم مسيرة التميز والإبداع في المعهد الصناعي الثانوي ببريدة.*
 """
-    await update.message.reply_text(msg, parse_mode='Markdown')
+    await update.effective_message.reply_text(msg, parse_mode='Markdown')
 
 async def db_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return
     if str(update.effective_user.id) != ADMIN_ID: return
+    msg_obj = update.effective_message
     try:
         if not os.path.exists('data.xlsx'):
-            await update.message.reply_text("⚠️ لا يوجد ملف بيانات.")
+            await msg_obj.reply_text("⚠️ لا يوجد ملف بيانات.")
             return
         df = pd.read_excel('data.xlsx', dtype=str)
         sample = df['stu_num'].dropna().unique()[:5]
         msg = f"📊 *كشاف البيانات:*\n✅ تم حفظ: {len(df)} سجل.\n🔍 عينة أرقام:\n`{', '.join(sample)}`"
-        await update.message.reply_text(msg, parse_mode='Markdown')
+        await msg_obj.reply_text(msg, parse_mode='Markdown')
     except: pass
 
 async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return
     if str(update.effective_user.id) != ADMIN_ID: return
-    await update.message.reply_text("⏳ جاري التجهيز...")
+    msg_obj = update.effective_message
+    await msg_obj.reply_text("⏳ جاري التجهيز...")
     for f in ['data.xlsx', 'scores.json', 'interrogations.json', 'stats.json', 'plans.json']:
         if os.path.exists(f): await context.bot.send_document(chat_id=update.effective_chat.id, document=open(f, 'rb'))
 
@@ -235,17 +237,18 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return
     if str(update.effective_user.id) != ADMIN_ID: return
     text = update.message.text.replace('/broadcast', '').strip()
-    if not text: return await update.message.reply_text("⚠️ الطريقة: `/broadcast التعميم هنا`", parse_mode='Markdown')
+    if not text: return await update.effective_message.reply_text("⚠️ الطريقة: `/broadcast التعميم هنا`", parse_mode='Markdown')
     users = load_json(STATS_FILE).get("users_list", [])
-    await update.message.reply_text(f"📢 جاري الإرسال لـ {len(users)}...")
+    await update.effective_message.reply_text(f"📢 جاري الإرسال لـ {len(users)}...")
     for u in users:
         try: await context.bot.send_message(chat_id=u, text=f"📢 *إعلان إداري هام:*\n{SEP}\n{text}", parse_mode='Markdown')
         except: pass
-    await update.message.reply_text("✅ تم إرسال التعميم.")
+    await update.effective_message.reply_text("✅ تم إرسال التعميم.")
 
 async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return
     if str(update.effective_user.id) != ADMIN_ID: return
+    msg_obj = update.effective_message
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
     
     stats = load_json(STATS_FILE)
@@ -298,7 +301,7 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ♻️ *معيار الاستدامة:*
 ✅ ربط سحابي وتحديث دائم (24/7).
 """
-    await update.message.reply_text(report_msg, parse_mode='Markdown')
+    await msg_obj.reply_text(report_msg, parse_mode='Markdown')
 
 async def admin_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """لوحة تحكم بأزرار تفاعلية مخصصة للمشرف فقط"""
@@ -310,8 +313,9 @@ async def admin_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         [InlineKeyboardButton("📊 تقرير الأداء الشامل", callback_data="admin_report")],
-        [InlineKeyboardButton("📢 إرسال تعميم للكل", callback_data="admin_broadcast_init"),
+        [InlineKeyboardButton("📢 إرسال تعميم", callback_data="admin_broadcast_init"),
          InlineKeyboardButton("🔍 فحص البيانات", callback_data="admin_db")],
+        [InlineKeyboardButton("🦞 مساعد OpenClaw (للمدير)", callback_data="admin_openclaw")],
         [InlineKeyboardButton("💾 سحب نسخة احتياطية", callback_data="admin_backup"),
          InlineKeyboardButton("❌ إغلاق", callback_data="admin_close")]
     ]
@@ -399,6 +403,24 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
             del user_states[user_id]
             return await update.message.reply_text(f"✅ تم إرسال التعميم بنجاح لـ {success_count} مستخدم.", reply_markup=get_main_menu())
+
+        if state['flow'] == 'openclaw_admin':
+            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+            try:
+                openclaw_url = "http://127.0.0.1:18789/api/chat"
+                headers = {"Content-Type": "application/json"}
+                payload = {"message": text, "session_id": "admin_session_1"}
+                response = requests.post(openclaw_url, json=payload, headers=headers, timeout=30)
+                if response.status_code == 200:
+                    reply_data = response.json()
+                    openclaw_reply = reply_data.get('response', reply_data.get('text', 'تم استلام الأمر.'))
+                    return await update.message.reply_text(f"🦞 *رد النظام:*\n\n{openclaw_reply}", parse_mode='Markdown')
+                else:
+                    return await update.message.reply_text(f"⚠️ خطأ من خادم OpenClaw: {response.status_code}")
+            except requests.exceptions.ConnectionError:
+                return await update.message.reply_text("❌ لم أتمكن من الاتصال بخادم OpenClaw. تأكد من تشغيل (Gateway) على البورت 18789.")
+            except Exception as e:
+                return await update.message.reply_text(f"⚠️ حدث خطأ غير متوقع: `{e}`", parse_mode='Markdown')
 
         if state['flow'] == 'pledge':
             step = state['step']
@@ -855,20 +877,21 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return await query.answer("⛔️ ليس لديك صلاحية!", show_alert=True)
             
         if query.data == "admin_report":
-            update.message = query.message 
             await report_command(update, context)
             
         elif query.data == "admin_db":
-            update.message = query.message
             await db_status_command(update, context)
             
         elif query.data == "admin_backup":
-            update.message = query.message
             await backup_command(update, context)
             
         elif query.data == "admin_broadcast_init":
             user_states[user_id] = {'flow': 'admin_broadcast'}
             await query.message.reply_text("📢 *نظام التعاميم الإدارية:*\nالرجاء كتابة نص التعميم الآن لإرساله لجميع المتدربين والمدربين المشتركين في البوت...", parse_mode='Markdown', reply_markup=get_cancel_menu())
+            
+        elif query.data == "admin_openclaw":
+            user_states[user_id] = {'flow': 'openclaw_admin'}
+            await query.message.reply_text("🦞 *تم تفعيل وضع OpenClaw!*\n\nأنا جاهز لتنفيذ الأوامر المتقدمة، قراءة الملفات، أو إدارة النظام. ماذا تريد أن أفعل؟", parse_mode='Markdown', reply_markup=get_cancel_menu())
             
         elif query.data == "admin_close":
             await query.message.delete()
