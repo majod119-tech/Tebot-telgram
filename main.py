@@ -16,6 +16,10 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+import os
+from pymongo import MongoClient
+
+
 # --- 🌟 استدعاء مكتبة الصور للختم الآلي ---
 try:
     from PIL import Image, ImageDraw, ImageFont
