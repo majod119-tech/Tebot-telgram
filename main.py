@@ -1,140 +1,139 @@
 import os
-import subprocess
-import json
-import io
-from flask import Flask, request, jsonify
+import threading
+import time
+import telebot
+from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+import requests
+from pymongo import MongoClient
+from flask import Flask
 
-app = Flask(__name__)
+# --- إعدادات البيئة ---
+TOKEN = os.environ.get("TOKEN")
+ADMIN_ID = os.environ.get("ADMIN_ID")
+MONGODB_URI = os.environ.get("MONGODB_URI")
+OPENCLAW_URL = "https://openclaw-server-2j6r.onrender.com/api/chat"
 
-# الاتصال بالذاكرة الحية (MongoDB)
-MONGO_URI = os.environ.get("MONGODB_URI", "").strip()
+bot = telebot.TeleBot(TOKEN)
+user_states = {}
+
+# --- الاتصال بقاعدة البيانات ---
 db_collection = None
-rayat_collection = None
-if MONGO_URI:
+if MONGODB_URI:
     try:
-        from pymongo import MongoClient
-        client = MongoClient(MONGO_URI)
+        client = MongoClient(MONGODB_URI)
         db_collection = client["computer_dept_db"]["trainees"]
-        rayat_collection = client["computer_dept_db"]["rayat_data"]
-        client.admin.command('ping')
     except Exception as e:
-        print("خطأ صامت في القاعدة:", e)
+        print("خطأ في الاتصال بالقاعدة:", e)
 
+# --- سيرفر ويب وهمي (لإرضاء منصة Render) ---
+app = Flask(__name__)
 @app.route('/')
 def home():
-    return "OpenClaw Rayat Analyst is Online!"
+    return "Tebot Telegram Bot is Live and Polling!"
 
-@app.route('/api/chat', methods=['POST'])
-def chat():
-    try:
-        data = request.json
-        user_message = data.get("message", "").strip()
-        clean_msg = user_message.replace("أ", "ا").replace("إ", "ا").lower()
-
-        # 🧹 أمر الطوارئ: تفريغ قاعدة رايات يدوياً
-        if clean_msg == "تفريغ رايات":
-            if rayat_collection is not None:
-                rayat_collection.delete_many({})
-                return jsonify({"response": "✅ تم كنس وتفريغ جميع بيانات رايات من قاعدة البيانات بنجاح."}), 200
-            else:
-                return jsonify({"response": "❌ قاعدة البيانات غير متصلة."}), 200
-
-        # 1️⃣ حفظ بيانات رايات (مع درع الحماية ضد التكرار)
-        if user_message.startswith("حفظ_بيانات_رايات\n"):
-            if rayat_collection is None:
-                return jsonify({"response": "❌ خطأ: لم يتم الاتصال بقاعدة البيانات MongoDB."}), 200
-            
-            try:
-                csv_data = user_message.split("\n", 1)[1]
-                import pandas as pd
-                
-                df = pd.read_csv(io.StringIO(csv_data))
-                
-                # 🛡️ السطر السحري: مسح أي تكرار في البيانات تلقائياً
-                df = df.drop_duplicates()
-                records = df.to_dict('records')
-                
-                # مسح البيانات القديمة بالكامل وحفظ الجديدة النظيفة
-                rayat_collection.delete_many({})
-                rayat_collection.insert_many(records)
-                
-                return jsonify({"response": f"✅ **نجاح ساحق!**\nتم تنظيف الملف من التكرار، وحفظ {len(records)} متدرب في قاعدة (رايات) بنجاح.\nالنظام جاهز للتحليل."}), 200
-            except Exception as e:
-                return jsonify({"response": f"⚠️ خطأ أثناء حفظ البيانات: {str(e)}"}), 200
-
-        # 2️⃣ تحليل بيانات رايات من القاعدة
-        if clean_msg.startswith("حلل رايات") or clean_msg.startswith("رايات"):
-            if rayat_collection is None or rayat_collection.count_documents({}) == 0:
-                return jsonify({"response": "❌ قاعدة بيانات رايات فارغة! الرجاء رفع ملف رايات في التلجرام أولاً."}), 200
-            
-            try:
-                import pandas as pd
-                records = list(rayat_collection.find({}, {"_id": 0}))
-                df = pd.DataFrame(records)
-                
-                sample_data = df.head(50).to_json(orient="records", force_ascii=False)
-                columns_list = ", ".join(df.columns.tolist())
-                total_rows = len(df)
-
-                api_key = os.environ.get("GEMINI_API_KEY", "").strip()
-                if api_key:
-                    import google.generativeai as genai
-                    genai.configure(api_key=api_key)
-                    
-                    selected_model = 'gemini-pro'
-                    for m in genai.list_models():
-                        if 'generateContent' in m.supported_generation_methods and 'flash' in m.name.lower():
-                            selected_model = m.name.replace('models/', '')
-                            break
-                            
-                    model = genai.GenerativeModel(selected_model)
-                    
-                    ai_prompt = f"""
-أنت (OpenClaw)، خبير استشاري ومحلل بيانات تعمل لدى رئيس قسم الحاسب.
-هذه بيانات تم سحبها من قاعدة (رايات)، وتحتوي على {total_rows} سجل خالي من التكرار.
-الأعمدة: {columns_list}
-
-عينة البيانات:
-{sample_data}
-
-بناءً على الأرقام، قدم تقريراً إدارياً احترافياً:
-1. نظرة عامة (كم عدد الطلاب، حالة الحضور).
-2. تنبؤ استباقي: هل هناك طلاب معرضون للحرمان؟ اذكرهم.
-3. توصية إدارية فورية.
-                    """
-                    ai_response = model.generate_content(ai_prompt)
-                    reply = f"📊 *تحليل ذكي لقاعدة رايات الحية:*\n\n" + ai_response.text
-                    return jsonify({"response": reply}), 200
-                else:
-                    return jsonify({"response": "⚠️ مفتاح الذكاء الاصطناعي مفقود."}), 200
-            except Exception as e:
-                return jsonify({"response": f"⚠️ خطأ أثناء التحليل: {str(e)}"}), 200
-
-        # 3️⃣ الأوامر العامة والـ RAG
-        api_key = os.environ.get("GEMINI_API_KEY", "").strip()
-        if api_key:
-            try:
-                import google.generativeai as genai
-                genai.configure(api_key=api_key)
-                selected_model = 'gemini-pro'
-                for m in genai.list_models():
-                    if 'generateContent' in m.supported_generation_methods and 'flash' in m.name.lower():
-                        selected_model = m.name.replace('models/', '')
-                        break
-                model = genai.GenerativeModel(selected_model)
-                sys_inst = "أنت مساعد تنفيذي قوي لرئيس قسم الحاسب، اسمك OpenClaw. أجب باختصار واحترافية: "
-                ai_response = model.generate_content(sys_inst + user_message)
-                return jsonify({"response": "🧠 رد المستشار:\n" + ai_response.text}), 200
-            except Exception as e:
-                return jsonify({"response": "⚠️ خطأ في الذكاء الاصطناعي: " + str(e)}), 200
-        else:
-            return jsonify({"response": "الأمر وصل: " + user_message}), 200
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-if __name__ == '__main__':
+def run_web_server():
     port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host="0.0.0.0", port=port)
+
+# --- لوحات المفاتيح ---
+def admin_menu():
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(KeyboardButton("🦞 مساعد OpenClaw"))
+    markup.add(KeyboardButton("العودة للقائمة الرئيسية 🏠"))
+    return markup
+
+def cancel_menu():
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(KeyboardButton("العودة للقائمة الرئيسية 🏠"))
+    return markup
+
+# --- الأوامر الأساسية ---
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    chat_id = message.chat.id
+    user_states[chat_id] = None
+    bot.reply_to(message, "مرحباً بك في المساعد الرقمي لقسم الحاسب الآلي.\n(هذه النسخة المحدثة للاتصال بخوادم OpenClaw).")
+
+@bot.message_handler(commands=['admin'])
+def admin_panel(message):
+    chat_id = message.chat.id
+    if str(chat_id) == str(ADMIN_ID) or not ADMIN_ID:
+        bot.send_message(chat_id, "مرحباً بك يا رئيس القسم. تم فتح لوحة التحكم.", reply_markup=admin_menu())
+    else:
+        bot.send_message(chat_id, "عذراً، هذا الأمر مخصص للإدارة فقط.")
+
+# --- المعالج الشامل للرسائل والملفات ---
+@bot.message_handler(content_types=['text', 'photo', 'document'])
+def handle_all_messages(message):
+    chat_id = message.chat.id
+    text = message.text
+    state = user_states.get(chat_id)
+
+    if text == "🦞 مساعد OpenClaw":
+        user_states[chat_id] = "openclaw_admin"
+        bot.send_message(
+            chat_id, 
+            "🦞 **مرحباً بك في وحدة OpenClaw للتحليل المتقدم!**\n\n"
+            "• للتحليل التنبؤي: أرسل ملف (رايات) بصيغة CSV هنا مباشرة.\n"
+            "• للأوامر: اكتب (تفريغ رايات) لتنظيف القاعدة.\n"
+            "• للاستفسار: اطرح أي سؤال إداري.\n\n"
+            "أنا جاهز.", 
+            parse_mode="Markdown",
+            reply_markup=cancel_menu()
+        )
+        return
+
+    if state == "openclaw_admin":
+        if text == "العودة للقائمة الرئيسية 🏠":
+            user_states[chat_id] = None
+            bot.send_message(chat_id, "تم إغلاق اتصال OpenClaw.", reply_markup=telebot.types.ReplyKeyboardRemove())
+            return
+            
+        if message.document:
+            try:
+                msg = bot.send_message(chat_id, "⏳ جاري إرسال الملف لسيرفر OpenClaw...")
+                file_info = bot.get_file(message.document.file_id)
+                downloaded_file = bot.download_file(file_info.file_path)
+                csv_text = downloaded_file.decode('utf-8')
+                
+                payload = {"message": "حفظ_بيانات_رايات\n" + csv_text}
+                response = requests.post(OPENCLAW_URL, json=payload, timeout=60)
+                
+                reply = response.json().get("response", "تم استلام الرد.")
+                bot.edit_message_text(reply, chat_id=chat_id, message_id=msg.message_id, parse_mode='Markdown')
+                
+            except UnicodeDecodeError:
+                bot.send_message(chat_id, "⚠️ خطأ: يرجى التأكد أن الملف بتنسيق (UTF-8).")
+            except Exception as e:
+                bot.send_message(chat_id, f"⚠️ خطأ: {str(e)}")
+            return
+
+        if text:
+            bot.send_chat_action(chat_id, 'typing')
+            try:
+                payload = {"message": text}
+                response = requests.post(OPENCLAW_URL, json=payload, timeout=60)
+                reply = response.json().get("response", "خطأ في الاتصال.")
+                bot.reply_to(message, reply, parse_mode='Markdown')
+            except Exception as e:
+                bot.reply_to(message, f"⚠️ خطأ: {str(e)}")
+            return
+
+# --- تشغيل البوت مع درع الحماية ضد الانهيار (409) ---
+if __name__ == "__main__":
+    # تشغيل السيرفر الوهمي في مسار خلفي لإسكات Render
+    web_thread = threading.Thread(target=run_web_server, daemon=True)
+    web_thread.start()
+    
+    print("جاري تشغيل البوت الأساسي...")
+    
+    # حلقة لا نهائية تمنع البوت من الانهيار حتى لو حدث تضارب
+    while True:
+        try:
+            bot.remove_webhook() # تنظيف أي اتصالات قديمة أو معلقة
+            bot.infinity_polling(timeout=10, long_polling_timeout=5)
+        except Exception as e:
+            print(f"⚠️ حدث تضارب 409 (نسخة أخرى تعمل). سأنتظر 10 ثوانٍ وأحاول مجدداً...\n{e}")
+            time.sleep(10) # الانتظار حتى تقوم المنصة بإغلاق النسخة القديمة
 
 
