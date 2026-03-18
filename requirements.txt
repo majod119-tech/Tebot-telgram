@@ -9,3 +9,4 @@ Pillow
 pymongo[srv]
 pyTelegramBotAPI
 requests
+Flask==3.0.2
