@@ -25,7 +25,7 @@ collection = db["RayatRecords"]    # اسم جدول المتدربين والم
 
 # إعداد نموذج Gemini
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-pro')
 
 # ==========================================
 # 3. أوامر المتدربين والمدربين (العامة)
