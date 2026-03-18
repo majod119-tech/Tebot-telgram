@@ -4,6 +4,8 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from pymongo import MongoClient
 import google.generativeai as genai
+from flask import Flask
+from threading import Thread
 
 # ==========================================
 # 1. إعدادات السيرفر والمتغيرات السرية (من Koyeb)
@@ -28,7 +30,26 @@ genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-pro')
 
 # ==========================================
-# 3. أوامر المتدربين والمدربين (العامة)
+# 3. خادم الويب المصغر (لمنع نوم السيرفر في Koyeb)
+# ==========================================
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot is awake and running smoothly!"
+
+def run_server():
+    # هذا السطر الذكي يقرأ المنفذ الذي يطلبه Koyeb (10000) تلقائياً
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
+
+def keep_alive():
+    t = Thread(target=run_server)
+    t.daemon = True
+    t.start()
+
+# ==========================================
+# 4. أوامر المتدربين والمدربين (العامة)
 # ==========================================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.effective_user.first_name
@@ -40,7 +61,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # يمكنك لاحقاً إضافة أي دوال أخرى للمتدربين هنا...
 
 # ==========================================
-# 4. أوامر رئيس القسم السرية (تحليل الملفات)
+# 5. أوامر رئيس القسم السرية (تحليل الملفات)
 # ==========================================
 async def handle_admin_files(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -105,9 +126,12 @@ async def handle_admin_files(update: Update, context: ContextTypes.DEFAULT_TYPE)
             os.remove(file_path)
 
 # ==========================================
-# 5. محرك التشغيل الرئيسي
+# 6. محرك التشغيل الرئيسي
 # ==========================================
 def main():
+    # تشغيل السيرفر الداعم للمنفذ 10000 لمنع إيقاف Koyeb
+    keep_alive()
+
     # بناء التطبيق وربطه بتوكن التليجرام
     application = Application.builder().token(TOKEN).build()
 
