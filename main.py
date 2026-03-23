@@ -47,7 +47,7 @@ except Exception as e:
     print(f"❌ خطأ في الاتصال بقاعدة البيانات: {e}")
 
 try:
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image, ImageDraw
     HAS_PIL = True
 except ImportError:
     HAS_PIL = False
@@ -58,7 +58,6 @@ def load_json(f):
             with open(f, "r", encoding="utf-8") as file: return json.load(file)
         except Exception as e:
             print(f"Error loading {f}: {e}")
-            return {}
     return {}
 
 def save_json(f, d): 
@@ -69,15 +68,12 @@ def save_json(f, d):
 
 try:
     from questions_bank import QUESTIONS
-except Exception as e:
+except:
     QUESTIONS = [{"q": "ما هو عنوان الـ IP لـ (Localhost)؟", "options": ["192.168.1.1", "127.0.0.1", "8.8.8.8", "255.255.255.0"], "answer": 1}]
 
 TECH_TIPS = [
     "💡 نصيحة أمنية: استخدم مفتاحي (Win + L) لقفل جهازك فوراً عند الابتعاد عنه.",
-    "🛡️ نصيحة تقنية: احرص دائماً على تحديث نظام التشغيل لديك لسد الثغرات.",
-    "🚀 نصيحة برمجية: التنسيق والمسافات البادئة في لغة بايثون هي أساس عمل الكود.",
-    "💾 نصيحة: احرص دائماً على أخذ نسخة احتياطية لملفاتك المهمة.",
-    "🌐 نصيحة: تجنب الاتصال بشبكات الواي فاي العامة المفتوحة بدون VPN."
+    "🛡️ نصيحة تقنية: احرص دائماً على تحديث نظام التشغيل لديك لسد الثغرات."
 ]
 
 def update_stat(cat):
@@ -86,7 +82,7 @@ def update_stat(cat):
     save_json(STATS_FILE, s)
 
 # ==========================================
-# ⚡ نظام التخزين المؤقت (Caching) للإكسل ⚡
+# ⚡ نظام التخزين المؤقت (Caching) للإكسل
 # ==========================================
 EXCEL_CACHE = None
 LAST_CACHE_TIME = 0
@@ -111,7 +107,7 @@ def get_excel_data():
     return EXCEL_CACHE
 
 # ==========================================
-# 2. المهام الخلفية (الخميس وإعادة النقاط) والويب السري
+# 2. المهام الخلفية والويب السري
 # ==========================================
 def background_tasks():
     while True:
@@ -128,8 +124,7 @@ def background_tasks():
             if now.weekday() == 3 and now.hour == 14:
                 if stats.get("last_thursday_report") != today_str:
                     report_text = f"🗓️ *حصاد الخميس التلقائي*\n{SEP}\nتم إغلاق أسبوع تدريبي جديد. أرسل `/admin` لمراجعة التقارير وسحب كشوفات الغياب.\nنهاية أسبوع سعيدة يا رئيس القسم! ☕"
-                    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-                    requests.post(url, json={"chat_id": ADMIN_ID, "text": report_text, "parse_mode": "Markdown"}, timeout=10)
+                    requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={"chat_id": ADMIN_ID, "text": report_text, "parse_mode": "Markdown"}, timeout=10)
                     stats["last_thursday_report"] = today_str
                     save_json(STATS_FILE, stats)
         except Exception as e: 
@@ -141,84 +136,49 @@ class WebDashboardHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/html; charset=utf-8')
         self.end_headers()
-        db_records = 0
-        active_students = 0
+        db_records = 0; active_students = 0
         df = get_excel_data()
         if df is not None:
             try:
                 db_records = len(df)
                 active_rows = df[~df['parsnt'].astype(str).str.contains('ح|ط|حرمان|طي', na=False)]
                 active_students = active_rows['stu_num'].nunique()
-            except Exception as e: print(f"Dashboard Error: {e}")
+            except: pass
             
         stats = load_json(STATS_FILE)
-        ai_q = stats.get("ai_questions", 0)
         html = f"""
         <html>
-        <head>
-            <title>لوحة القيادة - قسم الحاسب</title>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <style>
-                body {{ font-family: 'Segoe UI', Tahoma, sans-serif; text-align: center; background: #f0f2f5; padding: 20px; direction: rtl; }}
-                .header {{ color: #1e3a8a; margin-bottom: 30px; }}
-                .card-container {{ display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; }}
-                .card {{ background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); width: 250px; border-top: 5px solid #10b981; }}
-                .card h3 {{ color: #6b7280; margin: 0 0 10px 0; font-size: 1.2rem; }}
-                .card h2 {{ color: #111827; margin: 0; font-size: 2.5rem; }}
-            </style>
-        </head>
-        <body>
-            <h1 class="header">📊 لوحة القيادة الحية | قسم الحاسب</h1>
-            <div class="card-container">
-                <div class="card" style="border-top-color: #3b82f6;"><h3>السجلات المؤتمتة</h3><h2>{db_records}</h2></div>
-                <div class="card" style="border-top-color: #10b981;"><h3>المتدربين المنتظمين</h3><h2>{active_students}</h2></div>
-                <div class="card" style="border-top-color: #8b5cf6;"><h3>استشارات الذكاء الاصطناعي</h3><h2>{ai_q}</h2></div>
-            </div>
-        </body>
-        </html>
+        <head><title>لوحة القيادة - قسم الحاسب</title><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>body {{ font-family: 'Segoe UI', Tahoma, sans-serif; text-align: center; background: #f0f2f5; padding: 20px; direction: rtl; }}
+        .card {{ background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); width: 250px; display: inline-block; margin: 10px; border-top: 5px solid #10b981; }}
+        h2 {{ color: #111827; margin: 0; font-size: 2.5rem; }}</style></head>
+        <body><h1>📊 لوحة القيادة الحية | قسم الحاسب</h1>
+        <div>
+        <div class="card" style="border-top-color: #3b82f6;"><h3>السجلات المؤتمتة</h3><h2>{db_records}</h2></div>
+        <div class="card" style="border-top-color: #10b981;"><h3>المتدربين المنتظمين</h3><h2>{active_students}</h2></div>
+        <div class="card" style="border-top-color: #8b5cf6;"><h3>استشارات الذكاء الاصطناعي</h3><h2>{stats.get("ai_questions", 0)}</h2></div>
+        </div></body></html>
         """
         self.wfile.write(html.encode('utf-8'))
 
 def run_web_server():
-    port = int(os.environ.get("PORT", 10000))
-    server = HTTPServer(("0.0.0.0", port), WebDashboardHandler)
+    server = HTTPServer(("0.0.0.0", int(os.environ.get("PORT", 10000))), WebDashboardHandler)
     server.serve_forever()
 
-def backup_to_github(file_path="data.xlsx"):
-    github_token = os.environ.get("GITHUB_TOKEN")
-    github_repo = os.environ.get("GITHUB_REPO")
-    if not github_token or not github_repo: return "⚠️ (حفظ محلي مؤقت، السحابة غير مربوطة)."
-    
-    url = f"https://api.github.com/repos/{github_repo}/contents/{file_path}"
-    headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
-    try:
-        sha = None
-        resp = requests.get(url, headers=headers, timeout=10)
-        if resp.status_code == 200: sha = resp.json().get("sha")
-        with open(file_path, "rb") as f: content = base64.b64encode(f.read()).decode("utf-8")
-        data = {"message": f"تحديث قاعدة البيانات - {datetime.now().strftime('%Y-%m-%d %H:%M')}", "content": content}
-        if sha: data["sha"] = sha
-        put_resp = requests.put(url, headers=headers, json=data, timeout=15)
-        if put_resp.status_code in [200, 201]: return "✅ **تم التثبيت الدائم في GitHub!**"
-        else: return "⚠️ فشل الرفع لـ GitHub."
-    except Exception as e: 
-        print(f"GitHub Error: {e}")
-        return "⚠️ خطأ بالاتصال بـ GitHub."
-
 # ==========================================
-# 3. إعدادات الذكاء الاصطناعي (Gemini)
+# 3. إعدادات الذكاء الاصطناعي (Gemini RAG)
 # ==========================================
+# 🧠 الذاكرة المعرفية المستخلصة من الملفات المرفوعة
 AI_KNOWLEDGE = (
-    "أنت 'المساعد الرقمي'، مساعد ذكي ورسمي لقسم الحاسب الآلي في المعهد الصناعي الثانوي ببريدة. "
-    "مهمتك الإجابة على جميع استفسارات المستخدمين بشكل مبسط، ودي، ومختصر جداً.\n"
-    "1. إذا كان السؤال (عام أو تقني أو ثقافي): أجب عليه بأسلوب مبسط ومفيد وبدون تعقيد.\n"
-    "2. إذا كان السؤال يخص (المتدربين، اللوائح، الغياب، الحرمان، المكافآت، أو أنظمة التدريب التقني): "
-    "استخدم معلوماتك بالإضافة لهذه الثوابت: (الإنذار عند غياب 15%، الحرمان وطي القيد عند 20%. المكافأة 800 ريال وتتوقف إذا نزل المعدل عن 2.00. درجة الاجتياز 50 للمعاهد. "
-    f"رابط الحقائب التدريبية: {DRIVE_LINK}).\n"
-    "🚨 تعليمات هامة جداً عند الإجابة على أي سؤال يخص (أنظمة المتدربين): "
-    "يجب عليك دائماً وبدون استثناء أن تختم إجابتك بهذه العبارة حرفياً:\n"
-    "\n💡 *للمزيد من التفاصيل، يمكنك تحميل (دليل المتدرب الشامل) من خلال الضغط على زر 📘 دليل المتدرب في القائمة الرئيسية بالأسفل.*"
+    "أنت 'المستشار الأكاديمي'، مساعد ذكي ورسمي لقسم الحاسب الآلي في المعهد الصناعي الثانوي ببريدة. "
+    "أجب بشكل ودي، رسمي، ومختصر جداً بناءً على هذه اللوائح المستخرجة من دليل المتدرب:\n"
+    "- الإنذار يبدأ عند غياب 15%. الحرمان وطي القيد عند 20%.\n"
+    "- المكافأة: 800 ريال، تُعلق إذا انخفض المعدل عن 2.00.\n"
+    "- درجة الاجتياز للمقررات: 50 درجة.\n"
+    "- الأعذار: تُقبل خلال 3 إلى 5 أيام من الغياب.\n"
+    "- خطة برمجة الحاسب: مدرب المقرر هو م. نايف السلمان، رقم المكتب 205، عدد الساعات الأسبوعية 5.\n"
+    "- خطة تطبيقات الحاسب المتقدمة: تهدف لإكساب مهارات متقدمة في Excel و Access.\n"
+    "🚨 اختم الإجابات عن الأنظمة بعبارة:\n💡 *للمزيد، يرجى تصفح (دليل المتدرب) من القائمة الرئيسية.*"
 )
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
@@ -239,20 +199,20 @@ user_states = {}
 # ==========================================
 def get_main_menu():
     return ReplyKeyboardMarkup([
-        ["🤖 المعلم الذكي"], 
+        ["🤖 المعلم الذكي (مستشار القسم)"], 
         ["📚 الحقائب التدريبية", "📄 الخطط التدريبية"],
         ["📊 استعلام الغياب", "📝 رفع الغياب والأعذار"],
         ["🔗 المنصات الإلكترونية", "📅 التقويم التدريبي"],
         ["📰 أخبار القسم والمعهد", "📍 موقع القسم"],
         ["❓ الأسئلة الشائعة", "📘 دليل المتدرب"],
-        ["📬 الاقتراحات والشكاوى", "🕹️ قسم الألعاب والإضافات"]
+        ["📬 الاقتراحات والشكاوى", "🕹️ قسم الألعاب والتقنية"]
     ], resize_keyboard=True, is_persistent=True)
 
 def get_admin_menu():
     return ReplyKeyboardMarkup([
         ["📊 حالة قاعدة البيانات", "💾 سحب نسخة احتياطية"],
         ["📢 إرسال تعميم", "📈 تقرير التميز المؤسسي"],
-        ["📥 تصدير كشوفات الإكسل", "🦞 مساعد OpenClaw"],
+        ["📥 تصدير كشوفات الإكسل", "🧠 تحليل الجودة بالذكاء الاصطناعي"],
         ["🔙 الرجوع للقائمة الرئيسية"]
     ], resize_keyboard=True, is_persistent=True)
 
@@ -261,7 +221,7 @@ def get_back_menu(): return ReplyKeyboardMarkup([["🔙 الرجوع للقائ�
 def get_pledge_step1_menu(): return ReplyKeyboardMarkup([["✅ نعم، أطلعت على نسبة الغياب"]], resize_keyboard=True)
 def get_pledge_step2_menu(): return ReplyKeyboardMarkup([["🏥 عذر طبي", "👨‍👩‍👧‍👦 ظروف عائلية طارئة"], ["🚗 مشكلة في المواصلات", "⚙️ أعطال تقنية/أخرى"], ["❌ إلغاء العملية"]], resize_keyboard=True)
 def get_pledge_step3_menu(): return ReplyKeyboardMarkup([["✍️ أقر وأتعهد بالانضباط للحفاظ على مستقبلي التدريبي"]], resize_keyboard=True)
-def get_plans_menu(): return ReplyKeyboardMarkup([["1️⃣ الفصل الأول", "2️⃣ الفصل الثاني"], ["3️⃣ الفصل الثالث", "4️⃣ الفصل الرابع"], ["5️⃣ الفصل الخامس", "6️⃣ الفصل السادس"], ["🖥️ برامج فصلية", "🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
+def get_plans_menu(): return ReplyKeyboardMarkup([["1️⃣ الفصل الأول", "2️⃣ الفصل الثاني"], ["3️⃣ الفصل الثالث", "4️⃣ الفصل الرابع"], ["5️⃣ الفصل الخامس", "6️⃣ الفصل السادس"], ["🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
 def get_games_menu(): return ReplyKeyboardMarkup([["🎮 تحدي الأسبوع", "🏆 بطل الأسبوع"], ["💡 نصيحة تقنية", "🌐 أخبار التقنية"], ["🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
 
 # ==========================================
@@ -273,7 +233,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = str(user.id)
     first_name = user.first_name
-    username = user.username
 
     stats = load_json(STATS_FILE)
     if user_id not in stats.get("users_list", []): 
@@ -282,26 +241,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if user_id in user_states: del user_states[user_id]
     
-    welcome_prefix = f"أهلاً بك يا {first_name} في المساعد الذكي لقسم الحاسب الآلي 💻✨\n{SEP}\n"
-    try:
-        if 'trainees_collection' in globals():
-            existing_user = trainees_collection.find_one({"telegram_id": user_id})
-            if not existing_user:
-                new_trainee = { "telegram_id": user_id, "name": first_name, "username": username, "role": "student", "absence_percentage": 0, "pledges_count": 0, "join_date": datetime.now() }
-                trainees_collection.insert_one(new_trainee)
-                welcome_prefix = f"🎉 أهلاً بك يا {first_name}! تم فتح ملف إلكتروني لك بنجاح في النظام.\n{SEP}\n"
-            else:
-                pledges = existing_user.get("pledges_count", 0)
-                welcome_prefix = f"أهلاً بعودتك يا {first_name}! (سجلك يحتوي على {pledges} تعهد).\n{SEP}\n"
-    except Exception as e: print(f"MongoDB Error in start: {e}")
-
-    welcome_msg = welcome_prefix + "أنا نظامك الرقمي المتكامل. تم تصميمي لتوفير وقتك وتسهيل رحلتك التدريبية.\n\n👇 الرجاء اختيار الخدمة المطلوبة من القائمة السفلية:"
+    welcome_msg = f"أهلاً بك يا {first_name} في المساعد الذكي لقسم الحاسب الآلي 💻✨\n{SEP}\n👇 الرجاء اختيار الخدمة المطلوبة:"
     try:
         if os.path.exists('IMG_1058.jpeg'): await update.message.reply_photo(photo=open('IMG_1058.jpeg', 'rb'), caption=welcome_msg, reply_markup=get_main_menu())
         else: await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
-    except Exception as e: 
-        print(f"Start Error: {e}")
-        await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
+    except: await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
 
 async def admin_gateway(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return
@@ -315,7 +259,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return 
 
     raw_text = update.message.text.strip()
-    text = raw_text[:500] # حماية من النصوص الطويلة جداً
+    text = raw_text[:500] 
     user_id = str(update.effective_user.id)
     trans_table = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
     clean_text = text.translate(trans_table).strip()
@@ -328,16 +272,14 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if df is None: return await update.message.reply_text("⚠️ لا يوجد ملف بيانات.")
                 sample = df['stu_num'].dropna().unique()[:5]
                 return await update.message.reply_text(f"📊 *كشاف البيانات:*\n✅ تم حفظ: {len(df)} سجل.\n🔍 عينة أرقام:\n`{', '.join(sample)}`", parse_mode='Markdown')
-            except Exception as e: 
-                print(f"DB Status Error: {e}")
-                return await update.message.reply_text("⚠️ حدث خطأ في قراءة البيانات.")
+            except Exception as e: return await update.message.reply_text("⚠️ حدث خطأ في قراءة البيانات.")
 
         if text == "💾 سحب نسخة احتياطية":
             await update.message.reply_text("⏳ جاري التجهيز...")
             for f in ['data.xlsx', 'scores.json', 'interrogations.json', 'stats.json', 'plans.json']:
                 if os.path.exists(f): 
                     try: await context.bot.send_document(chat_id=user_id, document=open(f, 'rb'))
-                    except Exception as e: print(f"Backup Error for {f}: {e}")
+                    except: pass
             return
 
         if text == "📢 إرسال تعميم":
@@ -349,8 +291,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             stats = load_json(STATS_FILE)
             interrogations = load_json(INTERROGATIONS_FILE)
             users_count = len(stats.get("users_list", []))
-            ai_queries = stats.get("ai_questions", 0)
-            pledges_count = sum(len(subjects) for subjects in interrogations.values())
+            pledges_count = sum(len(sub) for sub in interrogations.values())
             
             db_records = 0; active_students_count = 0; weekly_attendance_rate = 100.0
             try: 
@@ -361,10 +302,9 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     active_students_count = active_rows['stu_num'].nunique()
                     valid_absence = pd.to_numeric(df['parsnt'].astype(str).str.replace('%', ''), errors='coerce').dropna()
                     if not valid_absence.empty: weekly_attendance_rate = round(100 - valid_absence.mean(), 2)
-            except Exception as e: print(f"Report Excel Error: {e}")
+            except: pass
             
-            total_hours_saved = round(((ai_queries * 3) + (pledges_count * 15)) / 60, 1)
-            report_msg = f"🏆 *تقرير الأداء لجائزة التميز بمنطقة القصيم* 🏆\n{SEP}\n👥 *المؤشرات الأكاديمية:*\n🔹 المتدربين المنتظمين: `{active_students_count}`\n🔹 نسبة الحضور: `{weekly_attendance_rate}%`\n\n📱 *التحول الرقمي:*\n🔹 المسجلين: `{users_count}`\n🔹 السجلات المؤتمتة: `{db_records}`\n\n📊 *الأثر الفعلي:*\n🔹 استشارات الذكاء الاصطناعي: `{ai_queries}`\n🔹 تعهدات نُفذت آلياً: `{pledges_count}`\n\n⏳ *توفير وقت الإدارة:* *{total_hours_saved} ساعة عمل!*"
+            report_msg = f"🏆 *تقرير الأداء لجائزة التميز* 🏆\n{SEP}\n👥 المتدربين المنتظمين: `{active_students_count}`\n🔹 نسبة الحضور: `{weekly_attendance_rate}%`\n📱 المسجلين: `{users_count}`\n🔹 السجلات المؤتمتة: `{db_records}`\n📊 تعهدات نُفذت آلياً: `{pledges_count}`"
             return await update.message.reply_text(report_msg, parse_mode='Markdown')
 
         if text == "📥 تصدير كشوفات الإكسل":
@@ -380,21 +320,30 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 export_df.to_excel("Warnings.xlsx", index=False)
                 await context.bot.send_document(chat_id=user_id, document=open("Warnings.xlsx", 'rb'), caption=f"📊 *كشف الإنذارات والحرمان*\nالعدد: {len(export_df)}", parse_mode='Markdown')
                 os.remove("Warnings.xlsx")
-            except Exception as e: 
-                print(f"Export Error: {e}")
-                await update.message.reply_text(f"⚠️ حدث خطأ أثناء التصدير.")
+            except Exception as e: await update.message.reply_text(f"⚠️ حدث خطأ أثناء التصدير.")
             return
 
-        if text == "🦞 مساعد OpenClaw":
-            user_states[user_id] = {'flow': 'openclaw'}
-            return await update.message.reply_text("🦞 **مرحباً بك في وحدة OpenClaw!**\nأرسل ملف CSV أو اسأل عن البيانات.", parse_mode='Markdown', reply_markup=get_back_menu())
+        if text == "🧠 تحليل الجودة بالذكاء الاصطناعي":
+            if not ai_model: return await update.message.reply_text("⚠️ الذكاء الاصطناعي غير مفعل. تأكد من مفتاح API.")
+            await update.message.reply_text("⏳ جاري تحليل تقارير الجودة وبيانات القسم...")
+            await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING)
+            try:
+                quality_prompt = (
+                    "بناءً على تقارير قياس رضا المتدربين لقسم الحاسب، قم بإعطائي ملخصاً إدارياً احترافياً لنقاط القوة والضعف.\n"
+                    "المعطيات: نسبة الرضا عن إعلانات القبول 85.6%، ونظام رايات 78.8%، والأنشطة اللاصفية 72%.\n"
+                    "أبرز التحديات التي وردت في التقرير: الحاجة لتفعيل سجل المهارات الشخصية وقابلية التوظيف (نسبة الرضا 76%).\n"
+                    "اكتب التقرير في 3 نقاط سريعة توضح للإدارة أين تركز جهودها لضمان الفوز بجائزة التميز المؤسسي."
+                )
+                res = await ai_model.generate_content_async(quality_prompt)
+                return await update.message.reply_text(f"🧠 *تحليل الجودة:*\n\n{res.text}", parse_mode='Markdown')
+            except Exception as e: return await update.message.reply_text(f"⚠️ فشل التحليل: {e}")
 
     # 🔵 الحالات المستمرة (التعهدات وغيرها) 🔵
     if user_id in user_states:
         state = user_states[user_id]
         if text in ["❌ إلغاء العملية", "🔙 الرجوع للقائمة الرئيسية"]:
             del user_states[user_id]
-            menu = get_admin_menu() if user_id == ADMIN_ID and state.get('flow') in ['openclaw', 'broadcast'] else get_main_menu()
+            menu = get_admin_menu() if user_id == ADMIN_ID and state.get('flow') == 'broadcast' else get_main_menu()
             return await update.message.reply_text("تم العودة 🏠", reply_markup=menu)
 
         if state['flow'] == 'broadcast':
@@ -403,20 +352,10 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for u in users:
                 try: 
                     await context.bot.send_message(chat_id=u, text=f"📢 *إعلان إداري هام:*\n{SEP}\n{text}", parse_mode='Markdown')
-                    await asyncio.sleep(0.05) # حماية من الحظر
-                except Exception as e: print(f"Broadcast failed for {u}: {e}")
+                    await asyncio.sleep(0.05) 
+                except: pass
             del user_states[user_id]
             return await update.message.reply_text("✅ تم إرسال التعميم.", reply_markup=get_admin_menu())
-
-        if state['flow'] == 'openclaw':
-            await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING)
-            try:
-                response = requests.post(OPENCLAW_URL, json={"message": text}, timeout=20)
-                await update.message.reply_text(response.json().get("response", "تم الاستلام."), parse_mode='Markdown')
-            except Exception as e: 
-                print(f"OpenClaw Chat Error: {e}")
-                await update.message.reply_text(f"⚠️ تعذر الاتصال بخادم OpenClaw.")
-            return
 
         if state['flow'] == 'pledge':
             step = state['step']
@@ -437,7 +376,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 official_document = f"🏛️ **المعهد الصناعي الثانوي ببريدة**\n{SEP}\n📄 **وثيقة تعهد إلكتروني بالانضباط**\nأقر المتدرب / **{state['stu_nam']}**\nالرقم / **{state['stu_num']}**\nالمقرر / **{state['subject']}**\nالعذر: {state['excuse']}\n✅ مُعتمد ومُوقع إلكترونياً | ⏱️ {timestamp}"
                 try: await context.bot.send_message(chat_id=GROUP_ID, text=official_document, parse_mode='Markdown')
-                except Exception as e: print(f"Pledge Admin Send Error: {e}")
+                except: pass
                 del user_states[user_id]
                 await update.message.reply_text(official_document, parse_mode='Markdown')
                 return await update.message.reply_text("✅ *تم توثيق إقرارك.*", parse_mode='Markdown', reply_markup=get_main_menu())
@@ -448,18 +387,17 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_message(chat_id=GROUP_ID, text=f"💡 *شكوى/مقترح:*\nالمرسل: {update.effective_user.first_name}\nالنص: {text}", parse_mode='Markdown')
                 del user_states[user_id]
                 return await update.message.reply_text("✅ تم إرسال رسالتك للإدارة بسرية تامة.", reply_markup=get_main_menu())
-            except Exception as e: 
-                print(f"Feedback Error: {e}")
+            except: 
                 del user_states[user_id]
                 return await update.message.reply_text("⚠️ خطأ، حاول لاحقاً.", reply_markup=get_main_menu())
 
         if state['flow'] == 'ai':
-            if not ai_model: return await update.message.reply_text("⚠️ المعلم غير متصل حالياً.", reply_markup=get_main_menu())
+            if not ai_model: return await update.message.reply_text("⚠️ المعلم غير متصل حالياً بسبب نقص المفتاح.", reply_markup=get_main_menu())
             await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING)
             update_stat("ai_questions") 
             try:
                 response = await ai_model.generate_content_async(f"{AI_KNOWLEDGE}\nسؤال: {text}")
-                return await update.message.reply_text(f"📝 رد المعلم:\n\n{response.text}", reply_markup=get_back_menu())
+                return await update.message.reply_text(f"📝 رد المستشار الأكاديمي:\n\n{response.text}", reply_markup=get_back_menu())
             except Exception as e: 
                 print(f"Gemini Chat Error: {e}")
                 return await update.message.reply_text("⚠️ خطأ تقني، الخدمة مشغولة.", reply_markup=get_back_menu())
@@ -476,9 +414,9 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_states[user_id] = {'flow': 'feedback'}
         return await update.message.reply_text("📬 اكتب رسالتك أو شكواك الآن وسوف تصل للإدارة بسرية...", reply_markup=get_cancel_menu())
 
-    if text == "🤖 المعلم الذكي":
+    if text == "🤖 المعلم الذكي (مستشار القسم)":
         user_states[user_id] = {'flow': 'ai'}
-        return await update.message.reply_text("🤖 اكتب أي سؤال تقني أو إداري وسأجيبك...", reply_markup=get_back_menu())
+        return await update.message.reply_text("🤖 أنا المستشار الأكاديمي.. اسألني عن أنظمة المعهد، المكافآت، الحرمان، أو أي مقرر!", reply_markup=get_back_menu())
 
     if text == "📊 استعلام الغياب": return await update.message.reply_text("🔎 أرسل رقمك التدريبي الآن (أرقام فقط)...")
     if text == "📚 الحقائب التدريبية": return await update.message.reply_text("📚 *الحقائب:*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📥 الدخول", url=DRIVE_LINK)]]), parse_mode='Markdown')
@@ -486,11 +424,18 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "📍 موقع القسم": return await update.message.reply_text("📍 *الموقع:*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🗺️ خرائط جوجل", url="http://googleusercontent.com/maps.google.com/3")]]), parse_mode='Markdown')
     if text == "📰 أخبار القسم والمعهد": return await update.message.reply_text("📰 *الأخبار:*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📱 منصة X", url=TVTC_X_LINK)]]), parse_mode='Markdown')
     if text == "📅 التقويم التدريبي": return await update.message.reply_photo(photo=open('calendar.jpg', 'rb')) if os.path.exists('calendar.jpg') else await update.message.reply_text("📅 جاري التحديث.")
-    if text == "📘 دليل المتدرب": return await update.message.reply_document(document=open("trainee_guide.pdf", 'rb')) if os.path.exists("trainee_guide.pdf") else await update.message.reply_text("📘 جاري التحديث.")
+    
+    # 📘 إرسال دليل المتدرب (تم تعديل الاسم إلى trainee_guide.pdf)
+    if text == "📘 دليل المتدرب": 
+        if os.path.exists("trainee_guide.pdf"): 
+            return await update.message.reply_document(document=open("trainee_guide.pdf", 'rb'), caption="📘 *دليل المتدرب الرسمي*", parse_mode='Markdown')
+        else: 
+            return await update.message.reply_text("📘 *دليل المتدرب*\nالرجاء التأكد من رفع ملف الدليل (trainee_guide.pdf) في النظام.", parse_mode='Markdown')
+
     if text == "📄 الخطط التدريبية": return await update.message.reply_text("📄 *اختر الفصل:*", reply_markup=get_plans_menu(), parse_mode='Markdown')
     if text in ["1️⃣ الفصل الأول", "2️⃣ الفصل الثاني", "3️⃣ الفصل الثالث", "4️⃣ الفصل الرابع", "5️⃣ الفصل الخامس", "6️⃣ الفصل السادس", "🖥️ برامج فصلية"]: return await update.message.reply_text(f"{load_json('plans.json').get(text, 'جاري التحديث')}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📥 تحميل", url=DRIVE_LINK)]]), parse_mode='Markdown')
-    if text == "🕹️ قسم الألعاب والإضافات": return await update.message.reply_text("🕹️ *اختر النشاط:*", reply_markup=get_games_menu(), parse_mode='Markdown')
-    if text == "❓ الأسئلة الشائعة": return await update.message.reply_text("📌 الحرمان عند (20%).\n💳 المكافأة تتوقف إذا نزل المعدل عن (2.00).\n🎓 الاجتياز (50).")
+    if text == "🕹️ قسم الألعاب والتقنية": return await update.message.reply_text("🕹️ *اختر النشاط:*", reply_markup=get_games_menu(), parse_mode='Markdown')
+    if text == "❓ الأسئلة الشائعة": return await update.message.reply_text("📌 الحرمان عند (20%).\n💳 المكافأة تتوقف إذا نزل المعدل عن (2.00).\n🎓 الاجتياز (50).\n\n💡 *اسأل (المعلم الذكي) لتفاصيل أكثر!*", parse_mode='Markdown')
     if text == "💡 نصيحة تقنية": return await update.message.reply_text(random.choice(TECH_TIPS))
     if text == "🌐 أخبار التقنية": return await update.message.reply_text("🌐 يمكنك تصفح التقنية عبر منصة X.")
     
@@ -546,29 +491,15 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("⚠️ الرجاء اختيار خدمة من الأسفل 👇", reply_markup=get_main_menu())
 
 # ==========================================
-# 7. محرك رفع الملفات (ذكاء الاصطناعي، رايات، أعذار)
+# 7. محرك رفع الملفات وصور الأعذار
 # ==========================================
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return 
     user_id = str(update.effective_user.id)
-    state = user_states.get(user_id, {})
     
-    if state.get('flow') == 'openclaw' and update.message.document and update.message.document.file_name.endswith('.csv'):
-        status_msg = await update.message.reply_text("⏳ جاري تحميل البيانات لـ OpenClaw...")
-        try:
-            file = await context.bot.get_file(update.message.document.file_id)
-            in_memory = io.BytesIO()
-            await file.download_to_memory(in_memory)
-            res = requests.post(OPENCLAW_URL, json={"message": "حفظ_بيانات_رايات\n" + in_memory.getvalue().decode('utf-8')}, timeout=25)
-            await status_msg.edit_text(res.json().get("response", "تم."), parse_mode='Markdown')
-        except Exception as e: 
-            print(f"OpenClaw Upload Error: {e}")
-            await status_msg.edit_text(f"⚠️ خطأ أثناء المعالجة.")
-        return
-
     # معالجة ملفات الإدارة (رايات)
     if user_id == ADMIN_ID and update.message.document and update.message.document.file_name.endswith(('.xlsx', '.xls', '.csv')):
-        status_msg = await update.message.reply_text("⏳ جاري تحليل ملف رايات...")
+        status_msg = await update.message.reply_text("⏳ جاري تحديث الكاش وتحليل ملف الإدارة...")
         try:
             file = await context.bot.get_file(update.message.document.file_id)
             temp_file = "temp_rayat.csv" if update.message.document.file_name.endswith('.csv') else "data.xlsx"
@@ -582,7 +513,6 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     except: pass
                 df_raw = pd.read_csv(io.StringIO(raw_bytes.decode(best_enc)), dtype=str, sep=',', on_bad_lines='skip')
                 
-                # تقرير الجودة
                 if any('نسبة التحضير' in str(c) for c in df_raw.columns):
                     total_sections = len(df_raw)
                     col_prep = [c for c in df_raw.columns if 'نسبة التحضير' in str(c)][0]
@@ -590,7 +520,6 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     os.remove(temp_file)
                     return await status_msg.edit_text(f"📑 *تقرير الجودة*\nالشعب المحضرة: {total_sections - len(unrecorded)}\n⚠️ غير المحضرة: {len(unrecorded)}", parse_mode='Markdown')
 
-                # تنظيف كشف الغياب
                 df_clean = pd.DataFrame()
                 col_map = {'c_course': 14, 'c_id': 16, 'c_name': 17, 'c_perc': 18}
                 for i, col in enumerate(df_raw.columns):
@@ -605,22 +534,19 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 df_clean['stu_nam'] = df_raw.iloc[:, col_map['c_name']].astype(str)
                 df_clean['parsnt'] = df_raw.iloc[:, col_map['c_perc']].astype(str)
                 df_clean = df_clean[df_clean['stu_num'].str.len() >= 5]
-                df_clean['day'] = datetime.now().strftime("%Y-%m-%d")
                 df_clean.to_excel("data.xlsx", index=False)
                 os.remove(temp_file)
 
-            # إعادة تعيين الكاش فوراً بعد تحديث الملف
+            # إعادة تعيين الكاش فوراً 
             global EXCEL_CACHE
             EXCEL_CACHE = None 
-            
-            github_status = backup_to_github("data.xlsx")
-            await status_msg.edit_text(f"✅ *تم التحديث بنجاح!*\n🌐 {github_status}", parse_mode='Markdown')
+            await status_msg.edit_text(f"✅ *تم تحديث قاعدة البيانات بنجاح!*", parse_mode='Markdown')
         except Exception as e: 
             print(f"Admin File Upload Error: {e}")
             await status_msg.edit_text(f"⚠️ فشل التحديث.")
         return
 
-    # ختم وصور الأعذار والمفتش الذكي
+    # المفتش الذكي (الأعذار الطبية)
     if update.message.photo or update.message.document:
         caption_text = update.message.caption
         stu_id = ''.join(filter(str.isdigit, str(caption_text)))
@@ -632,7 +558,7 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            ai_vision = "لم يتم تحليل الصورة بالذكاء الاصطناعي."
+            ai_vision = "لم يتم التفعيل."
             if update.message.photo and HAS_PIL:
                 photo = update.message.photo[-1]
                 file = await context.bot.get_file(photo.file_id)
@@ -641,14 +567,13 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 in_memory_img.seek(0)
                 img = Image.open(in_memory_img)
                 
-                # فحص Gemini
+                # فحص Gemini Vision
                 if ai_model:
                     try:
                         res = await ai_model.generate_content_async(["استخرج: اسم المستشفى، ومدة الإجازة بالأيام فقط.", img])
                         ai_vision = res.text
                     except Exception as e: print(f"Vision Error: {e}")
 
-                # الختم
                 width, height = img.size
                 txt_img = Image.new('RGB', (1000, 50), color='#1e3a8a')
                 ImageDraw.Draw(txt_img).text((20, 15), f"TVTC OFFICIAL | ID: {stu_id} | DATE: {timestamp}", fill="white")
@@ -694,7 +619,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل النظام المدرع V2.1 (جاهز للعمل بكفاءة)...")
+    print("🚀 تشغيل النظام الخارق V3.0 (مستشار القسم ومحلل الجودة)...")
     app.run_polling()
 
 if __name__ == '__main__': 
