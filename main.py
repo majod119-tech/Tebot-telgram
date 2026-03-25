@@ -168,7 +168,6 @@ def run_web_server():
 # ==========================================
 # 3. إعدادات الذكاء الاصطناعي (Gemini RAG)
 # ==========================================
-# 🧠 الذاكرة المعرفية المستخلصة (تم تحرير ذكاء البوت)
 AI_KNOWLEDGE = (
     "أنت 'المعلم الذكي' والمستشار الأكاديمي لقسم الحاسب الآلي في المعهد الصناعي الثانوي ببريدة. "
     "شخصيتك: مستشار خبير، ودود، متعاون جداً، تشرح بوضوح وتفصيل، وتقدم نصائح أبوية وأكاديمية للمتدربين. "
@@ -182,7 +181,6 @@ AI_KNOWLEDGE = (
     "- مقررات قسم الحاسب: (برمجة الحاسب) يدربها م. نايف السلمان في مكتب 205 بواقع 5 ساعات. (تطبيقات الحاسب المتقدمة) تدرب مهارات متقدمة في Excel و Access.\n"
     "تعليمات الرد: كن ذكياً، حلل سؤال المتدرب، أعطه الإجابة الشافية من هذه القوانين، وشجعه بكلمات إيجابية وتنسيق جميل ومرتب واستخدم الإيموجي."
 )
-
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 ai_model = None
@@ -203,8 +201,8 @@ user_states = {}
 def get_main_menu():
     return ReplyKeyboardMarkup([
         ["🤖 المعلم الذكي (مستشار القسم)"], 
-        ["📚 الحقائب التدريبية", "📄 الخطط التدريبية"],
         ["📊 استعلام الغياب", "📝 رفع الغياب والأعذار"],
+        ["📚 الحقائب التدريبية", "📄 الخطط التدريبية"],
         ["🔗 المنصات الإلكترونية", "📅 التقويم التدريبي"],
         ["📰 أخبار القسم والمعهد", "📍 موقع القسم"],
         ["❓ الأسئلة الشائعة", "📘 دليل المتدرب"],
@@ -244,11 +242,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if user_id in user_states: del user_states[user_id]
     
-    welcome_msg = f"أهلاً بك يا {first_name} في المساعد الذكي لقسم الحاسب الآلي 💻✨\n{SEP}\n👇 الرجاء اختيار الخدمة المطلوبة:"
+    welcome_msg = (
+        f"أهلاً بك يا {first_name} في المساعد الذكي لقسم الحاسب الآلي 💻✨\n"
+        f"{SEP}\n"
+        "أنا هنا لتسهيل مسيرتك التدريبية وتوفير وقتك. صُممت هذه القائمة لتلبي كافة احتياجاتك:\n\n"
+        "🤖 **المعلم الذكي**: مستشارك الخاص للإجابة على أي سؤال أكاديمي.\n"
+        "📊 **استعلام الغياب**: لمعرفة وضعك في المقررات بضغطة زر.\n"
+        "📝 **رفع الأعذار**: لإرسال أعذارك الطبية للإدارة بشكل آلي وموثق.\n"
+        "📚 **الحقائب والخطط**: للوصول السريع إلى مناهجك الدراسية.\n\n"
+        "👇 *تفضل باختيار الخدمة المطلوبة من القائمة أدناه:*"
+    )
+    
     try:
-        if os.path.exists('IMG_1058.jpeg'): await update.message.reply_photo(photo=open('IMG_1058.jpeg', 'rb'), caption=welcome_msg, reply_markup=get_main_menu())
-        else: await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
-    except: await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
+        if os.path.exists('IMG_1058.jpeg'): await update.message.reply_photo(photo=open('IMG_1058.jpeg', 'rb'), caption=welcome_msg, reply_markup=get_main_menu(), parse_mode='Markdown')
+        else: await update.message.reply_text(welcome_msg, reply_markup=get_main_menu(), parse_mode='Markdown')
+    except: await update.message.reply_text(welcome_msg, reply_markup=get_main_menu(), parse_mode='Markdown')
 
 async def admin_gateway(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return
@@ -341,13 +349,13 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return await update.message.reply_text(f"🧠 *تحليل الجودة:*\n\n{res.text}", parse_mode='Markdown')
             except Exception as e: return await update.message.reply_text(f"⚠️ فشل التحليل: {e}")
 
-    # 🔵 الحالات المستمرة (التعهدات وغيرها) 🔵
+    # 🔵 الحالات المستمرة (العمليات النشطة) 🔵
     if user_id in user_states:
         state = user_states[user_id]
         if text in ["❌ إلغاء العملية", "🔙 الرجوع للقائمة الرئيسية"]:
             del user_states[user_id]
             menu = get_admin_menu() if user_id == ADMIN_ID and state.get('flow') == 'broadcast' else get_main_menu()
-            return await update.message.reply_text("تم العودة 🏠", reply_markup=menu)
+            return await update.message.reply_text("✅ تم العودة للقائمة الرئيسية.", reply_markup=menu)
 
         if state['flow'] == 'broadcast':
             users = load_json(STATS_FILE).get("users_list", [])
@@ -364,15 +372,15 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             step = state['step']
             if step == 1:
                 user_states[user_id]['step'] = 2
-                return await update.message.reply_text("2️⃣ *فضلاً، اختر العذر الرئيسي لكثرة غياباتك:*", parse_mode='Markdown', reply_markup=get_pledge_step2_menu())
+                return await update.message.reply_text("2️⃣ *الخطوة الثانية:* فضلاً، اختر العذر الرئيسي لكثرة غياباتك من القائمة أدناه، أو قم بكتابته:", parse_mode='Markdown', reply_markup=get_pledge_step2_menu())
             elif step == 2:
-                if len(text) < 4: return await update.message.reply_text("⚠️ العذر غير واضح، اختر من الأزرار أو اكتبه:", reply_markup=get_pledge_step2_menu())
+                if len(text) < 4: return await update.message.reply_text("⚠️ العذر غير واضح، الرجاء كتابة عذر مقنع أو اختياره من الأزرار:", reply_markup=get_pledge_step2_menu())
                 user_states[user_id]['excuse'] = text
                 user_states[user_id]['step'] = 3
-                return await update.message.reply_text("3️⃣ *الإقرار النهائي:*\nهل تتعهد بالانضباط لتفادي الحرمان (20%) وطي القيد؟", parse_mode='Markdown', reply_markup=get_pledge_step3_menu())
+                return await update.message.reply_text("3️⃣ *الخطوة الأخيرة (الإقرار):*\nبناءً على ما سبق، هل تتعهد بالانضباط في الحضور لتفادي عقوبة الحرمان (20%) وطي القيد؟", parse_mode='Markdown', reply_markup=get_pledge_step3_menu())
             elif step == 3:
                 if "تعهد" not in text and "أقر" not in text and "نعم" not in text:
-                    return await update.message.reply_text("⚠️ الرجاء الضغط على زر الإقرار للموافقة:", reply_markup=get_pledge_step3_menu())
+                    return await update.message.reply_text("⚠️ لإكمال الإجراء، الرجاء الضغط على زر الإقرار والموافقة في الأسفل 👇", reply_markup=get_pledge_step3_menu())
                 completed = load_json(INTERROGATIONS_FILE)
                 completed.setdefault(state['stu_num'], []).append(state['subject'])
                 save_json(INTERROGATIONS_FILE, completed)
@@ -382,116 +390,233 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except: pass
                 del user_states[user_id]
                 await update.message.reply_text(official_document, parse_mode='Markdown')
-                return await update.message.reply_text("✅ *تم توثيق إقرارك.*", parse_mode='Markdown', reply_markup=get_main_menu())
+                return await update.message.reply_text("✅ *تم توثيق إقرارك بنجاح، ونتمنى لك انضباطاً وتوفيقاً في مسيرتك التدريبية.*", parse_mode='Markdown', reply_markup=get_main_menu())
 
         if state['flow'] == 'feedback':
-            if len(text) < 15: return await update.message.reply_text("⚠️ الرسالة قصيرة جداً!", reply_markup=get_cancel_menu())
+            if len(text) < 15: return await update.message.reply_text("⚠️ رسالتك قصيرة جداً! نرجو توضيح الفكرة بشكل أفضل لنتمكن من خدمتك.", reply_markup=get_cancel_menu())
             try:
-                await context.bot.send_message(chat_id=GROUP_ID, text=f"💡 *شكوى/مقترح:*\nالمرسل: {update.effective_user.first_name}\nالنص: {text}", parse_mode='Markdown')
+                await context.bot.send_message(chat_id=GROUP_ID, text=f"💡 *صندوق الاقتراحات/الشكاوى:*\n👤 المرسل: {update.effective_user.first_name}\n📝 النص: {text}", parse_mode='Markdown')
                 del user_states[user_id]
-                return await update.message.reply_text("✅ تم إرسال رسالتك للإدارة بسرية تامة.", reply_markup=get_main_menu())
+                return await update.message.reply_text("✅ تم إرسال رسالتك للإدارة بسرية تامة. شكراً لمساهمتك في تطوير القسم!", reply_markup=get_main_menu())
             except: 
                 del user_states[user_id]
-                return await update.message.reply_text("⚠️ خطأ، حاول لاحقاً.", reply_markup=get_main_menu())
+                return await update.message.reply_text("⚠️ حدث خطأ فني، الرجاء المحاولة لاحقاً.", reply_markup=get_main_menu())
 
         if state['flow'] == 'ai':
-            if not ai_model: return await update.message.reply_text("⚠️ المعلم غير متصل حالياً بسبب نقص المفتاح.", reply_markup=get_main_menu())
+            if not ai_model: return await update.message.reply_text("⚠️ المعلم غير متصل حالياً. يرجى المراجعة لاحقاً.", reply_markup=get_main_menu())
             await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING)
             update_stat("ai_questions") 
             try:
                 response = await ai_model.generate_content_async(f"{AI_KNOWLEDGE}\nسؤال: {text}")
-                return await update.message.reply_text(f"📝 رد المستشار الأكاديمي:\n\n{response.text}", reply_markup=get_back_menu())
+                return await update.message.reply_text(f"📝 *رد المستشار الأكاديمي:*\n\n{response.text}", parse_mode='Markdown', reply_markup=get_back_menu())
             except Exception as e: 
                 print(f"Gemini Chat Error: {e}")
-                return await update.message.reply_text("⚠️ خطأ تقني، الخدمة مشغولة.", reply_markup=get_back_menu())
+                return await update.message.reply_text("⚠️ خطأ تقني، الخدمة مشغولة حالياً.", reply_markup=get_back_menu())
 
         if state['flow'] == 'excuse':
-            return await update.message.reply_text("⚠️ هذا نص! الرجاء إرسال صورة العذر الطبي.", reply_markup=get_cancel_menu())
+            return await update.message.reply_text("⚠️ لقد أرسلت نصاً! الرجاء إرسال **صورة** العذر الطبي من خلال أيقونة المرفقات 📎.", reply_markup=get_cancel_menu())
 
-    # 🟢 أوامر المتدربين الشاملة 🟢
+    # 🟢 القائمة الرئيسية الشاملة والنصوص التوضيحية 🟢
+    
+    if text == "🤖 المعلم الذكي (مستشار القسم)":
+        user_states[user_id] = {'flow': 'ai'}
+        return await update.message.reply_text(
+            "🤖 *مرحباً بك في خدمة المعلم الذكي!*\n\n"
+            "أنا مستشارك الأكاديمي الافتراضي، مبرمج للرد على استفساراتك.\n"
+            "يمكنك سؤالي بحرية عن:\n"
+            "🔸 أنظمة المعهد (المكافآت، الحرمان، الأعذار).\n"
+            "🔸 المقررات والخطط التدريبية.\n"
+            "🔸 التقويم التدريبي والإجازات الرسمية.\n\n"
+            "✍️ *تفضل، اكتب سؤالك الآن وسأجيبك فوراً...*",
+            parse_mode='Markdown',
+            reply_markup=get_back_menu()
+        )
+
+    if text == "📊 استعلام الغياب": 
+        return await update.message.reply_text(
+            "📊 *بوابة الاستعلام الأكاديمي*\n\n"
+            "لمعرفة وضعك الأكاديمي وتفاصيل الغياب، يرجى كتابة **رقمك التدريبي** بالأسفل (أرقام فقط باللغة الإنجليزية، مثال: 441234567) وسأقوم بجلب السجل فوراً 🔍.",
+            parse_mode='Markdown'
+        )
+
     if text == "📝 رفع الغياب والأعذار": 
         user_states[user_id] = {'flow': 'excuse'}
-        return await update.message.reply_text("📝 الرجاء إرفاق (صورة العذر) الآن، واكتب (رقمك التدريبي) في الوصف.", reply_markup=get_cancel_menu())
+        return await update.message.reply_text(
+            "📝 *خدمة رفع الأعذار الطبية والرسمية*\n\n"
+            "لرفع عذرك للإدارة بشكل رسمي، اتبع الخطوات التالية بدقة:\n"
+            "1️⃣ التقط صورة واضحة للعذر الطبي.\n"
+            "2️⃣ **مهم جداً:** اكتب رقمك التدريبي في خانة (الوصف / Caption) للصورة.\n"
+            "3️⃣ أرسل الصورة هنا وسأقوم بختمها وتحويلها فوراً 📩.",
+            parse_mode='Markdown',
+            reply_markup=get_cancel_menu()
+        )
 
     if text == "📬 الاقتراحات والشكاوى":
         user_states[user_id] = {'flow': 'feedback'}
-        return await update.message.reply_text("📬 اكتب رسالتك أو شكواك الآن وسوف تصل للإدارة بسرية...", reply_markup=get_cancel_menu())
+        return await update.message.reply_text(
+            "📬 *صندوق الاقتراحات والشكاوى*\n\n"
+            "رأيك يهمنا وصوتك مسموع! اكتب مقترحك أو شكواك في رسالة واحدة متصلة.\n"
+            "كن واثقاً أن رسالتك ستصل بسرية تامة إلى إدارة القسم للنظر فيها واتخاذ اللازم 🔒.\n\n"
+            "✍️ *الرجاء كتابة رسالتك الآن:*",
+            parse_mode='Markdown',
+            reply_markup=get_cancel_menu()
+        )
 
-    if text == "🤖 المعلم الذكي (مستشار القسم)":
-        user_states[user_id] = {'flow': 'ai'}
-        return await update.message.reply_text("🤖 أنا المستشار الأكاديمي.. اسألني عن أنظمة المعهد، المكافآت، الحرمان، أو أي مقرر!", reply_markup=get_back_menu())
+    if text == "📚 الحقائب التدريبية": 
+        return await update.message.reply_text(
+            "📚 *مكتبة الحقائب التدريبية*\n\n"
+            "اضغط على الزر أدناه للانتقال إلى السحابة الإلكترونية، حيث يمكنك تصفح وتحميل جميع الحقائب والكتب الخاصة بمقرراتك بصيغة PDF 📥.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📥 الدخول للمكتبة", url=DRIVE_LINK)]]), 
+            parse_mode='Markdown'
+        )
 
-    if text == "📊 استعلام الغياب": return await update.message.reply_text("🔎 أرسل رقمك التدريبي الآن (أرقام فقط)...")
-    if text == "📚 الحقائب التدريبية": return await update.message.reply_text("📚 *الحقائب:*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📥 الدخول", url=DRIVE_LINK)]]), parse_mode='Markdown')
-    if text == "🔗 المنصات الإلكترونية": return await update.message.reply_text("🌐 *المنصات:*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("رايات", url="https://rayat.tvtc.gov.sa")], [InlineKeyboardButton("تقني", url="https://tvtclms.edu.sa")]]), parse_mode='Markdown')
-    if text == "📍 موقع القسم": return await update.message.reply_text("📍 *الموقع:*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🗺️ خرائط جوجل", url="http://googleusercontent.com/maps.google.com/3")]]), parse_mode='Markdown')
-    if text == "📰 أخبار القسم والمعهد": return await update.message.reply_text("📰 *الأخبار:*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📱 منصة X", url=TVTC_X_LINK)]]), parse_mode='Markdown')
-    if text == "📅 التقويم التدريبي": return await update.message.reply_photo(photo=open('calendar.jpg', 'rb')) if os.path.exists('calendar.jpg') else await update.message.reply_text("📅 جاري التحديث.")
+    if text == "🔗 المنصات الإلكترونية": 
+        return await update.message.reply_text(
+            "🌐 *المنصات الإلكترونية المعتمدة*\n\n"
+            "وفرنا لك أزرار الوصول السريع لأهم المنصات التي تحتاجها في تدريبك (رايات لخدمات المتدربين، وتقني للتدريب الإلكتروني):",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🖥️ منصة رايات", url="https://rayat.tvtc.gov.sa")], 
+                [InlineKeyboardButton("💻 منصة تقني", url="https://tvtclms.edu.sa")]
+            ]), 
+            parse_mode='Markdown'
+        )
+
+    if text == "📍 موقع القسم": 
+        return await update.message.reply_text(
+            "📍 *الموقع الجغرافي*\n\n"
+            "يسعدنا حضورك وتواجدك! يمكنك الوصول لمقر المعهد وقسم الحاسب الآلي بسهولة عبر خرائط جوجل من خلال الرابط أدناه 🗺️:",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🗺️ فتح خرائط جوجل", url="http://googleusercontent.com/maps.google.com/3")]]), 
+            parse_mode='Markdown'
+        )
+
+    if text == "📰 أخبار القسم والمعهد": 
+        return await update.message.reply_text(
+            "📰 *المركز الإعلامي*\n\n"
+            "لتبقى على اطلاع دائم بأحدث الأخبار، الفعاليات، ومواعيد القبول، تفضل بمتابعة الحساب الرسمي للمعهد في منصة X (تويتر سابقاً) 📱:",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📱 الانتقال لمنصة X", url=TVTC_X_LINK)]]), 
+            parse_mode='Markdown'
+        )
+
+    if text == "📅 التقويم التدريبي": 
+        if os.path.exists('calendar.jpg'):
+            return await update.message.reply_photo(photo=open('calendar.jpg', 'rb'), caption="📅 *التقويم التدريبي المعتمد*\nمواعيد الإجازات وبداية ونهاية الفصول التدريبية.", parse_mode='Markdown')
+        else: 
+            return await update.message.reply_text("📅 جاري تحديث صورة التقويم التدريبي من قبل الإدارة.")
     
-    # 📘 إرسال دليل المتدرب (تم تعديل الاسم إلى trainee_guide.pdf)
     if text == "📘 دليل المتدرب": 
         if os.path.exists("trainee_guide.pdf"): 
-            return await update.message.reply_document(document=open("trainee_guide.pdf", 'rb'), caption="📘 *دليل المتدرب الرسمي*", parse_mode='Markdown')
+            return await update.message.reply_document(document=open("trainee_guide.pdf", 'rb'), caption="📘 *دليل المتدرب الرسمي*\nيحتوي على كافة اللوائح والأنظمة التي تهمك كمتدرب.", parse_mode='Markdown')
         else: 
-            return await update.message.reply_text("📘 *دليل المتدرب*\nالرجاء التأكد من رفع ملف الدليل (trainee_guide.pdf) في النظام.", parse_mode='Markdown')
+            return await update.message.reply_text("📘 *دليل المتدرب*\nعذراً، جاري تحديث ملف الدليل في النظام.", parse_mode='Markdown')
 
-    if text == "📄 الخطط التدريبية": return await update.message.reply_text("📄 *اختر الفصل:*", reply_markup=get_plans_menu(), parse_mode='Markdown')
-    if text in ["1️⃣ الفصل الأول", "2️⃣ الفصل الثاني", "3️⃣ الفصل الثالث", "4️⃣ الفصل الرابع", "5️⃣ الفصل الخامس", "6️⃣ الفصل السادس", "🖥️ برامج فصلية"]: return await update.message.reply_text(f"{load_json('plans.json').get(text, 'جاري التحديث')}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📥 تحميل", url=DRIVE_LINK)]]), parse_mode='Markdown')
-    if text == "🕹️ قسم الألعاب والتقنية": return await update.message.reply_text("🕹️ *اختر النشاط:*", reply_markup=get_games_menu(), parse_mode='Markdown')
-    if text == "❓ الأسئلة الشائعة": return await update.message.reply_text("📌 الحرمان عند (20%).\n💳 المكافأة تتوقف إذا نزل المعدل عن (2.00).\n🎓 الاجتياز (50).\n\n💡 *اسأل (المعلم الذكي) لتفاصيل أكثر!*", parse_mode='Markdown')
-    if text == "💡 نصيحة تقنية": return await update.message.reply_text(random.choice(TECH_TIPS))
-    if text == "🌐 أخبار التقنية": return await update.message.reply_text("🌐 يمكنك تصفح التقنية عبر منصة X.")
+    if text == "📄 الخطط التدريبية": 
+        return await update.message.reply_text(
+            "📄 *الخطط التدريبية*\n\n"
+            "اختر الفصل التدريبي الذي ترغب بالاستعلام عنه لمعرفة المقررات وتوزيعها:",
+            reply_markup=get_plans_menu(), 
+            parse_mode='Markdown'
+        )
+    
+    if text in ["1️⃣ الفصل الأول", "2️⃣ الفصل الثاني", "3️⃣ الفصل الثالث", "4️⃣ الفصل الرابع", "5️⃣ الفصل الخامس", "6️⃣ الفصل السادس", "🖥️ برامج فصلية"]: 
+        return await update.message.reply_text(
+            f"{load_json('plans.json').get(text, 'عذراً، جاري التحديث من قبل الإدارة.')}", 
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📥 تحميل التفاصيل", url=DRIVE_LINK)]]), 
+            parse_mode='Markdown'
+        )
+
+    if text == "🕹️ قسم الألعاب والتقنية": 
+        return await update.message.reply_text(
+            "🕹️ *الاستراحة التقنية*\n\n"
+            "استرح قليلاً وجدد نشاطك! يمكنك اختبار معلوماتك في 🎮 (تحدي الأسبوع) أو قراءة 💡 (نصائح تقنية) سريعة ومفيدة.",
+            reply_markup=get_games_menu(), 
+            parse_mode='Markdown'
+        )
+
+    if text == "❓ الأسئلة الشائعة": 
+        return await update.message.reply_text(
+            "❓ *أبرز الأسئلة الشائعة للأنظمة التدريبية*\n\n"
+            "🛑 **الحرمان:** يُحرم المتدرب ويطوى قيده عند تجاوز الغياب نسبة (20%).\n"
+            "⚠️ **الإنذار:** يوجه للمتدرب عند بلوغ غيابه نسبة (15%) في أي مقرر.\n"
+            "💳 **المكافأة:** تُصرف مكافأة (800 ريال)، وتتوقف آلياً إذا انخفض المعدل عن (2.00).\n"
+            "🎓 **النجاح:** الحد الأدنى لاجتياز أي مقرر هو الحصول على (50 درجة).\n\n"
+            "💡 *تلميحة:* لمعرفة تفاصيل أكثر، يمكنك دائماً التحدث مع 🤖 (المعلم الذكي) من القائمة الرئيسية!", 
+            parse_mode='Markdown'
+        )
+
+    if text == "💡 نصيحة تقنية": 
+        return await update.message.reply_text(random.choice(TECH_TIPS))
+    
+    if text == "🌐 أخبار التقنية": 
+        return await update.message.reply_text("🌐 يمكنك تصفح التقنية وأحدث المستجدات عبر منصة X لمواكبة التطورات.")
     
     if text == "🎮 تحدي الأسبوع":
         update_stat("quiz_attempts")
         q = random.choice(QUESTIONS)
         kb = [[InlineKeyboardButton(o, callback_data=f"ans_{QUESTIONS.index(q)}_{i}")] for i, o in enumerate(q['options'])]
-        return await update.message.reply_text(f"❓ *تحدي الأسبوع:*\n{q['q']}", reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
+        return await update.message.reply_text(f"❓ *تحدي الأسبوع:*\n\n{q['q']}", reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
         
     if text == "🏆 بطل الأسبوع":
         sc = load_json(SCORES_FILE)
-        if not sc: return await update.message.reply_text("📉 لا يوجد نقاط.")
+        if not sc: return await update.message.reply_text("📉 لا يوجد نقاط مسجلة هذا الأسبوع حتى الآن. كن أنت المبادر!")
         top = sorted(sc.items(), key=lambda x: x[1]['score'], reverse=True)[0][1]
-        return await update.message.reply_text(f"🏆 *البطل:* {top['name']}\n🌟 *النقاط:* {top['score']}", parse_mode='Markdown')
+        return await update.message.reply_text(f"🏆 *بطل الأسبوع في التحديات:*\n\n👤 الاســم: {top['name']}\n🌟 النقاط: {top['score']}\n\nتمنياتنا للجميع بالتوفيق!", parse_mode='Markdown')
 
+    # معالجة الاستعلام بالرقم التدريبي
     if clean_text.isdigit() and len(clean_text) > 4: 
         await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING)
         try:
             df = get_excel_data()
-            if df is None: return await update.message.reply_text("⚠️ قاعدة البيانات غير متوفرة.")
+            if df is None: return await update.message.reply_text("⚠️ قاعدة البيانات غير متوفرة حالياً. الرجاء المحاولة لاحقاً.")
             res = df[df['stu_num'] == clean_text]
             if not res.empty:
                 stu_nam = res.iloc[0]['stu_nam']
                 completed_interrogations = load_json(INTERROGATIONS_FILE).get(clean_text, [])
                 subject_to_interrogate = None; has_deprivation = False
-                m = f"🎓 *السجل الأكاديمي*\n{SEP}\n👤 *الاسم:* {stu_nam}\n🔢 *الرقم:* {clean_text}\n{SEP}\n"
+                
+                m = f"🎓 *السجل الأكاديمي التفصيلي*\n{SEP}\n👤 *الاسم:* {stu_nam}\n🔢 *الرقم التدريبي:* {clean_text}\n{SEP}\n"
                 for _, r in res.iterrows():
                     c_name_text = str(r.get('c_nam', 'غير معروف')).strip()
                     raw_val = str(r.get('parsnt', '0')).replace('%', '').strip()
+                    
                     if raw_val in ['ح', 'ط'] or 'حرمان' in raw_val or 'طي' in raw_val:
-                        display_val = "*حرمان/طي قيد* 🔴"
+                        display_val = "*حرمان / طي قيد* 🔴"
                         has_deprivation = True
                     else:
                         try:
                             val = float(raw_val)
-                            if val >= 20: display_val = f"*{val}%* 🔴"; has_deprivation = True
-                            elif val >= 15: display_val = f"*{val}%* ⚠️"; subject_to_interrogate = c_name_text if c_name_text not in completed_interrogations else None
-                            else: display_val = f"*{val}%* 🟢"
+                            if val >= 20: 
+                                display_val = f"*{val}%* 🔴 (محروم)"
+                                has_deprivation = True
+                            elif val >= 15: 
+                                display_val = f"*{val}%* ⚠️ (إنذار)"
+                                subject_to_interrogate = c_name_text if c_name_text not in completed_interrogations else None
+                            else: 
+                                display_val = f"*{val}%* 🟢 (سليم)"
                         except: display_val = f"*{raw_val}* ⚠️"
-                    m += f"📖 {c_name_text}\n▫️ النتيجة: {display_val}\n\n"
-                m += f"{SEP}\n💡 *الإنذار عند 15%، والحرمان 20%.*"
+                        
+                    m += f"📖 المقرر: {c_name_text}\n▫️ نسبة الغياب: {display_val}\n\n"
+                
+                m += f"{SEP}\n💡 *تذكير:* الإنذار يصدر عند تجاوز 15%، والحرمان عند 20%."
                 await update.message.reply_text(m, parse_mode='Markdown')
 
                 if subject_to_interrogate:
                     user_states[user_id] = {'flow': 'pledge', 'step': 1, 'stu_num': clean_text, 'stu_nam': stu_nam, 'subject': subject_to_interrogate}
-                    return await update.message.reply_text(f"⚠️ *تنبيه!*\nتجاوزت الخطر (15%) في: *{subject_to_interrogate}*\n🛑 *النظام مغلق لإكمال الإقرار!*\nهل تعلم أنك اقتربت من الحرمان؟", parse_mode='Markdown', reply_markup=get_pledge_step1_menu())
-                if has_deprivation: await update.message.reply_text("🛑 *تنبيه:* أنت محروم في مقرر أو أكثر.", parse_mode='Markdown')
-            else: await update.message.reply_text("❌ الرقم غير مسجل.")
+                    return await update.message.reply_text(
+                        f"⚠️ *تنبيه إداري عاجل!*\n"
+                        f"لقد تجاوزت نسبة الخطر (15%) في مقرر: *{subject_to_interrogate}*\n\n"
+                        f"🛑 *النظام مغلق مؤقتاً لإجبارك على إكمال إقرار الانضباط!*\n"
+                        f"هل تعلم أنك اقتربت جداً من الحرمان التام؟", 
+                        parse_mode='Markdown', reply_markup=get_pledge_step1_menu()
+                    )
+                if has_deprivation: 
+                    await update.message.reply_text("🛑 *تنبيه:* أنت محروم في مقرر أو أكثر. يرجى مراجعة إدارة القسم فوراً.", parse_mode='Markdown')
+            else: 
+                await update.message.reply_text("❌ لم يتم العثور على هذا الرقم. يرجى التأكد من كتابة الرقم التدريبي بشكل صحيح.")
         except Exception as e:
             print(f"Query Error: {e}")
         return
 
-    await update.message.reply_text("⚠️ الرجاء اختيار خدمة من الأسفل 👇", reply_markup=get_main_menu())
+    await update.message.reply_text("⚠️ لم أفهم هذا الإدخال. الرجاء اختيار إحدى الخدمات من القائمة أدناه 👇", reply_markup=get_main_menu())
 
 # ==========================================
 # 7. محرك رفع الملفات وصور الأعذار
@@ -554,10 +679,10 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         caption_text = update.message.caption
         stu_id = ''.join(filter(str.isdigit, str(caption_text)))
         if not caption_text or len(stu_id) < 5:
-            return await update.message.reply_text("🛑 *مرفوض!* ارفق الصورة واكتب *رقمك التدريبي* في الوصف.", parse_mode='Markdown')
+            return await update.message.reply_text("🛑 *عذراً!* لقد أرسلت الصورة بدون رقم. الرجاء إعادة إرسال الصورة واكتب **رقمك التدريبي** في خانة الوصف (Caption).", parse_mode='Markdown')
             
         await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.UPLOAD_PHOTO)
-        status_msg = await update.message.reply_text("⏳ جاري الفحص والختم...")
+        status_msg = await update.message.reply_text("⏳ جاري استلام المرفق وختم العذر رسمياً...")
         
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -591,11 +716,11 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.copy(chat_id=GROUP_ID)
                 
             if user_id in user_states: del user_states[user_id]
-            await status_msg.edit_text("✅ *تم الإرسال للإدارة بنجاح.*", parse_mode='Markdown')
-            await update.message.reply_text("العودة 🏠", reply_markup=get_main_menu())
+            await status_msg.edit_text("✅ *تم رفع العذر وختمه وإرساله للإدارة بنجاح.*", parse_mode='Markdown')
+            await update.message.reply_text("تمت العودة للقائمة الرئيسية 🏠", reply_markup=get_main_menu())
         except Exception as e: 
             print(f"Excuse Processing Error: {e}")
-            await status_msg.edit_text(f"⚠️ خطأ أثناء المعالجة.")
+            await status_msg.edit_text(f"⚠️ حدث خطأ تقني أثناء المعالجة.")
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return 
@@ -606,8 +731,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         q_idx, sel = int(parts[1]), int(parts[2])
         try:
             actual_question = QUESTIONS[q_idx]
-            m = "🎉 *إجابة صحيحة!*" if sel == actual_question["answer"] else f"❌ *خاطئة!*"
-            await query.edit_message_text(f"❓ *تحدي الأسبوع:*\n{actual_question['q']}\n{SEP}\n{m}", parse_mode='Markdown')
+            m = "🎉 *إجابة صحيحة! أحسنت.*" if sel == actual_question["answer"] else f"❌ *إجابة خاطئة! حظاً أوفر في المرات القادمة.*"
+            await query.edit_message_text(f"❓ *تحدي الأسبوع:*\n\n{actual_question['q']}\n{SEP}\n{m}", parse_mode='Markdown')
         except Exception as e: print(f"Callback Error: {e}")
 
 def main():
@@ -622,7 +747,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل النظام الخارق V3.0 (مستشار القسم ومحلل الجودة)...")
+    print("🚀 تشغيل النظام (نسخة الواجهات المحسنة)...")
     app.run_polling()
 
 if __name__ == '__main__': 
