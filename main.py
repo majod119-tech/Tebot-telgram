@@ -426,7 +426,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "🔗 المنصات الإلكترونية": return await update.message.reply_text("🌐 *المنصات:*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("رايات", url="https://rayat.tvtc.gov.sa")], [InlineKeyboardButton("تقني", url="https://tvtclms.edu.sa")]]), parse_mode='Markdown')
     if text == "📍 موقع القسم": return await update.message.reply_text("📍 *الموقع:*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🗺️ خرائط جوجل", url="http://googleusercontent.com/maps.google.com/3")]]), parse_mode='Markdown')
     if text == "📰 أخبار القسم والمعهد": return await update.message.reply_text("📰 *الأخبار:*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📱 منصة X", url=TVTC_X_LINK)]]), parse_mode='Markdown')
-    if text == "📅 التقويم التدريبي": return await update.message.reply_photo(photo=open('calendar.jpg', 'rb')) if os.path.exists('calendar.jpg') else await update.message.reply_text("📅 جاري التحديث.")
+    if text == "📅 التقويم التدريبي": return await update.message.reply_photo(photo=open('calendar.pdf', 'rb')) if os.path.exists('calendar.jpg') else await update.message.reply_text("📅 جاري التحديث.")
     
     # 📘 إرسال دليل المتدرب (تم تعديل الاسم إلى trainee_guide.pdf)
     if text == "📘 دليل المتدرب": 
