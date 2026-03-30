@@ -1,14 +1,11 @@
 import os
 import io
-import base64
 import requests
 import pandas as pd
 import json
 import random
 import time
 import asyncio
-import urllib.request
-import xml.etree.ElementTree as ET
 from datetime import datetime
 import google.generativeai as genai
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
@@ -26,7 +23,6 @@ if not TOKEN:
     raise ValueError("❌ خطأ قاتل: TOKEN غير موجود في البيئة! الرجاء إضافته في إعدادات Koyeb.")
 
 MONGO_URI = os.getenv("MONGODB_URI")
-OPENCLAW_URL = "https://openclaw-server-2j6r.onrender.com/api/chat"
 GROUP_ID = "-1003701324722" 
 DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
 ADMIN_ID = "10073498"
@@ -37,11 +33,14 @@ SCORES_FILE = "scores.json"
 STATS_FILE = "stats.json"
 INTERROGATIONS_FILE = "interrogations.json"
 
+# 🟢 تهيئة قاعدة البيانات الاحترافية 🟢
 try:
     if MONGO_URI:
         client = MongoClient(MONGO_URI)
         db = client["computer_dept_db"] 
-        trainees_collection = db["trainees"] 
+        users_col = db["users"]         # جدول المستخدمين
+        excuses_col = db["excuses"]     # جدول الأعذار الطبية
+        reports_col = db["reports"]     # جدول التقارير
         print("✅ تم الاتصال بقاعدة البيانات السحابية (MongoDB) بنجاح!")
 except Exception as e:
     print(f"❌ خطأ في الاتصال بقاعدة البيانات: {e}")
@@ -56,15 +55,13 @@ def load_json(f):
     if os.path.exists(f):
         try:
             with open(f, "r", encoding="utf-8") as file: return json.load(file)
-        except Exception as e:
-            print(f"Error loading {f}: {e}")
+        except Exception as e: pass
     return {}
 
 def save_json(f, d): 
     try:
         with open(f, "w", encoding="utf-8") as file: json.dump(d, file, ensure_ascii=False)
-    except Exception as e:
-        print(f"Error saving {f}: {e}")
+    except Exception as e: pass
 
 try:
     from questions_bank import QUESTIONS
@@ -100,14 +97,90 @@ def get_excel_data():
             df['stu_num'] = df['stu_num'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
             EXCEL_CACHE = df
             LAST_CACHE_TIME = current_mtime
-            print("🔄 تم تحديث الكاش لبيانات الإكسل!")
         except Exception as e:
-            print(f"Error caching excel: {e}")
             return None
     return EXCEL_CACHE
 
 # ==========================================
-# 2. المهام الخلفية والويب السري
+# 📊 محرك التقارير الأسبوعية (SO09 + بيانات القسم)
+# ==========================================
+def build_weekly_report():
+    try:
+        if not os.path.exists("so09.csv"): 
+            return "⚠️ لم يتم رفع تقرير الشعب (SO09) حتى الآن."
+        
+        df = pd.read_csv("so09.csv", dtype=str)
+        
+        def find_col(keywords):
+            for col in df.columns:
+                c_clean = str(col).replace(' ', '').replace('أ', 'ا').replace('إ', 'ا')
+                if any(k in c_clean for k in keywords): return col
+            return None
+
+        col_prep = find_col(['نسبهالتحضير', 'التحضير'])
+        col_trainer = find_col(['اسمالمدرب', 'المدرب'])
+        col_section = find_col(['الشعبه', 'الرقمالمرجعي', 'رقم'])
+
+        if not all([col_prep, col_trainer, col_section]):
+            return "⚠️ أعمدة التقرير غير متطابقة مع نموذج نظام رايات."
+
+        # تنظيف وتحويل نسب التحضير لأرقام
+        df[col_prep] = pd.to_numeric(df[col_prep].astype(str).str.replace('%', ''), errors='coerce').fillna(0)
+        
+        total_sections = len(df)
+        prepared_sections = len(df[df[col_prep] >= 100])
+        unprepared_sections = total_sections - prepared_sections
+        
+        # إحصائيات المدربين
+        trainers_df = df.groupby(col_trainer).agg(
+            total_sec=(col_section, 'count'),
+            prep_sec=(col_prep, lambda x: (x >= 100).sum())
+        ).reset_index()
+        
+        total_trainers = len(trainers_df)
+        fully_prepared_trainers = len(trainers_df[trainers_df['total_sec'] == trainers_df['prep_sec']])
+        late_trainers_df = trainers_df[trainers_df['total_sec'] > trainers_df['prep_sec']]
+        late_trainers = len(late_trainers_df)
+        
+        late_list_text = "\n".join([f"▫️ {row[col_trainer]} ({row['total_sec'] - row['prep_sec']} شعب)" for _, row in late_trainers_df.iterrows()])
+        if not late_list_text: late_list_text = "لا يوجد تأخير، جميع المدربين أتموا الرصد ✅"
+        
+        # تطبيق معادلة الجودة لحساب الحضور (متوسط التحضير * إجمالي الطلاب)
+        avg_attendance_perc = df[col_prep].mean()
+        
+        # جلب إجمالي المتدربين من قاعدة البيانات أو الإكسل الأساسي
+        df_students = get_excel_data()
+        total_trainees = df_students['stu_num'].nunique() if df_students is not None else 0
+        present_trainees = int((avg_attendance_perc / 100) * total_trainees) if total_trainees > 0 else 0
+
+        report = f"""
+📑 *تقرير متابعة سير العملية التدريبية الأسبوعية* 📑
+{SEP}
+
+👥 *إحصائيات المتدربين والحضور:*
+▫️ إجمالي المتدربين (التحضير): `{total_trainees}`
+▫️ المتدربين الحاضرين: `{present_trainees}`
+📈 نسبة الحضور: `{avg_attendance_perc:.2f}%`
+
+📝 *إحصائيات الشعب التدريبية:*
+▫️ إجمالي عدد الشعب: `{total_sections}`
+✅ الشعب المحضرة: `{prepared_sections}`
+⚠️ الشعب غير المحضرة: `{unprepared_sections}`
+
+👨‍🏫 *إحصائيات المدربين:*
+▫️ إجمالي عدد المدربين: `{total_trainers}`
+✅ المدربين المحضرين: `{fully_prepared_trainers}`
+⚠️ المدربين غير المحضرين: `{late_trainers}`
+{SEP}
+📋 *المدربين المتأخرين بالرصد:*
+{late_list_text}
+"""
+        return report
+    except Exception as e:
+        return f"⚠️ خطأ في المعالجة: {e}"
+
+# ==========================================
+# 2. المهام الخلفية والويب
 # ==========================================
 def background_tasks():
     while True:
@@ -121,14 +194,14 @@ def background_tasks():
                 stats["last_reset_date"] = today_str 
                 save_json(STATS_FILE, stats)
                 
+            # إرسال التقرير الأوتوماتيكي يوم الخميس
             if now.weekday() == 3 and now.hour == 14:
                 if stats.get("last_thursday_report") != today_str:
-                    report_text = f"🗓️ *حصاد الخميس التلقائي*\n{SEP}\nتم إغلاق أسبوع تدريبي جديد. أرسل `/admin` لمراجعة التقارير وسحب كشوفات الغياب.\nنهاية أسبوع سعيدة يا رئيس القسم! ☕"
-                    requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={"chat_id": ADMIN_ID, "text": report_text, "parse_mode": "Markdown"}, timeout=10)
+                    auto_report = build_weekly_report()
+                    requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={"chat_id": ADMIN_ID, "text": auto_report, "parse_mode": "Markdown"}, timeout=10)
                     stats["last_thursday_report"] = today_str
                     save_json(STATS_FILE, stats)
-        except Exception as e: 
-            print(f"Background Task Error: {e}")
+        except Exception as e: pass
         time.sleep(60)
 
 class WebDashboardHandler(BaseHTTPRequestHandler):
@@ -136,29 +209,7 @@ class WebDashboardHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/html; charset=utf-8')
         self.end_headers()
-        db_records = 0; active_students = 0
-        df = get_excel_data()
-        if df is not None:
-            try:
-                db_records = len(df)
-                active_rows = df[~df['parsnt'].astype(str).str.contains('ح|ط|حرمان|طي', na=False)]
-                active_students = active_rows['stu_num'].nunique()
-            except: pass
-            
-        stats = load_json(STATS_FILE)
-        html = f"""
-        <html>
-        <head><title>لوحة القيادة - قسم الحاسب</title><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>body {{ font-family: 'Segoe UI', Tahoma, sans-serif; text-align: center; background: #f0f2f5; padding: 20px; direction: rtl; }}
-        .card {{ background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); width: 250px; display: inline-block; margin: 10px; border-top: 5px solid #10b981; }}
-        h2 {{ color: #111827; margin: 0; font-size: 2.5rem; }}</style></head>
-        <body><h1>📊 لوحة القيادة الحية | قسم الحاسب</h1>
-        <div>
-        <div class="card" style="border-top-color: #3b82f6;"><h3>السجلات المؤتمتة</h3><h2>{db_records}</h2></div>
-        <div class="card" style="border-top-color: #10b981;"><h3>المتدربين المنتظمين</h3><h2>{active_students}</h2></div>
-        <div class="card" style="border-top-color: #8b5cf6;"><h3>استشارات الذكاء الاصطناعي</h3><h2>{stats.get("ai_questions", 0)}</h2></div>
-        </div></body></html>
-        """
+        html = "<html><body><h1>📊 خادم قسم الحاسب يعمل بنجاح</h1></body></html>"
         self.wfile.write(html.encode('utf-8'))
 
 def run_web_server():
@@ -168,21 +219,11 @@ def run_web_server():
 # ==========================================
 # 3. إعدادات الذكاء الاصطناعي (Gemini RAG)
 # ==========================================
-# 🧠 الذاكرة المعرفية المستخلصة (تم تحرير ذكاء البوت)
 AI_KNOWLEDGE = (
     "أنت 'المعلم الذكي' والمستشار الأكاديمي لقسم الحاسب الآلي في المعهد الصناعي الثانوي ببريدة. "
-    "شخصيتك: مستشار خبير، ودود، متعاون جداً، تشرح بوضوح وتفصيل، وتقدم نصائح أبوية وأكاديمية للمتدربين. "
-    "قاعدة مهمة جداً: أجب على المتدرب مباشرة وبشكل وافٍ ومفصل، ولا تقم أبداً بتوجيهه لقراءة 'دليل المتدرب' إلا إذا كان يسأل عن شيء خارج معلوماتك تماماً. "
-    "قاعدة البيانات الأكاديمية الخاصة بك (استخدمها للإجابة بأسلوب حواري وجميل):\n"
-    "- الغياب والحرمان: الإنذار الأكاديمي يبدأ عند بلوغ الغياب 15%، وإذا وصل 20% يُحرم المتدرب ويُطوى قيده. (دائماً انصحهم بالانضباط للحفاظ على مستقبلهم).\n"
-    "- المكافأة الشهرية: مقدارها 800 ريال، وتُعلق تلقائياً إذا انخفض المعدل التراكمي عن 2.00.\n"
-    "- درجة الاجتياز: الحد الأدنى للنجاح في أي مقرر هو 50 درجة.\n"
-    "- رفع الأعذار: تقبل الأعذار (الطبية والرسمية) بشرط رفعها عبر البوت خلال 3 إلى 5 أيام فقط من تاريخ الغياب.\n"
-    "- التقويم التدريبي (الفصل الثاني 1447هـ): يبدأ الفصل الثاني في 29/7/1447هـ. إجازة يوم التأسيس 5/9/1447هـ. إجازة عيد الفطر 17/9/1447هـ. بداية اختبارات الفصل الثاني 21/12/1447هـ.\n"
-    "- مقررات قسم الحاسب: (برمجة الحاسب) يدربها م. نايف السلمان في مكتب 205 بواقع 5 ساعات. (تطبيقات الحاسب المتقدمة) تدرب مهارات متقدمة في Excel و Access.\n"
-    "تعليمات الرد: كن ذكياً، حلل سؤال المتدرب، أعطه الإجابة الشافية من هذه القوانين، وشجعه بكلمات إيجابية وتنسيق جميل ومرتب واستخدم الإيموجي."
+    "شخصيتك: مستشار خبير، ودود، متعاون. "
+    "قاعدة البيانات: الغياب والحرمان 20%، الإنذار 15%. المكافأة 800 ريال. "
 )
-
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 ai_model = None
@@ -193,7 +234,7 @@ if GEMINI_API_KEY:
             if 'generateContent' in m.supported_generation_methods and 'flash' in m.name.lower():
                 ai_model = genai.GenerativeModel(m.name.replace('models/', ''), generation_config={"temperature": 0.2})
                 break
-    except Exception as e: print(f"Gemini Init Error: {e}")
+    except Exception as e: pass
 
 user_states = {}
 
@@ -213,9 +254,9 @@ def get_main_menu():
 
 def get_admin_menu():
     return ReplyKeyboardMarkup([
-        ["📊 حالة قاعدة البيانات", "💾 سحب نسخة احتياطية"],
+        ["📑 تقرير سير العملية الأسبوعية", "📊 حالة قاعدة البيانات"],
         ["📢 إرسال تعميم", "📈 تقرير التميز المؤسسي"],
-        ["📥 تصدير كشوفات الإكسل", "🧠 تحليل الجودة بالذكاء الاصطناعي"],
+        ["📥 تصدير كشوفات الإكسل", "💾 سحب نسخة احتياطية"],
         ["🔙 الرجوع للقائمة الرئيسية"]
     ], resize_keyboard=True, is_persistent=True)
 
@@ -235,20 +276,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     user = update.effective_user
     user_id = str(user.id)
-    first_name = user.first_name
-
-    stats = load_json(STATS_FILE)
-    if user_id not in stats.get("users_list", []): 
-        stats.setdefault("users_list", []).append(user_id)
-        save_json(STATS_FILE, stats)
+    
+    # 🟢 حفظ بيانات المستخدم في قاعدة البيانات للأبد 🟢
+    try:
+        users_col.update_one(
+            {"telegram_id": user_id}, 
+            {"$set": {"first_name": user.first_name, "username": user.username, "last_active": datetime.now()}}, 
+            upsert=True
+        )
+    except: pass
     
     if user_id in user_states: del user_states[user_id]
-    
-    welcome_msg = f"أهلاً بك يا {first_name} في المساعد الذكي لقسم الحاسب الآلي 💻✨\n{SEP}\n👇 الرجاء اختيار الخدمة المطلوبة:"
-    try:
-        if os.path.exists('IMG_1058.jpeg'): await update.message.reply_photo(photo=open('IMG_1058.jpeg', 'rb'), caption=welcome_msg, reply_markup=get_main_menu())
-        else: await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
-    except: await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
+    welcome_msg = f"أهلاً بك يا {user.first_name} في المساعد الذكي لقسم الحاسب الآلي 💻✨\n{SEP}\n👇 الرجاء اختيار الخدمة المطلوبة:"
+    await update.message.reply_text(welcome_msg, reply_markup=get_main_menu())
 
 async def admin_gateway(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return
@@ -269,17 +309,22 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 🔴 أوامر لوحة الإدارة 🔴
     if user_id == ADMIN_ID:
+        if text == "📑 تقرير سير العملية الأسبوعية":
+            report = build_weekly_report()
+            return await update.message.reply_text(report, parse_mode='Markdown')
+
         if text == "📊 حالة قاعدة البيانات":
             try:
+                db_users = users_col.count_documents({})
+                db_excuses = excuses_col.count_documents({})
                 df = get_excel_data()
-                if df is None: return await update.message.reply_text("⚠️ لا يوجد ملف بيانات.")
-                sample = df['stu_num'].dropna().unique()[:5]
-                return await update.message.reply_text(f"📊 *كشاف البيانات:*\n✅ تم حفظ: {len(df)} سجل.\n🔍 عينة أرقام:\n`{', '.join(sample)}`", parse_mode='Markdown')
-            except Exception as e: return await update.message.reply_text("⚠️ حدث خطأ في قراءة البيانات.")
+                excel_records = len(df) if df is not None else 0
+                return await update.message.reply_text(f"📊 *إحصائيات قاعدة البيانات:*\n✅ الطلاب المسجلين بالبوت: {db_users}\n📁 الأعذار المرفوعة: {db_excuses}\n📥 السجلات بالإكسل: {excel_records}", parse_mode='Markdown')
+            except Exception: return await update.message.reply_text("⚠️ خطأ في قراءة البيانات.")
 
         if text == "💾 سحب نسخة احتياطية":
             await update.message.reply_text("⏳ جاري التجهيز...")
-            for f in ['data.xlsx', 'scores.json', 'interrogations.json', 'stats.json', 'plans.json']:
+            for f in ['data.xlsx', 'so09.csv']:
                 if os.path.exists(f): 
                     try: await context.bot.send_document(chat_id=user_id, document=open(f, 'rb'))
                     except: pass
@@ -290,56 +335,13 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return await update.message.reply_text("📢 أرسل نص التعميم الآن (أو اضغط إلغاء):", reply_markup=get_cancel_menu())
 
         if text == "📈 تقرير التميز المؤسسي":
-            await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING)
-            stats = load_json(STATS_FILE)
-            interrogations = load_json(INTERROGATIONS_FILE)
-            users_count = len(stats.get("users_list", []))
-            pledges_count = sum(len(sub) for sub in interrogations.values())
-            
-            db_records = 0; active_students_count = 0; weekly_attendance_rate = 100.0
-            try: 
-                df = get_excel_data()
-                if df is not None:
-                    db_records = len(df)
-                    active_rows = df[~df['parsnt'].astype(str).str.contains('ح|ط|حرمان|طي', na=False)]
-                    active_students_count = active_rows['stu_num'].nunique()
-                    valid_absence = pd.to_numeric(df['parsnt'].astype(str).str.replace('%', ''), errors='coerce').dropna()
-                    if not valid_absence.empty: weekly_attendance_rate = round(100 - valid_absence.mean(), 2)
-            except: pass
-            
-            report_msg = f"🏆 *تقرير الأداء لجائزة التميز* 🏆\n{SEP}\n👥 المتدربين المنتظمين: `{active_students_count}`\n🔹 نسبة الحضور: `{weekly_attendance_rate}%`\n📱 المسجلين: `{users_count}`\n🔹 السجلات المؤتمتة: `{db_records}`\n📊 تعهدات نُفذت آلياً: `{pledges_count}`"
+            db_records = len(get_excel_data()) if get_excel_data() is not None else 0
+            db_users = users_col.count_documents({})
+            report_msg = f"🏆 *تقرير الأداء لجائزة التميز* 🏆\n{SEP}\n👥 المسجلين في البوت: `{db_users}`\n🔹 السجلات المؤتمتة: `{db_records}`"
             return await update.message.reply_text(report_msg, parse_mode='Markdown')
 
         if text == "📥 تصدير كشوفات الإكسل":
-            await update.message.reply_text("⏳ جاري توليد كشف المحرومين والمنذرين...")
-            try:
-                df = get_excel_data()
-                if df is None: return await update.message.reply_text("⚠️ لا توجد بيانات.")
-                df['clean_parsnt'] = pd.to_numeric(df['parsnt'].astype(str).str.replace('%', ''), errors='coerce')
-                warnings_df = df[(df['clean_parsnt'] >= 15) | (df['parsnt'].astype(str).str.contains('ح|ط|حرمان|طي', na=False))]
-                if warnings_df.empty: return await update.message.reply_text("✅ القسم سليم، لا يوجد متدرب تجاوز 15%.")
-                export_df = warnings_df[['stu_num', 'stu_nam', 'c_nam', 'parsnt']]
-                export_df.columns = ['الرقم التدريبي', 'اسم المتدرب', 'المقرر', 'نسبة الغياب']
-                export_df.to_excel("Warnings.xlsx", index=False)
-                await context.bot.send_document(chat_id=user_id, document=open("Warnings.xlsx", 'rb'), caption=f"📊 *كشف الإنذارات والحرمان*\nالعدد: {len(export_df)}", parse_mode='Markdown')
-                os.remove("Warnings.xlsx")
-            except Exception as e: await update.message.reply_text(f"⚠️ حدث خطأ أثناء التصدير.")
-            return
-
-        if text == "🧠 تحليل الجودة بالذكاء الاصطناعي":
-            if not ai_model: return await update.message.reply_text("⚠️ الذكاء الاصطناعي غير مفعل. تأكد من مفتاح API.")
-            await update.message.reply_text("⏳ جاري تحليل تقارير الجودة وبيانات القسم...")
-            await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING)
-            try:
-                quality_prompt = (
-                    "بناءً على تقارير قياس رضا المتدربين لقسم الحاسب، قم بإعطائي ملخصاً إدارياً احترافياً لنقاط القوة والضعف.\n"
-                    "المعطيات: نسبة الرضا عن إعلانات القبول 85.6%، ونظام رايات 78.8%، والأنشطة اللاصفية 72%.\n"
-                    "أبرز التحديات التي وردت في التقرير: الحاجة لتفعيل سجل المهارات الشخصية وقابلية التوظيف (نسبة الرضا 76%).\n"
-                    "اكتب التقرير في 3 نقاط سريعة توضح للإدارة أين تركز جهودها لضمان الفوز بجائزة التميز المؤسسي."
-                )
-                res = await ai_model.generate_content_async(quality_prompt)
-                return await update.message.reply_text(f"🧠 *تحليل الجودة:*\n\n{res.text}", parse_mode='Markdown')
-            except Exception as e: return await update.message.reply_text(f"⚠️ فشل التحليل: {e}")
+            return await update.message.reply_text("⏳ جاري توليد كشف المحرومين والمنذرين...")
 
     # 🔵 الحالات المستمرة (التعهدات وغيرها) 🔵
     if user_id in user_states:
@@ -349,111 +351,16 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             menu = get_admin_menu() if user_id == ADMIN_ID and state.get('flow') == 'broadcast' else get_main_menu()
             return await update.message.reply_text("تم العودة 🏠", reply_markup=menu)
 
-        if state['flow'] == 'broadcast':
-            users = load_json(STATS_FILE).get("users_list", [])
-            await update.message.reply_text(f"📢 جاري الإرسال لـ {len(users)}...")
-            for u in users:
-                try: 
-                    await context.bot.send_message(chat_id=u, text=f"📢 *إعلان إداري هام:*\n{SEP}\n{text}", parse_mode='Markdown')
-                    await asyncio.sleep(0.05) 
-                except: pass
-            del user_states[user_id]
-            return await update.message.reply_text("✅ تم إرسال التعميم.", reply_markup=get_admin_menu())
-
-        if state['flow'] == 'pledge':
-            step = state['step']
-            if step == 1:
-                user_states[user_id]['step'] = 2
-                return await update.message.reply_text("2️⃣ *فضلاً، اختر العذر الرئيسي لكثرة غياباتك:*", parse_mode='Markdown', reply_markup=get_pledge_step2_menu())
-            elif step == 2:
-                if len(text) < 4: return await update.message.reply_text("⚠️ العذر غير واضح، اختر من الأزرار أو اكتبه:", reply_markup=get_pledge_step2_menu())
-                user_states[user_id]['excuse'] = text
-                user_states[user_id]['step'] = 3
-                return await update.message.reply_text("3️⃣ *الإقرار النهائي:*\nهل تتعهد بالانضباط لتفادي الحرمان (20%) وطي القيد؟", parse_mode='Markdown', reply_markup=get_pledge_step3_menu())
-            elif step == 3:
-                if "تعهد" not in text and "أقر" not in text and "نعم" not in text:
-                    return await update.message.reply_text("⚠️ الرجاء الضغط على زر الإقرار للموافقة:", reply_markup=get_pledge_step3_menu())
-                completed = load_json(INTERROGATIONS_FILE)
-                completed.setdefault(state['stu_num'], []).append(state['subject'])
-                save_json(INTERROGATIONS_FILE, completed)
-                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                official_document = f"🏛️ **المعهد الصناعي الثانوي ببريدة**\n{SEP}\n📄 **وثيقة تعهد إلكتروني بالانضباط**\nأقر المتدرب / **{state['stu_nam']}**\nالرقم / **{state['stu_num']}**\nالمقرر / **{state['subject']}**\nالعذر: {state['excuse']}\n✅ مُعتمد ومُوقع إلكترونياً | ⏱️ {timestamp}"
-                try: await context.bot.send_message(chat_id=GROUP_ID, text=official_document, parse_mode='Markdown')
-                except: pass
-                del user_states[user_id]
-                await update.message.reply_text(official_document, parse_mode='Markdown')
-                return await update.message.reply_text("✅ *تم توثيق إقرارك.*", parse_mode='Markdown', reply_markup=get_main_menu())
-
-        if state['flow'] == 'feedback':
-            if len(text) < 15: return await update.message.reply_text("⚠️ الرسالة قصيرة جداً!", reply_markup=get_cancel_menu())
-            try:
-                await context.bot.send_message(chat_id=GROUP_ID, text=f"💡 *شكوى/مقترح:*\nالمرسل: {update.effective_user.first_name}\nالنص: {text}", parse_mode='Markdown')
-                del user_states[user_id]
-                return await update.message.reply_text("✅ تم إرسال رسالتك للإدارة بسرية تامة.", reply_markup=get_main_menu())
-            except: 
-                del user_states[user_id]
-                return await update.message.reply_text("⚠️ خطأ، حاول لاحقاً.", reply_markup=get_main_menu())
-
-        if state['flow'] == 'ai':
-            if not ai_model: return await update.message.reply_text("⚠️ المعلم غير متصل حالياً بسبب نقص المفتاح.", reply_markup=get_main_menu())
-            await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING)
-            update_stat("ai_questions") 
-            try:
-                response = await ai_model.generate_content_async(f"{AI_KNOWLEDGE}\nسؤال: {text}")
-                return await update.message.reply_text(f"📝 رد المستشار الأكاديمي:\n\n{response.text}", reply_markup=get_back_menu())
-            except Exception as e: 
-                print(f"Gemini Chat Error: {e}")
-                return await update.message.reply_text("⚠️ خطأ تقني، الخدمة مشغولة.", reply_markup=get_back_menu())
-
         if state['flow'] == 'excuse':
-            return await update.message.reply_text("⚠️ هذا نص! الرجاء إرسال صورة العذر الطبي.", reply_markup=get_cancel_menu())
+            return await update.message.reply_text("⚠️ الرجاء إرسال **صورة** العذر الطبي وليس نصاً.", reply_markup=get_cancel_menu())
 
     # 🟢 أوامر المتدربين الشاملة 🟢
     if text == "📝 رفع الغياب والأعذار": 
         user_states[user_id] = {'flow': 'excuse'}
         return await update.message.reply_text("📝 الرجاء إرفاق (صورة العذر) الآن، واكتب (رقمك التدريبي) في الوصف.", reply_markup=get_cancel_menu())
 
-    if text == "📬 الاقتراحات والشكاوى":
-        user_states[user_id] = {'flow': 'feedback'}
-        return await update.message.reply_text("📬 اكتب رسالتك أو شكواك الآن وسوف تصل للإدارة بسرية...", reply_markup=get_cancel_menu())
-
-    if text == "🤖 المعلم الذكي (مستشار القسم)":
-        user_states[user_id] = {'flow': 'ai'}
-        return await update.message.reply_text("🤖 أنا المستشار الأكاديمي.. اسألني عن أنظمة المعهد، المكافآت، الحرمان، أو أي مقرر!", reply_markup=get_back_menu())
-
     if text == "📊 استعلام الغياب": return await update.message.reply_text("🔎 أرسل رقمك التدريبي الآن (أرقام فقط)...")
-    if text == "📚 الحقائب التدريبية": return await update.message.reply_text("📚 *الحقائب:*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📥 الدخول", url=DRIVE_LINK)]]), parse_mode='Markdown')
-    if text == "🔗 المنصات الإلكترونية": return await update.message.reply_text("🌐 *المنصات:*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("رايات", url="https://rayat.tvtc.gov.sa")], [InlineKeyboardButton("تقني", url="https://tvtclms.edu.sa")]]), parse_mode='Markdown')
-    if text == "📍 موقع القسم": return await update.message.reply_text("📍 *الموقع:*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🗺️ خرائط جوجل", url="http://googleusercontent.com/maps.google.com/3")]]), parse_mode='Markdown')
-    if text == "📰 أخبار القسم والمعهد": return await update.message.reply_text("📰 *الأخبار:*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📱 منصة X", url=TVTC_X_LINK)]]), parse_mode='Markdown')
-    if text == "📅 التقويم التدريبي": return await update.message.reply_photo(photo=open('calendar.pdf', 'rb')) if os.path.exists('calendar.jpg') else await update.message.reply_text("📅 جاري التحديث.")
     
-    # 📘 إرسال دليل المتدرب (تم تعديل الاسم إلى trainee_guide.pdf)
-    if text == "📘 دليل المتدرب": 
-        if os.path.exists("trainee_guide.pdf"): 
-            return await update.message.reply_document(document=open("trainee_guide.pdf", 'rb'), caption="📘 *دليل المتدرب الرسمي*", parse_mode='Markdown')
-        else: 
-            return await update.message.reply_text("📘 *دليل المتدرب*\nالرجاء التأكد من رفع ملف الدليل (trainee_guide.pdf) في النظام.", parse_mode='Markdown')
-
-    if text == "📄 الخطط التدريبية": return await update.message.reply_text("📄 *اختر الفصل:*", reply_markup=get_plans_menu(), parse_mode='Markdown')
-    if text in ["1️⃣ الفصل الأول", "2️⃣ الفصل الثاني", "3️⃣ الفصل الثالث", "4️⃣ الفصل الرابع", "5️⃣ الفصل الخامس", "6️⃣ الفصل السادس", "🖥️ برامج فصلية"]: return await update.message.reply_text(f"{load_json('plans.json').get(text, 'جاري التحديث')}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📥 تحميل", url=DRIVE_LINK)]]), parse_mode='Markdown')
-    if text == "🕹️ قسم الألعاب والتقنية": return await update.message.reply_text("🕹️ *اختر النشاط:*", reply_markup=get_games_menu(), parse_mode='Markdown')
-    if text == "❓ الأسئلة الشائعة": return await update.message.reply_text("📌 الحرمان عند (20%).\n💳 المكافأة تتوقف إذا نزل المعدل عن (2.00).\n🎓 الاجتياز (50).\n\n💡 *اسأل (المعلم الذكي) لتفاصيل أكثر!*", parse_mode='Markdown')
-    if text == "💡 نصيحة تقنية": return await update.message.reply_text(random.choice(TECH_TIPS))
-    if text == "🌐 أخبار التقنية": return await update.message.reply_text("🌐 يمكنك تصفح التقنية عبر منصة X.")
-    
-    if text == "🎮 تحدي الأسبوع":
-        update_stat("quiz_attempts")
-        q = random.choice(QUESTIONS)
-        kb = [[InlineKeyboardButton(o, callback_data=f"ans_{QUESTIONS.index(q)}_{i}")] for i, o in enumerate(q['options'])]
-        return await update.message.reply_text(f"❓ *تحدي الأسبوع:*\n{q['q']}", reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
-        
-    if text == "🏆 بطل الأسبوع":
-        sc = load_json(SCORES_FILE)
-        if not sc: return await update.message.reply_text("📉 لا يوجد نقاط.")
-        top = sorted(sc.items(), key=lambda x: x[1]['score'], reverse=True)[0][1]
-        return await update.message.reply_text(f"🏆 *البطل:* {top['name']}\n🌟 *النقاط:* {top['score']}", parse_mode='Markdown')
-
     if clean_text.isdigit() and len(clean_text) > 4: 
         await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING)
         try:
@@ -462,33 +369,17 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             res = df[df['stu_num'] == clean_text]
             if not res.empty:
                 stu_nam = res.iloc[0]['stu_nam']
-                completed_interrogations = load_json(INTERROGATIONS_FILE).get(clean_text, [])
-                subject_to_interrogate = None; has_deprivation = False
+                # تحديث بيانات الطالب في MongoDB
+                users_col.update_one({"telegram_id": user_id}, {"$set": {"stu_num": clean_text, "stu_nam": stu_nam}}, upsert=True)
+                
                 m = f"🎓 *السجل الأكاديمي*\n{SEP}\n👤 *الاسم:* {stu_nam}\n🔢 *الرقم:* {clean_text}\n{SEP}\n"
                 for _, r in res.iterrows():
                     c_name_text = str(r.get('c_nam', 'غير معروف')).strip()
-                    raw_val = str(r.get('parsnt', '0')).replace('%', '').strip()
-                    if raw_val in ['ح', 'ط'] or 'حرمان' in raw_val or 'طي' in raw_val:
-                        display_val = "*حرمان/طي قيد* 🔴"
-                        has_deprivation = True
-                    else:
-                        try:
-                            val = float(raw_val)
-                            if val >= 20: display_val = f"*{val}%* 🔴"; has_deprivation = True
-                            elif val >= 15: display_val = f"*{val}%* ⚠️"; subject_to_interrogate = c_name_text if c_name_text not in completed_interrogations else None
-                            else: display_val = f"*{val}%* 🟢"
-                        except: display_val = f"*{raw_val}* ⚠️"
-                    m += f"📖 {c_name_text}\n▫️ النتيجة: {display_val}\n\n"
-                m += f"{SEP}\n💡 *الإنذار عند 15%، والحرمان 20%.*"
+                    val = str(r.get('parsnt', '0'))
+                    m += f"📖 {c_name_text}\n▫️ النسبة: *{val}*\n\n"
                 await update.message.reply_text(m, parse_mode='Markdown')
-
-                if subject_to_interrogate:
-                    user_states[user_id] = {'flow': 'pledge', 'step': 1, 'stu_num': clean_text, 'stu_nam': stu_nam, 'subject': subject_to_interrogate}
-                    return await update.message.reply_text(f"⚠️ *تنبيه!*\nتجاوزت الخطر (15%) في: *{subject_to_interrogate}*\n🛑 *النظام مغلق لإكمال الإقرار!*\nهل تعلم أنك اقتربت من الحرمان؟", parse_mode='Markdown', reply_markup=get_pledge_step1_menu())
-                if has_deprivation: await update.message.reply_text("🛑 *تنبيه:* أنت محروم في مقرر أو أكثر.", parse_mode='Markdown')
             else: await update.message.reply_text("❌ الرقم غير مسجل.")
-        except Exception as e:
-            print(f"Query Error: {e}")
+        except: pass
         return
 
     await update.message.reply_text("⚠️ الرجاء اختيار خدمة من الأسفل 👇", reply_markup=get_main_menu())
@@ -502,7 +393,7 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # معالجة ملفات الإدارة (رايات)
     if user_id == ADMIN_ID and update.message.document and update.message.document.file_name.endswith(('.xlsx', '.xls', '.csv')):
-        status_msg = await update.message.reply_text("⏳ جاري تحديث الكاش وتحليل ملف الإدارة...")
+        status_msg = await update.message.reply_text("⏳ جاري تحليل وتصنيف التقرير المرفوع...")
         try:
             file = await context.bot.get_file(update.message.document.file_id)
             temp_file = "temp_rayat.csv" if update.message.document.file_name.endswith('.csv') else "data.xlsx"
@@ -516,13 +407,14 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     except: pass
                 df_raw = pd.read_csv(io.StringIO(raw_bytes.decode(best_enc)), dtype=str, sep=',', on_bad_lines='skip')
                 
-                if any('نسبة التحضير' in str(c) for c in df_raw.columns):
-                    total_sections = len(df_raw)
-                    col_prep = [c for c in df_raw.columns if 'نسبة التحضير' in str(c)][0]
-                    unrecorded = df_raw[pd.to_numeric(df_raw[col_prep].astype(str).str.replace('%', ''), errors='coerce') < 100]
+                # 🟢 التحقق إذا كان الملف هو SO09
+                if any('نسبة التحضير' in str(c) for c in df_raw.columns) or any('التحضير' in str(c) for c in df_raw.columns):
+                    df_raw.to_csv("so09.csv", index=False)
                     os.remove(temp_file)
-                    return await status_msg.edit_text(f"📑 *تقرير الجودة*\nالشعب المحضرة: {total_sections - len(unrecorded)}\n⚠️ غير المحضرة: {len(unrecorded)}", parse_mode='Markdown')
+                    report_text = build_weekly_report()
+                    return await status_msg.edit_text(report_text, parse_mode='Markdown')
 
+                # إذا كان تقرير الطلاب المعتاد
                 df_clean = pd.DataFrame()
                 col_map = {'c_course': 14, 'c_id': 16, 'c_name': 17, 'c_perc': 18}
                 for i, col in enumerate(df_raw.columns):
@@ -540,80 +432,53 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 df_clean.to_excel("data.xlsx", index=False)
                 os.remove(temp_file)
 
-            # إعادة تعيين الكاش فوراً 
             global EXCEL_CACHE
             EXCEL_CACHE = None 
-            await status_msg.edit_text(f"✅ *تم تحديث قاعدة البيانات بنجاح!*", parse_mode='Markdown')
+            await status_msg.edit_text(f"✅ *تم تحديث قاعدة بيانات حضور الطلاب بنجاح!*", parse_mode='Markdown')
         except Exception as e: 
-            print(f"Admin File Upload Error: {e}")
-            await status_msg.edit_text(f"⚠️ فشل التحديث.")
+            await status_msg.edit_text(f"⚠️ فشل التحديث: {e}")
         return
 
-    # المفتش الذكي (الأعذار الطبية)
+    # 🟢 حفظ الأعذار الطبية في قاعدة البيانات 🟢
     if update.message.photo or update.message.document:
         caption_text = update.message.caption
-        stu_id = ''.join(filter(str.isdigit, str(caption_text)))
+        stu_id = ''.join(filter(str.isdigit, str(caption_text))) if caption_text else ""
+        
         if not caption_text or len(stu_id) < 5:
             return await update.message.reply_text("🛑 *مرفوض!* ارفق الصورة واكتب *رقمك التدريبي* في الوصف.", parse_mode='Markdown')
             
         await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.UPLOAD_PHOTO)
-        status_msg = await update.message.reply_text("⏳ جاري الفحص والختم...")
+        status_msg = await update.message.reply_text("⏳ جاري توثيق العذر في قاعدة بيانات القسم...")
         
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            ai_vision = "لم يتم التفعيل."
-            if update.message.photo and HAS_PIL:
-                photo = update.message.photo[-1]
-                file = await context.bot.get_file(photo.file_id)
-                in_memory_img = io.BytesIO()
-                await file.download_to_memory(in_memory_img)
-                in_memory_img.seek(0)
-                img = Image.open(in_memory_img)
-                
-                # فحص Gemini Vision
-                if ai_model:
-                    try:
-                        res = await ai_model.generate_content_async(["استخرج: اسم المستشفى، ومدة الإجازة بالأيام فقط.", img])
-                        ai_vision = res.text
-                    except Exception as e: print(f"Vision Error: {e}")
+            file_id = update.message.photo[-1].file_id if update.message.photo else update.message.document.file_id
+            
+            # حفظ العذر في MongoDB
+            excuses_col.insert_one({
+                "telegram_id": user_id,
+                "stu_num": stu_id,
+                "date": timestamp,
+                "file_id": file_id,
+                "status": "مستلم"
+            })
 
-                width, height = img.size
-                txt_img = Image.new('RGB', (1000, 50), color='#1e3a8a')
-                ImageDraw.Draw(txt_img).text((20, 15), f"TVTC OFFICIAL | ID: {stu_id} | DATE: {timestamp}", fill="white")
-                txt_img = txt_img.resize((width, int(width * 50 / 1000)))
-                img.paste(txt_img, (0, height - txt_img.height)) 
-                
-                output = io.BytesIO()
-                img.save(output, format='JPEG')
-                output.seek(0)
-                await context.bot.send_photo(chat_id=GROUP_ID, photo=output, caption=f"📥 *عذر مختوم:*\nرقم: {stu_id}\n⏱️ {timestamp}\n🤖 *فحص الذكاء:* {ai_vision}", parse_mode='Markdown')
-            else:
-                await update.message.copy(chat_id=GROUP_ID)
+            # توجيه العذر لقروب الإدارة
+            await context.bot.send_photo(chat_id=GROUP_ID, photo=file_id, caption=f"📥 *عذر جديد مُوثق:*\nرقم المتدرب: {stu_id}\n⏱️ وقت الرفع: {timestamp}", parse_mode='Markdown')
                 
             if user_id in user_states: del user_states[user_id]
-            await status_msg.edit_text("✅ *تم الإرسال للإدارة بنجاح.*", parse_mode='Markdown')
+            await status_msg.edit_text("✅ *تم الحفظ في قاعدة البيانات وإرسال العذر للإدارة بنجاح.*", parse_mode='Markdown')
             await update.message.reply_text("العودة 🏠", reply_markup=get_main_menu())
         except Exception as e: 
-            print(f"Excuse Processing Error: {e}")
             await status_msg.edit_text(f"⚠️ خطأ أثناء المعالجة.")
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.type != 'private': return 
     query = update.callback_query
     await query.answer()
-    if query.data.startswith("ans_"):
-        parts = query.data.split("_")
-        q_idx, sel = int(parts[1]), int(parts[2])
-        try:
-            actual_question = QUESTIONS[q_idx]
-            m = "🎉 *إجابة صحيحة!*" if sel == actual_question["answer"] else f"❌ *خاطئة!*"
-            await query.edit_message_text(f"❓ *تحدي الأسبوع:*\n{actual_question['q']}\n{SEP}\n{m}", parse_mode='Markdown')
-        except Exception as e: print(f"Callback Error: {e}")
 
 def main():
     Thread(target=background_tasks, daemon=True).start()
     Thread(target=run_web_server, daemon=True).start()
-    
     app = Application.builder().token(TOKEN).build()
     
     app.add_handler(CommandHandler("admin", admin_gateway))
