@@ -74,27 +74,29 @@ def update_stat(cat):
     save_json(STATS_FILE, s)
 
 EXCEL_CACHE = None
-LAST_CACHE_TIME = 0
 
 def get_excel_data():
-    global EXCEL_CACHE, LAST_CACHE_TIME
-    file_path = 'data.xlsx'
-    if not os.path.exists(file_path): 
+    global EXCEL_CACHE
+    if EXCEL_CACHE is not None:
+        return EXCEL_CACHE
+    try:
+        records = list(db["trainees_data"].find({}, {"_id": 0}))
+        if not records:
+            return None
+        df = pd.DataFrame(records)
+        df['stu_num'] = df['stu_num'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
+        EXCEL_CACHE = df
+        return EXCEL_CACHE
+    except Exception as e:
         return None
-    current_mtime = os.path.getmtime(file_path)
-    if EXCEL_CACHE is None or current_mtime > LAST_CACHE_TIME:
-        try:
-            df = pd.read_excel(file_path, dtype=str)
-            df['stu_num'] = df['stu_num'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
-            EXCEL_CACHE = df
-            LAST_CACHE_TIME = current_mtime
-        except: return None
-    return EXCEL_CACHE
 
 def build_weekly_report():
     try:
-        if not os.path.exists("so09.csv"): return "⚠️ لم يتم رفع إحصائيات الشعب (SO09) حتى الآن."
-        df_so09 = pd.read_csv("so09.csv", dtype=str)
+        records = list(db["so09_data"].find({}, {"_id": 0}))
+        if not records: 
+            return "⚠️ لم يتم رفع إحصائيات الشعب (SO09) حتى الآن."
+        
+        df_so09 = pd.DataFrame(records)
         col_prep = 'نسبة التحضير'
         col_trainer = 'اسم المدرب'
         col_section = 'رمز المقرر'
@@ -252,7 +254,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e: return await update.message.reply_text("⚠️ خطأ في القراءة.")
         if text == "💾 سحب نسخة احتياطية":
             await update.message.reply_text("⏳ جاري التجهيز...")
-            for f in ['data.xlsx', 'so09.csv', 'scores.json', 'stats.json']:
+            for f in ['scores.json', 'stats.json']:
                 if os.path.exists(f): 
                     try: await context.bot.send_document(chat_id=user_id, document=open(f, 'rb'))
                     except: pass
@@ -275,9 +277,9 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if warnings_df.empty: return await update.message.reply_text("✅ القسم سليم، لا يوجد متدرب تجاوز 15%.")
                 export_df = warnings_df[['stu_num', 'stu_nam', 'c_nam', 'parsnt']]
                 export_df.columns = ['الرقم التدريبي', 'اسم المتدرب', 'المقرر', 'نسبة الغياب']
-                export_df.to_excel("Warnings.xlsx", index=False)
-                await context.bot.send_document(chat_id=user_id, document=open("Warnings.xlsx", 'rb'), caption=f"📊 *كشف الإنذارات والحرمان*\nالعدد: {len(export_df)}", parse_mode='Markdown')
-                os.remove("Warnings.xlsx")
+                export_df.to_csv("Warnings.csv", index=False, encoding='utf-8-sig')
+                await context.bot.send_document(chat_id=user_id, document=open("Warnings.csv", 'rb'), caption=f"📊 *كشف الإنذارات والحرمان*\nالعدد: {len(export_df)}", parse_mode='Markdown')
+                os.remove("Warnings.csv")
             except Exception as e: await update.message.reply_text(f"⚠️ حدث خطأ أثناء التصدير.")
             return
         if text == "🧠 تحليل الجودة بالذكاء الاصطناعي":
@@ -314,19 +316,8 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 del user_states[user_id]
                 return await update.message.reply_text("⚠️ خطأ، حاول لاحقاً.", reply_markup=get_main_menu())
 
-        # 🟢 محادثة الذكاء الاصطناعي المرتبطة بـ MongoDB 🟢
+        # 🟢 محادثة الذكاء الاصطناعي (مع كشف الخطأ الحقيقي) 🟢
         if state['flow'] == 'ai':
-            if not ai_model: return await update.message.reply_text("⚠️ المعلم غير متصل حالياً بسبب نقص المفتاح.", reply_markup=get_main_menu())
-            await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING)
-            try:
-            
-            
-                    # 🟢 محادثة الذكاء الاصطناعي المرتبطة بـ MongoDB 🟢
-        if state['flow'] == 'ai':
-            if not ai_model: return await update.message.reply_text("⚠️ المعلم غير متصل حالياً بسبب نقص المفتاح.", reply_markup=get_main_menu())
-            await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING)
-            try:
-                   if state['flow'] == 'ai':
             if not ai_model: return await update.message.reply_text("⚠️ المعلم غير متصل حالياً بسبب نقص المفتاح.", reply_markup=get_main_menu())
             await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING)
             try:
@@ -337,7 +328,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 error_msg = str(e)[:300]
                 return await update.message.reply_text(f"⚠️ تفاصيل الخطأ الحقيقي:\n{error_msg}", reply_markup=get_back_menu())
 
-            
         if state['flow'] == 'excuse':
             return await update.message.reply_text("⚠️ هذا نص! الرجاء إرسال صورة العذر الطبي.", reply_markup=get_cancel_menu())
 
@@ -387,7 +377,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING)
         try:
             df = get_excel_data()
-            if df is None: return await update.message.reply_text("⚠️ قاعدة البيانات غير متوفرة.")
+            if df is None: return await update.message.reply_text("⚠️ قاعدة البيانات غير متوفرة. الرجاء رفع ملف الإكسل لتحديث البيانات.")
             res = df[df['stu_num'] == clean_text]
             if not res.empty:
                 stu_nam = res.iloc[0]['stu_nam']
@@ -410,8 +400,10 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     m += f"📖 {c_name_text}\n▫️ النتيجة: {display_val}\n\n"
                 m += f"{SEP}\n💡 *الإنذار عند 15%، والحرمان 20%.*"
                 await update.message.reply_text(m, parse_mode='Markdown')
-            else: await update.message.reply_text("❌ الرقم غير مسجل.")
-        except: pass
+            else: await update.message.reply_text("❌ الرقم غير مسجل في قاعدة البيانات الحالية.")
+        except Exception as e:
+            print(f"Error checking student: {e}")
+            await update.message.reply_text("⚠️ حدث خطأ أثناء الاستعلام.")
         return
 
     await update.message.reply_text("⚠️ الرجاء اختيار خدمة من الأسفل 👇", reply_markup=get_main_menu())
@@ -428,7 +420,6 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
             file = await context.bot.get_file(doc.file_id)
             pdf_bytes = await file.download_as_bytearray()
             
-            # استخراج النص وحفظه في MongoDB
             text = extract_text_from_pdf_bytes(pdf_bytes)
             if text.strip():
                 save_knowledge_to_db(db, doc.file_name, text)
@@ -439,12 +430,12 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await status_msg.edit_text(f"⚠️ فشل في معالجة ملف PDF: {e}")
         return
 
-    # 🟢 2. معالجة ملفات الإكسل (رايات) 🟢
+    # 🟢 2. معالجة وحفظ ملفات الإكسل (رايات) في MongoDB 🟢
     if user_id == ADMIN_ID and doc and doc.file_name.endswith(('.xlsx', '.xls', '.csv')):
-        status_msg = await update.message.reply_text("⏳ جاري تحليل وتصنيف التقرير المرفوع تلقائياً...")
+        status_msg = await update.message.reply_text("⏳ جاري تحليل وتوثيق التقرير في السحابة الدائمة...")
         try:
             file = await context.bot.get_file(update.message.document.file_id)
-            temp_file = "temp_rayat.csv" if update.message.document.file_name.endswith('.csv') else "data.xlsx"
+            temp_file = "temp_rayat.csv" if update.message.document.file_name.endswith('.csv') else "temp_rayat.xlsx"
             await file.download_to_drive(temp_file)
             
             if temp_file.endswith('.csv'):
@@ -457,14 +448,20 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 df_raw = pd.read_csv(io.StringIO(raw_bytes.decode(best_enc)), dtype=str, sep=',', on_bad_lines='skip')
                 current_week = datetime.now().isocalendar()[1]
                 
+                # تحديث تقرير SO09
                 if 'اسم المدرب' in df_raw.columns and 'نسبة التحضير' in df_raw.columns:
-                    df_raw.to_csv("so09.csv", index=False)
+                    records = df_raw.to_dict(orient='records')
+                    if records:
+                        db["so09_data"].delete_many({}) 
+                        db["so09_data"].insert_many(records) 
+                    
                     os.remove(temp_file)
                     report_text = build_weekly_report()
                     try: reports_col.insert_one({"type": "SO09", "week_number": current_week, "date": datetime.now(), "total_sections": len(df_raw)})
                     except: pass
-                    return await status_msg.edit_text(report_text, parse_mode='Markdown')
+                    return await status_msg.edit_text(f"✅ **تم تحديث الإحصائيات الدائمة!**\n\n{report_text}", parse_mode='Markdown')
 
+                # تحديث سجلات غياب المتدربين
                 elif 'اسم المتدرب' in df_raw.columns and 'إجمالي نسبة الغياب بعذر وبدون عذر' in df_raw.columns:
                     df_clean = pd.DataFrame()
                     df_clean['c_nam'] = df_raw['اسم المقرر'].astype(str)
@@ -473,14 +470,19 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     df_clean['parsnt'] = df_raw['إجمالي نسبة الغياب بعذر وبدون عذر'].astype(str)
                     
                     df_clean = df_clean[df_clean['stu_num'].str.len() >= 5]
-                    df_clean.to_excel("data.xlsx", index=False)
+                    
+                    records = df_clean.to_dict(orient='records')
+                    if records:
+                        db["trainees_data"].delete_many({}) 
+                        db["trainees_data"].insert_many(records) 
+                    
                     os.remove(temp_file)
                     
                     global EXCEL_CACHE
                     EXCEL_CACHE = None 
                     try: reports_col.insert_one({"type": "Trainees_Absence", "week_number": current_week, "date": datetime.now(), "total_records": len(df_clean)})
                     except: pass
-                    return await status_msg.edit_text(f"✅ *تم تحديث بيانات الطلاب بنجاح!*\nتم رفع وتوثيق {len(df_clean)} سجل في الأرشيف (أسبوع {current_week}).", parse_mode='Markdown')
+                    return await status_msg.edit_text(f"✅ *تم تحديث بيانات الطلاب بنجاح!*\nتم حفظ وتوثيق {len(df_clean)} سجل في قاعدة البيانات الدائمة (أسبوع {current_week}).", parse_mode='Markdown')
                 
                 else:
                     os.remove(temp_file)
@@ -537,7 +539,7 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
     
-    print("🚀 تشغيل النظام الخارق V4.1 (مع ربط الذكاء الاصطناعي بقاعدة MongoDB)...")
+    print("🚀 تشغيل النظام الخارق V4.3 (مستقر بالكامل)...")
     app.run_polling()
 
 if __name__ == '__main__': 
