@@ -319,12 +319,22 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not ai_model: return await update.message.reply_text("⚠️ المعلم غير متصل حالياً بسبب نقص المفتاح.", reply_markup=get_main_menu())
             await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING)
             try:
-                # تمرير db للدالة عشان يسحب المراجع من القاعدة
+            
+            
+                    # 🟢 محادثة الذكاء الاصطناعي المرتبطة بـ MongoDB 🟢
+        if state['flow'] == 'ai':
+            if not ai_model: return await update.message.reply_text("⚠️ المعلم غير متصل حالياً بسبب نقص المفتاح.", reply_markup=get_main_menu())
+            await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING)
+            try:
                 final_prompt = build_ai_prompt(db, AI_KNOWLEDGE, text)
                 response = await ai_model.generate_content_async(final_prompt)
                 return await update.message.reply_text(f"📝 المستشار الأكاديمي:\n\n{response.text}", reply_markup=get_back_menu())
-            except Exception as e: return await update.message.reply_text("⚠️ خطأ تقني، الخدمة مشغولة.", reply_markup=get_back_menu())
+            except Exception as e: 
+                # 🟢 التعديل هنا: خلينا البوت ينطق بالخطأ الحقيقي عشان نصيده
+                error_msg = str(e)[:250] # نأخذ أول 250 حرف من الخطأ
+                return await update.message.reply_text(f"⚠️ تفاصيل الخطأ التقني:\n{error_msg}", reply_markup=get_back_menu())
 
+            
         if state['flow'] == 'excuse':
             return await update.message.reply_text("⚠️ هذا نص! الرجاء إرسال صورة العذر الطبي.", reply_markup=get_cancel_menu())
 
