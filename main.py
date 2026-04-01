@@ -27,7 +27,7 @@ TOKEN = os.environ.get("TOKEN")
 MONGO_URI = os.getenv("MONGODB_URI")
 PORT = int(os.environ.get("PORT", 8080))
 
-ADMIN_ID = "6167816001" 
+ADMIN_ID = "10073498" 
 GROUP_ID = "-1003701324722" 
 DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
 OPENCLAW_URL = "https://openclaw-server-2j6r.onrender.com"
