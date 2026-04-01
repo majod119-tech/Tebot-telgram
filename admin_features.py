@@ -5,9 +5,12 @@ import base64
 import requests
 import pandas as pd
 from datetime import datetime
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import Update
 from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
+
+# 🔴 استدعاء القائمة الإدارية المحدثة 🔴
+from menus import get_admin_menu
 
 # --- 🌟 ثوابت الإدارة 🌟 ---
 ADMIN_ID = "10073498"
@@ -47,11 +50,8 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return
     if str(update.effective_user.id) != ADMIN_ID: return
     
-    markup = ReplyKeyboardMarkup([
-        ["🦞 مساعد OpenClaw"],
-        ["🔙 الرجوع للقائمة الرئيسية"]
-    ], resize_keyboard=True)
-    await update.message.reply_text("مرحباً بك يا رئيس القسم. تم فتح لوحة التحكم المتقدمة.", reply_markup=markup)
+    # هنا كان الخطأ: استبدلناه بالاستدعاء المباشر للقائمة المحدثة
+    await update.message.reply_text("مرحباً بك يا رئيس القسم. تم فتح لوحة التحكم المتقدمة.", reply_markup=get_admin_menu())
 
 async def db_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return
@@ -141,6 +141,44 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ✅ ربط سحابي وتحديث دائم (24/7).
 """
     await update.message.reply_text(report_msg, parse_mode='Markdown')
+
+# --- 🌟 كشف الحالات الحرجة 🌟 ---
+async def critical_cases_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if str(update.effective_user.id) != ADMIN_ID: return
+    
+    if not os.path.exists('data.xlsx'):
+        return await update.message.reply_text("⚠️ لا يوجد ملف بيانات حالياً.")
+    
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+    
+    try:
+        df = pd.read_excel('data.xlsx', dtype=str)
+        df['numeric_perc'] = pd.to_numeric(df['parsnt'].astype(str).str.replace('%', ''), errors='coerce').fillna(0)
+        
+        critical_df = df[df['numeric_perc'] >= 15].copy()
+        critical_df = critical_df.sort_values(by='numeric_perc', ascending=False)
+        
+        if critical_df.empty:
+            return await update.message.reply_text("✅ أبشرك، لا يوجد أي حالات حرمان أو إنذار حالياً.")
+            
+        msg = f"⚠️ *كشف المتدربين في مرحلة الخطر (15% فما فوق)*\n{SEP}\n"
+        
+        for _, row in critical_df.iterrows():
+            perc = row['numeric_perc']
+            status = "🔴 محروم" if perc >= 20 else "🟡 منذر"
+            msg += f"👤 *{row['stu_nam']}*\n"
+            msg += f"🔢 `{row['stu_num']}` | 📖 {row['c_nam']}\n"
+            msg += f"📊 النسبة: *%{perc}* ({status})\n\n"
+            
+            if len(msg) > 3500:
+                await update.message.reply_text(msg, parse_mode='Markdown')
+                msg = ""
+                
+        if msg:
+            await update.message.reply_text(msg, parse_mode='Markdown')
+            
+    except Exception as e:
+        await update.message.reply_text(f"❌ خطأ في إعداد الكشف: {e}")
 
 # --- 🌟 محرك معالجة الملفات للمدير (إكسل وتقارير) 🌟 ---
 async def process_admin_excel(update: Update, context: ContextTypes.DEFAULT_TYPE, db):
@@ -255,7 +293,6 @@ async def process_admin_excel(update: Update, context: ContextTypes.DEFAULT_TYPE
             df_clean.to_excel("data.xlsx", index=False)
             records_count = len(df_clean)
             
-            # رفع البيانات الجديدة لـ MongoDB
             records = df_clean.to_dict('records')
             if len(records) > 0 and db is not None:
                 db["trainees_data"].delete_many({})
@@ -271,48 +308,3 @@ async def process_admin_excel(update: Update, context: ContextTypes.DEFAULT_TYPE
         await status_msg.edit_text(f"✅ *نجاح ساحق (تحديث قاعدة الطلاب)!*\n📊 *النتيجة:* حفظ `{records_count}` متدرب.\n🌐 *السحابة:* {github_status}", parse_mode='Markdown')
     except Exception as e:
         await status_msg.edit_text(f"⚠️ *فشل التحديث:* `{e}`", parse_mode='Markdown')
-
-#كشف حاله الطلاب المحرومين وعلى وشك الحرمان admin_features.py
-
-async def critical_cases_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if str(update.effective_user.id) != ADMIN_ID: return
-    
-    if not os.path.exists('data.xlsx'):
-        return await update.message.reply_text("⚠️ لا يوجد ملف بيانات حالياً.")
-    
-    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-    
-    try:
-        df = pd.read_excel('data.xlsx', dtype=str)
-        # تحويل النسبة لرقم للمقارنة
-        df['numeric_perc'] = pd.to_numeric(df['parsnt'].astype(str).str.replace('%', ''), errors='coerce').fillna(0)
-        
-        # فلترة الحالات من 15% وأعلى
-        critical_df = df[df['numeric_perc'] >= 15].copy()
-        
-        # فرز: الأعلى نسبة (المحرومين) أولاً
-        critical_df = critical_df.sort_values(by='numeric_perc', ascending=False)
-        
-        if critical_df.empty:
-            return await update.message.reply_text("✅ أبشرك، لا يوجد أي حالات حرمان أو إنذار حالياً.")
-            
-        msg = f"⚠️ *كشف المتدربين في مرحلة الخطر (15% فما فوق)*\n{SEP}\n"
-        
-        for _, row in critical_df.iterrows():
-            perc = row['numeric_perc']
-            status = "🔴 محروم" if perc >= 20 else "🟡 منذر"
-            msg += f"👤 *{row['stu_nam']}*\n"
-            msg += f"🔢 `{row['stu_num']}` | 📖 {row['c_nam']}\n"
-            msg += f"📊 النسبة: *%{perc}* ({status})\n\n"
-            
-            # تقسيم الرسالة إذا كانت طويلة جداً
-            if len(msg) > 3500:
-                await update.message.reply_text(msg, parse_mode='Markdown')
-                msg = ""
-                
-        if msg:
-            await update.message.reply_text(msg, parse_mode='Markdown')
-            
-    except Exception as e:
-        await update.message.reply_text(f"❌ خطأ في إعداد الكشف: {e}")
-
