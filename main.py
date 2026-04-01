@@ -201,6 +201,15 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     trans_table = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
     clean_text = text.translate(trans_table).strip()
+        # 🔴 ربط أزرار الإدارة النصية بالأوامر 🔴
+    if user_id == ADMIN_ID:
+        if text == "حالة قاعدة البيانات 📊" or text == "حالة قاعدة البيانات":
+            return await db_status_command(update, context)
+        if text == "سحب نسخة احتياطية 💾" or text == "سحب نسخة احتياطية":
+            return await backup_command(update, context)
+        if text == "تقرير سير العملية الأسبوعية 📑" or text == "تقرير سير العملية الأسبوعية":
+            return await report_command(update, context)
+
 
     if text == "🦞 مساعد OpenClaw":
         if user_id != ADMIN_ID: return
