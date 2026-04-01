@@ -53,9 +53,13 @@ def keep_alive():
 # ==========================================
 # 3. الاتصال بقاعدة البيانات
 # ==========================================
+
+import certifi # 👈 هذي المكتبة هي التصريح الأمني
+
 try:
     if MONGO_URI:
-        client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+        # 👈 أضفنا tlsCAFile عشان نعطي البوت شهادة الأمان للعبور
+        client = MongoClient(MONGO_URI, tlsCAFile=certifi.where(), serverSelectionTimeoutMS=10000)
         db = client["computer_dept_db"] 
         print("✅ تم الاتصال بقاعدة البيانات السحابية (MongoDB) بنجاح!")
 except Exception as e:
