@@ -28,6 +28,16 @@ from menus import (
     get_games_menu, get_pledge_step1_menu, get_pledge_step2_menu, get_pledge_step3_menu
 )
 
+# 🔴 استدعاء ملف الإعدادات 🔴
+from bot_settings import *
+
+# 🔴 استدعاء النصائح من مجلد config 🔴
+try:
+    from config.tips import TECH_TIPS
+except ImportError:
+    # نسخة احتياطية لو كان الملف فيه مشكلة
+    TECH_TIPS = ["💡 نصيحة: احرص دائماً على أخذ نسخة احتياطية لملفاتك."] 
+
 
 # --- 🌟 الاتصال بقاعدة البيانات السحابية (MongoDB) ---
 MONGO_URI = os.getenv("MONGODB_URI")
