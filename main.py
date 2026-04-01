@@ -118,6 +118,37 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text in ["📅 التقويم التدريبي", "🎮 تحدي الأسبوع", "🏆 بطل الأسبوع", "🌐 أخبار التقنية"]:
         return await process_extra_features(update, text)
 
+    # داخل دالة handle_logic في main.py
+
+    if user_id == ADMIN_ID:
+        # زر الكشف الجديد
+        if "الحالات الحرجة" in text:
+            return await critical_cases_report(update, context)
+            
+        # زر التعميم
+        if text == "إرسال تعميم 📢":
+            user_states[user_id] = {'flow': 'broadcast_msg'}
+            return await update.message.reply_text("📢 *مرحباً سعادة رئيس القسم..*\nاكتب الآن نص التعميم الذي تريد إرساله لجميع المتدربين:", parse_mode='Markdown', reply_markup=get_cancel_menu())
+
+    # معالجة حالة إرسال التعميم
+    if user_id in user_states and user_states[user_id].get('flow') == 'broadcast_msg':
+        if text == "❌ إلغاء العملية":
+            del user_states[user_id]
+            return await update.message.reply_text("تم إلغاء التعميم.", reply_markup=get_main_menu())
+            
+        users = load_json(STATS_FILE).get("users_list", [])
+        await update.message.reply_text(f"🚀 جاري إرسال التعميم لـ {len(users)} متدرب...")
+        
+        count = 0
+        for u in users:
+            try:
+                await context.bot.send_message(chat_id=u, text=f"📢 *تعميم إداري من رئيس القسم:*\n{SEP}\n{text}", parse_mode='Markdown')
+                count += 1
+            except: pass
+            
+        del user_states[user_id]
+        return await update.message.reply_text(f"✅ تم إرسال التعميم بنجاح لـ {count} متدرب.", reply_markup=get_main_menu())
+
     
     if user_id == ADMIN_ID:
         if "حالة قاعدة البيانات" in text: return await db_status_command(update, context)
