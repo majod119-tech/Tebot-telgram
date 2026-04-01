@@ -21,6 +21,9 @@ try:
 except ImportError:
     TECH_TIPS = ["💡 نصيحة تقنية: احرص دائماً على أخذ نسخة احتياطية لملفاتك."]
 
+# 🔴 استدعاء الخدمات الإضافية 🔴
+from extra_features import process_extra_features
+
 # --- الاتصال بقاعدة البيانات ---
 db = None
 try:
@@ -110,7 +113,12 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = str(update.effective_user.id)
     clean_text = text.translate(str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')).strip()
+    
+        # توجيه الخدمات الإضافية للملف المختص
+    if text in ["📅 التقويم التدريبي", "🎮 تحدي الأسبوع", "🏆 بطل الأسبوع", "🌐 أخبار التقنية"]:
+        return await process_extra_features(update, text)
 
+    
     if user_id == ADMIN_ID:
         if "حالة قاعدة البيانات" in text: return await db_status_command(update, context)
         if "سحب نسخة احتياطية" in text: return await backup_command(update, context)
