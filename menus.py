@@ -46,3 +46,11 @@ def get_pledge_step2_menu():
 
 def get_pledge_step3_menu(): 
     return ReplyKeyboardMarkup([["✍️ أقر وأتعهد بالانضباط للحفاظ على مستقبلي التدريبي"]], resize_keyboard=True)
+
+# في ملف قائمة المدير menus.py
+def get_admin_menu():
+    return ReplyKeyboardMarkup([
+        ["إرسال تعميم 📢", "كشف الحالات الحرجة ⚠️"],
+        ["حالة قاعدة البيانات 📊", "تقرير سير العملية 📑"],
+        ["سحب نسخة احتياطية 💾", "🔙 الرجوع للقائمة الرئيسية"]
+    ], resize_keyboard=True)
