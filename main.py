@@ -8,10 +8,9 @@ from telegram.constants import ChatAction
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from pymongo import MongoClient
 
 # 🔴 استدعاء الملفات المنفصلة 🔴
-from admin_features import ADMIN_ID, admin_command, db_status_command, backup_command, broadcast_command, report_command, process_admin_excel
+from admin_features import ADMIN_ID, admin_command, db_status_command, backup_command, broadcast_command, report_command, process_admin_excel, critical_cases_report
 from menus import get_main_menu, get_cancel_menu, get_back_menu, get_plans_menu, get_games_menu, get_pledge_step1_menu
 from bot_settings import *
 from student_excuses import process_pledge_step, process_excuse_document # 👈 المحرك الجديد للأعذار
