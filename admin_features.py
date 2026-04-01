@@ -271,3 +271,48 @@ async def process_admin_excel(update: Update, context: ContextTypes.DEFAULT_TYPE
         await status_msg.edit_text(f"✅ *نجاح ساحق (تحديث قاعدة الطلاب)!*\n📊 *النتيجة:* حفظ `{records_count}` متدرب.\n🌐 *السحابة:* {github_status}", parse_mode='Markdown')
     except Exception as e:
         await status_msg.edit_text(f"⚠️ *فشل التحديث:* `{e}`", parse_mode='Markdown')
+
+#كشف حاله الطلاب المحرومين وعلى وشك الحرمان admin_features.py
+
+async def critical_cases_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if str(update.effective_user.id) != ADMIN_ID: return
+    
+    if not os.path.exists('data.xlsx'):
+        return await update.message.reply_text("⚠️ لا يوجد ملف بيانات حالياً.")
+    
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+    
+    try:
+        df = pd.read_excel('data.xlsx', dtype=str)
+        # تحويل النسبة لرقم للمقارنة
+        df['numeric_perc'] = pd.to_numeric(df['parsnt'].astype(str).str.replace('%', ''), errors='coerce').fillna(0)
+        
+        # فلترة الحالات من 15% وأعلى
+        critical_df = df[df['numeric_perc'] >= 15].copy()
+        
+        # فرز: الأعلى نسبة (المحرومين) أولاً
+        critical_df = critical_df.sort_values(by='numeric_perc', ascending=False)
+        
+        if critical_df.empty:
+            return await update.message.reply_text("✅ أبشرك، لا يوجد أي حالات حرمان أو إنذار حالياً.")
+            
+        msg = f"⚠️ *كشف المتدربين في مرحلة الخطر (15% فما فوق)*\n{SEP}\n"
+        
+        for _, row in critical_df.iterrows():
+            perc = row['numeric_perc']
+            status = "🔴 محروم" if perc >= 20 else "🟡 منذر"
+            msg += f"👤 *{row['stu_nam']}*\n"
+            msg += f"🔢 `{row['stu_num']}` | 📖 {row['c_nam']}\n"
+            msg += f"📊 النسبة: *%{perc}* ({status})\n\n"
+            
+            # تقسيم الرسالة إذا كانت طويلة جداً
+            if len(msg) > 3500:
+                await update.message.reply_text(msg, parse_mode='Markdown')
+                msg = ""
+                
+        if msg:
+            await update.message.reply_text(msg, parse_mode='Markdown')
+            
+    except Exception as e:
+        await update.message.reply_text(f"❌ خطأ في إعداد الكشف: {e}")
+
