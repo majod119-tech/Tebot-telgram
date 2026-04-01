@@ -174,16 +174,8 @@ AI_KNOWLEDGE = (
     "الغياب والحرمان 20%، الإنذار 15%. المكافأة 800 ريال. رفع الأعذار خلال 3 أيام."
 )
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-ai_model = None
-if GEMINI_API_KEY:
-    try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods and 'flash' in m.name.lower():
-                ai_model = genai.GenerativeModel(m.name.replace('models/', ''), generation_config={"temperature": 0.2})
-                break
-    except Exception as e: pass
+
+OPENCLAW_URL = "https://openclaw-server-2j6r.onrender.com"
 
 user_states = {}
 
@@ -316,14 +308,26 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 del user_states[user_id]
                 return await update.message.reply_text("⚠️ خطأ، حاول لاحقاً.", reply_markup=get_main_menu())
 
-        # 🟢 محادثة الذكاء الاصطناعي (مع كشف الخطأ الحقيقي) 🟢
+       # 🟢 محادثة الذكاء الاصطناعي (مع كشف الخطأ الحقيقي) 🟢
         if state['flow'] == 'ai':
-            if not ai_model: return await update.message.reply_text("⚠️ المعلم غير متصل حالياً بسبب نقص المفتاح.", reply_markup=get_main_menu())
             await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING)
             try:
+                # 1. نجهز السؤال للمحرك
                 final_prompt = build_ai_prompt(db, AI_KNOWLEDGE, text)
-                response = await ai_model.generate_content_async(final_prompt)
-                return await update.message.reply_text(f"📝 المستشار الأكاديمي:\n\n{response.text}", reply_markup=get_back_menu())
+                
+                # 2. نرسل الطلب لسيرفر Render الخاص فينا
+                payload = {"messages": [{"role": "user", "content": final_prompt}]}
+                headers = {"Content-Type": "application/json"}
+                
+                # 3. نستقبل الرد (حطينا timeout 30 ثانية عشان لو السيرفر نايم يصحى)
+                response = requests.post(f"{OPENCLAW_URL}/v1/chat/completions", json=payload, headers=headers, timeout=30)
+                
+                if response.status_code == 200:
+                    ai_reply = response.json()['choices'][0]['message']['content']
+                    return await update.message.reply_text(f"📝 المستشار الأكاديمي (OpenClaw):\n\n{ai_reply}", reply_markup=get_back_menu())
+                else:
+                    return await update.message.reply_text(f"⚠️ السيرفر مشغول، رد برمز الخطأ: {response.status_code}", reply_markup=get_back_menu())
+
             except Exception as e: 
                 error_msg = str(e)[:300]
                 return await update.message.reply_text(f"⚠️ تفاصيل الخطأ الحقيقي:\n{error_msg}", reply_markup=get_back_menu())
