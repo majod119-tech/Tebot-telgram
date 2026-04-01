@@ -50,7 +50,6 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return
     if str(update.effective_user.id) != ADMIN_ID: return
     
-    # هنا كان الخطأ: استبدلناه بالاستدعاء المباشر للقائمة المحدثة
     await update.message.reply_text("مرحباً بك يا رئيس القسم. تم فتح لوحة التحكم المتقدمة.", reply_markup=get_admin_menu())
 
 async def db_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -142,14 +141,14 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """
     await update.message.reply_text(report_msg, parse_mode='Markdown')
 
-# --- 🌟 كشف الحالات الحرجة 🌟 ---
+# --- 🌟 كشف الحالات الحرجة (تصدير إكسل) 🌟 ---
 async def critical_cases_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(update.effective_user.id) != ADMIN_ID: return
     
     if not os.path.exists('data.xlsx'):
         return await update.message.reply_text("⚠️ لا يوجد ملف بيانات حالياً.")
     
-    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_DOCUMENT)
     
     try:
         df = pd.read_excel('data.xlsx', dtype=str)
@@ -159,26 +158,27 @@ async def critical_cases_report(update: Update, context: ContextTypes.DEFAULT_TY
         critical_df = critical_df.sort_values(by='numeric_perc', ascending=False)
         
         if critical_df.empty:
-            return await update.message.reply_text("✅ أبشرك، لا يوجد أي حالات حرمان أو إنذار حالياً.")
+            return await update.message.reply_text("✅ أبشرك، لا يوجد أي حالات حرمان أو إنذار حالياً في القسم.")
             
-        msg = f"⚠️ *كشف المتدربين في مرحلة الخطر (15% فما فوق)*\n{SEP}\n"
+        export_df = critical_df[['stu_num', 'stu_nam', 'c_nam', 'parsnt']].copy()
+        export_df.columns = ['الرقم التدريبي', 'اسم المتدرب', 'المقرر', 'نسبة الغياب']
+        export_df['الحالة'] = critical_df['numeric_perc'].apply(lambda x: '🔴 محروم' if x >= 20 else '🟡 منذر')
         
-        for _, row in critical_df.iterrows():
-            perc = row['numeric_perc']
-            status = "🔴 محروم" if perc >= 20 else "🟡 منذر"
-            msg += f"👤 *{row['stu_nam']}*\n"
-            msg += f"🔢 `{row['stu_num']}` | 📖 {row['c_nam']}\n"
-            msg += f"📊 النسبة: *%{perc}* ({status})\n\n"
-            
-            if len(msg) > 3500:
-                await update.message.reply_text(msg, parse_mode='Markdown')
-                msg = ""
-                
-        if msg:
-            await update.message.reply_text(msg, parse_mode='Markdown')
+        file_name = f"كشف_الحالات_الحرجة_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
+        export_df.to_excel(file_name, index=False)
+        
+        caption_msg = f"⚠️ *كشف المتدربين في مرحلة الخطر*\n📊 إجمالي الحالات: `{len(export_df)}` حالة.\nالملف جاهز للطباعة والمشاركة 👇"
+        await context.bot.send_document(
+            chat_id=update.effective_chat.id,
+            document=open(file_name, 'rb'),
+            caption=caption_msg,
+            parse_mode='Markdown'
+        )
+        
+        os.remove(file_name)
             
     except Exception as e:
-        await update.message.reply_text(f"❌ خطأ في إعداد الكشف: {e}")
+        await update.message.reply_text(f"❌ خطأ في إعداد أو تصدير الكشف: {e}")
 
 # --- 🌟 محرك معالجة الملفات للمدير (إكسل وتقارير) 🌟 ---
 async def process_admin_excel(update: Update, context: ContextTypes.DEFAULT_TYPE, db):
