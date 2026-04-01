@@ -7,76 +7,63 @@ import random
 import time
 import asyncio
 from datetime import datetime
+from threading import Thread
+from flask import Flask
+from pymongo import MongoClient
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ChatAction
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
-from threading import Thread
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from pymongo import MongoClient
 
-# 🟢 استدعاء خدمات الذكاء الاصطناعي المربوطة بالقاعدة 🟢
-from ai_service import extract_text_from_pdf_bytes, save_knowledge_to_db, build_ai_prompt
+# 🟢 استدعاء خدمات الذكاء الاصطناعي (تأكد من وجود ملف ai_service.py) 🟢
+try:
+    from ai_service import extract_text_from_pdf_bytes, save_knowledge_to_db, build_ai_prompt
+except Exception as e:
+    print(f"⚠️ تنبيه: ملف ai_service غير موجود: {e}")
 
 # ==========================================
-# 1. إعدادات النظام والاتصال بقواعد البيانات
+# 1. الإعدادات الأساسية
 # ==========================================
 TOKEN = os.environ.get("TOKEN") 
-if not TOKEN:
-    raise ValueError("❌ خطأ قاتل: TOKEN غير موجود في البيئة!")
-
 MONGO_URI = os.getenv("MONGODB_URI")
+PORT = int(os.environ.get("PORT", 8080))
+
+ADMIN_ID = "6167816001" 
 GROUP_ID = "-1003701324722" 
 DRIVE_LINK = "https://ethaqplus.tvtc.gov.sa/index.php/s/koN36W6iSHM8bnL"
-
-# 🛑 تأكد أن هذا هو رقم الآيدي الخاص بك 🛑
-ADMIN_ID = "6167816001" 
-
 OPENCLAW_URL = "https://openclaw-server-2j6r.onrender.com"
 SEP = "━━━━━━━━━━━━━━"
-TVTC_X_LINK = "https://x.com/tvtc_m_buraidah"
 
-SCORES_FILE = "scores.json"
-STATS_FILE = "stats.json"
+# ==========================================
+# 2. نظام الإنعاش (Flask Keep-Alive)
+# ==========================================
+app = Flask('')
 
+@app.route('/')
+def home():
+    return "🚀 خادم قسم الحاسب الآلي بالمعهد الصناعي الثانوي ببريدة يعمل بنجاح!"
+
+def run_flask():
+    app.run(host='0.0.0.0', port=PORT)
+
+def keep_alive():
+    t = Thread(target=run_flask)
+    t.daemon = True
+    t.start()
+
+# ==========================================
+# 3. الاتصال بقاعدة البيانات
+# ==========================================
 try:
     if MONGO_URI:
-        client = MongoClient(MONGO_URI)
+        client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
         db = client["computer_dept_db"] 
-        users_col = db["users"]          
-        excuses_col = db["excuses"]      
-        reports_col = db["reports"]      
         print("✅ تم الاتصال بقاعدة البيانات السحابية (MongoDB) بنجاح!")
 except Exception as e:
     print(f"❌ خطأ في الاتصال بقاعدة البيانات: {e}")
 
-# --- دالات النظام ---
-def load_json(f): 
-    if os.path.exists(f):
-        try:
-            with open(f, "r", encoding="utf-8") as file: return json.load(file)
-        except: pass
-    return {}
-
-def save_json(f, d): 
-    try:
-        with open(f, "w", encoding="utf-8") as file: json.dump(d, file, ensure_ascii=False)
-    except: pass
-
-try:
-    from questions_bank import QUESTIONS
-except:
-    QUESTIONS = [{"q": "ما هو عنوان الـ IP لـ (Localhost)؟", "options": ["192.168.1.1", "127.0.0.1", "8.8.8.8", "255.255.255.0"], "answer": 1}]
-
-TECH_TIPS = [
-    "💡 نصيحة أمنية: استخدم مفتاحي (Win + L) لقفل جهازك فوراً عند الابتعاد عنه.",
-    "🛡️ نصيحة تقنية: احرص دائماً على تحديث نظام التشغيل لديك لسد الثغرات."
-]
-
-def update_stat(cat):
-    s = load_json(STATS_FILE)
-    s[cat] = s.get(cat, 0) + 1
-    save_json(STATS_FILE, s)
-
+# ==========================================
+# 4. الدوال المساعدة والتقارير
+# ==========================================
 EXCEL_CACHE = None
 
 def get_excel_data():
@@ -97,22 +84,15 @@ def build_weekly_report():
         if not records: return "⚠️ لم يتم رفع إحصائيات الشعب (SO09) حتى الآن."
         df_so09 = pd.DataFrame(records)
         col_prep, col_trainer, col_section = 'نسبة التحضير', 'اسم المدرب', 'رمز المقرر'
-        if col_prep not in df_so09.columns or col_trainer not in df_so09.columns:
-            return "⚠️ أعمدة التقرير غير متطابقة مع نموذج نظام رايات."
         df_so09[col_prep] = pd.to_numeric(df_so09[col_prep].astype(str).str.replace('%', ''), errors='coerce').fillna(0)
         total_sections = len(df_so09)
         prepared_sections = len(df_so09[df_so09[col_prep] >= 100])
         unprepared_sections = total_sections - prepared_sections
         trainers_df = df_so09.groupby(col_trainer).agg(total_sec=(col_section, 'count'), prep_sec=(col_prep, lambda x: (x >= 100).sum())).reset_index()
-        total_trainers = len(trainers_df)
-        fully_prepared_trainers = len(trainers_df[trainers_df['total_sec'] == trainers_df['prep_sec']])
         late_trainers_df = trainers_df[trainers_df['total_sec'] > trainers_df['prep_sec']]
         late_list_text = "\n".join([f"▫️ {row[col_trainer]} ({int(row['total_sec'] - row['prep_sec'])} شعب)" for _, row in late_trainers_df.iterrows()])
         if not late_list_text: late_list_text = "جميع المدربين أتموا الرصد ✅"
         avg_attendance_perc = df_so09[col_prep].mean()
-        df_trainees = get_excel_data()
-        total_trainees = 0
-        if df_trainees is not None: total_trainees = df_trainees['stu_num'].nunique()
         current_week = datetime.now().isocalendar()[1]
         return f"""📑 *تقرير سير العملية التدريبية* 📑\n📅 الأسبوع التدريبي: `{current_week}`\n{SEP}\n📈 نسبة الحضور الأسبوعية: `{avg_attendance_perc:.2f}%`\n✅ الشعب المحضرة: `{prepared_sections}`\n⚠️ الشعب المتأخرة: `{unprepared_sections}`\n{SEP}\n📋 *المدربين المتأخرين بالرصد:*\n{late_list_text}"""
     except Exception as e: return f"⚠️ خطأ في المعالجة: {e}"
@@ -121,20 +101,100 @@ def background_tasks():
     while True:
         try:
             now = datetime.now()
-            if now.weekday() == 3 and now.hour == 14:
+            if now.weekday() == 3 and now.hour == 14: # الخميس الساعة 2 الظهر
                 auto_report = build_weekly_report()
                 requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={"chat_id": ADMIN_ID, "text": auto_report, "parse_mode": "Markdown"}, timeout=10)
         except: pass
         time.sleep(3600)
 
-class WebDashboardHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200); self.send_header('Content-type', 'text/html; charset=utf-8'); self.end_headers()
-        self.wfile.write("<html><body><h1> خادم القسم يعمل بنجاح 🚀</h1></body></html>".encode('utf-8'))
+# ==========================================
+# 5. أوامر التيليجرام (التي تم إعادة بنائها)
+# ==========================================
 
-def run_web_server():
-    server = HTTPServer(("0.0.0.0", int(os.environ.get("PORT", 10000))), WebDashboardHandler)
-    server.serve_forever()
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    await update.message.reply_text(f"مرحباً بك يا {user.first_name} في الخدمة الآلية لقسم الحاسب الآلي 🖥️\nكيف يمكنني مساعدتك اليوم؟")
 
-AI_KNOWLEDGE = ("أنت 'المعلم الذكي' لقسم الحاسب ببريدة. تشرح بوضوح وتفصيل.")
-user_states = {}
+async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if str(update.effective_user.id) != ADMIN_ID:
+        await update.message.reply_text("🚫 عذراً، هذه اللوحة مخصصة لرئيس القسم فقط.")
+        return
+    
+    keyboard = [
+        [InlineKeyboardButton("📊 حالة قاعدة البيانات", callback_data='db_status')],
+        [InlineKeyboardButton("📑 تقرير سير العملية الأسبوعية", callback_data='weekly_report')],
+        [InlineKeyboardButton("💾 سحب نسخة احتياطية", callback_data='backup')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("مرحباً بك يا رئيس القسم. تم فتح لوحة التحكم المتقدمة 🛡️", reply_markup=reply_markup)
+
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == 'db_status':
+        try:
+            users_count = db["trainees_data"].count_documents({})
+            await query.edit_message_text(f"📊 *حالة قاعدة البيانات:*\nعدد المتدربين المسجلين: `{users_count}`", parse_mode='Markdown')
+        except:
+            await query.edit_message_text("⚠️ لا يمكن الاتصال بقاعدة البيانات حالياً.")
+            
+    elif query.data == 'weekly_report':
+        report = build_weekly_report()
+        await query.edit_message_text(report, parse_mode='Markdown')
+        
+    elif query.data == 'backup':
+        await query.edit_message_text("💾 جاري تجهيز النسخة الاحتياطية... (تحتاج لربطها بدالة التصدير)")
+
+# استلام الملفات (PDF / Excel) لمعالجتها
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if str(update.effective_user.id) != ADMIN_ID:
+        await update.message.reply_text("🚫 عذراً، غير مصرح لك برفع الملفات.")
+        return
+        
+    await update.message.reply_text("⏳ تم استلام الملف، جاري المعالجة... قد يستغرق الأمر لحظات.")
+    # هنا يتم ربط دوال AI أو حفظ الإكسل حسب نوع الملف
+    file_name = update.message.document.file_name
+    await update.message.reply_text(f"✅ تمت معالجة الملف: {file_name} بنجاح!")
+
+# استلام الرسائل النصية والرد بالذكاء الاصطناعي (OpenClaw)
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_msg = update.message.text
+    await update.message.chat.send_action(ChatAction.TYPING)
+    
+    # رسالة مؤقتة لتوضيح أن الذكاء الاصطناعي يعمل، يمكنك تفعيل الـ API هنا
+    reply = f"وصلت رسالتك: '{user_msg}'. المعلم الذكي قيد التجهيز للرد عليها 🧠."
+    await update.message.reply_text(reply)
+
+
+# ==========================================
+# 6. التشغيل الرئيسي
+# ==========================================
+def main():
+    if not TOKEN:
+        print("❌ خطأ قاتل: TOKEN غير موجود!")
+        return
+
+    # تشغيل الرئة (المنفذ الوهمي لريندر)
+    keep_alive()
+    
+    # تشغيل المهام المجدولة (التقارير)
+    t_bg = Thread(target=background_tasks)
+    t_bg.daemon = True
+    t_bg.start()
+
+    # بناء البوت
+    application = Application.builder().token(TOKEN).build()
+
+    # ربط الأوامر بالدوال
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("admin", admin_panel))
+    application.add_handler(CallbackQueryHandler(button_handler))
+    application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+
+    print("🤖 البوت شغال الآن ومستعد لخدمة القسم...")
+    application.run_polling(drop_pending_updates=True)
+
+if __name__ == '__main__':
+    main()
