@@ -9,12 +9,18 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+# 🔴 استدعاء قاعدة البيانات (السطر اللي كان ناقص) 🔴
+from pymongo import MongoClient
+
 # 🔴 استدعاء الملفات المنفصلة 🔴
 from admin_features import ADMIN_ID, admin_command, db_status_command, backup_command, broadcast_command, report_command, process_admin_excel, critical_cases_report
 from menus import get_main_menu, get_cancel_menu, get_back_menu, get_plans_menu, get_games_menu, get_pledge_step1_menu, get_openclaw_menu
 from bot_settings import *
 from student_excuses import process_pledge_step, process_excuse_document
 from extra_features import process_extra_features
+
+
+
 
 # استدعاء محرك OpenClaw (تأكد من وجود الدالة في ملف ai_service.py)
 try:
