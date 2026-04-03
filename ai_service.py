@@ -6,7 +6,7 @@ def ask_openclaw_api(user_message):
     
     try:
         # إرسال الطلب للسيرفر (ننتظر 30 ثانية كحد أقصى)
-        response = requests.post(API_URL, json={"message": user_message}, timeout=30)
+        response = requests.post(API_URL, json={"message": user_message}, timeout=90)
         
         # 🛡️ الدرع الأول: السيرفر متصل لكنه زعلان (رفض الطلب)
         if response.status_code != 200:
