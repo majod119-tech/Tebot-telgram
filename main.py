@@ -8,6 +8,11 @@ from telegram.constants import ChatAction
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from menus import get_openclaw_menu
+# تأكد إنك تستدعي دالة الذكاء الاصطناعي اللي تو سويناها في ai_service
+
+
+
 
 # 🔴 استدعاء الملفات المنفصلة 🔴
 from admin_features import ADMIN_ID, admin_command, db_status_command, backup_command, broadcast_command, report_command, process_admin_excel, critical_cases_report
@@ -120,7 +125,31 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # داخل دالة handle_logic في main.py
 
     if user_id == ADMIN_ID:
-        # زر الكشف الجديد
+            text = update.message.text or ""
+    
+    # 🔴 --- نظام الغرفة المعزولة (OpenClaw) --- 🔴
+    if user_id in user_states and user_states[user_id].get('flow') == 'openclaw_mode':
+        if text == "❌ إنهاء محادثة الذكاء الاصطناعي":
+            del user_states[user_id]
+            # نرجعك للوحة الإدارة
+            from menus import get_admin_menu
+            return await update.message.reply_text("✅ *تم إغلاق الغرفة المعزولة.*\nعدنا للوحة تحكم القسم.", parse_mode='Markdown', reply_markup=get_admin_menu())
+        
+        # إذا أرسلت مستند (CSV) وهو داخل الغرفة
+        if update.message.document:
+            return await update.message.reply_text("📥 استلمت الملف. (يجب ربط دالة تحليل الملفات هنا لاحقاً).", reply_markup=get_openclaw_menu())
+
+        # إذا كان نص عادي، نرسله مباشرة للمحرك المحمي
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+        
+        # استدعاء دالة OpenClaw (تأكد من استيرادها صح)
+        ai_reply = ask_openclaw_api(text) 
+        
+        # يرد عليك ويبقى في نفس الغرفة!
+        return await update.message.reply_text(f"🦞 *OpenClaw:*\n{ai_reply}", parse_mode='Markdown', reply_markup=get_openclaw_menu())
+    # 🔴 ------------------------------------------ 🔴
+
+      # زر الكشف الجديد
         if "الحالات الحرجة" in text:
             return await critical_cases_report(update, context)
             
@@ -154,8 +183,10 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if "سحب نسخة احتياطية" in text: return await backup_command(update, context)
         if "تقرير سير العملية" in text: return await report_command(update, context)
         if text == "🦞 مساعد OpenClaw":
-            user_states[user_id] = {'flow': 'openclaw'}
-            return await update.message.reply_text("🦞 **وحدة OpenClaw:**\nأرسل ملف CSV للتحليل.", parse_mode='Markdown', reply_markup=get_back_menu())
+            user_states[user_id] = {'flow': 'openclaw_mode'}
+            welcome_msg = "🦞 *مرحباً بك في غرفة OpenClaw المعزولة!*\n\nأنت الآن تتحدث معي مباشرة. لا توجد أوامر، فقط نقاش حر.\nاسألني أو تناقش معي، وللخروج اضغط على زر الإنهاء بالأسفل 👇"
+            return await update.message.reply_text(welcome_msg, parse_mode='Markdown', reply_markup=get_openclaw_menu())
+.reply_text("🦞 **وحدة OpenClaw:**\nأرسل ملف CSV للتحليل.", parse_mode='Markdown', reply_markup=get_back_menu())
 
     if user_id in user_states:
         state = user_states[user_id]
