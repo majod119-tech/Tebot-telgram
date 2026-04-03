@@ -5,7 +5,7 @@ import requests
 
 def ask_openclaw_api(user_message):
     # ⚠️ استبدل هذا الرابط برابط سيرفر OpenClaw حقك
-    API_URL = "https://your-openclaw-server-url.com/api/chat" 
+    API_URL = "https://openclaw-server-2j6r.onrender.com" 
     
     try:
         # إرسال الطلب للسيرفر (ننتظر 30 ثانية كحد أقصى)
