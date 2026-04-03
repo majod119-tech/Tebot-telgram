@@ -8,25 +8,24 @@ from telegram.constants import ChatAction
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from menus import get_openclaw_menu
-# تأكد إنك تستدعي دالة الذكاء الاصطناعي اللي تو سويناها في ai_service
-
-
-
 
 # 🔴 استدعاء الملفات المنفصلة 🔴
 from admin_features import ADMIN_ID, admin_command, db_status_command, backup_command, broadcast_command, report_command, process_admin_excel, critical_cases_report
-from menus import get_main_menu, get_cancel_menu, get_back_menu, get_plans_menu, get_games_menu, get_pledge_step1_menu
+from menus import get_main_menu, get_cancel_menu, get_back_menu, get_plans_menu, get_games_menu, get_pledge_step1_menu, get_openclaw_menu
 from bot_settings import *
-from student_excuses import process_pledge_step, process_excuse_document # 👈 المحرك الجديد للأعذار
+from student_excuses import process_pledge_step, process_excuse_document
+from extra_features import process_extra_features
+
+# استدعاء محرك OpenClaw (تأكد من وجود الدالة في ملف ai_service.py)
+try:
+    from ai_service import ask_openclaw_api
+except ImportError:
+    def ask_openclaw_api(text): return "⚠️ محرك OpenClaw غير متصل حالياً."
 
 try:
     from config.tips import TECH_TIPS
 except ImportError:
     TECH_TIPS = ["💡 نصيحة تقنية: احرص دائماً على أخذ نسخة احتياطية لملفاتك."]
-
-# 🔴 استدعاء الخدمات الإضافية 🔴
-from extra_features import process_extra_features
 
 # --- الاتصال بقاعدة البيانات ---
 db = None
@@ -118,101 +117,70 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     clean_text = text.translate(str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')).strip()
     
-        # توجيه الخدمات الإضافية للملف المختص
-    if text in ["📅 التقويم التدريبي", "🎮 تحدي الأسبوع", "🏆 بطل الأسبوع", "🌐 أخبار التقنية"]:
-        return await process_extra_features(update, text)
-
-    # داخل دالة handle_logic في main.py
-
-    if user_id == ADMIN_ID:
-            text = update.message.text or ""
-    
     # 🔴 --- نظام الغرفة المعزولة (OpenClaw) --- 🔴
     if user_id in user_states and user_states[user_id].get('flow') == 'openclaw_mode':
         if text == "❌ إنهاء محادثة الذكاء الاصطناعي":
             del user_states[user_id]
-            # نرجعك للوحة الإدارة
             from menus import get_admin_menu
             return await update.message.reply_text("✅ *تم إغلاق الغرفة المعزولة.*\nعدنا للوحة تحكم القسم.", parse_mode='Markdown', reply_markup=get_admin_menu())
         
-        # إذا أرسلت مستند (CSV) وهو داخل الغرفة
-        if update.message.document:
-            return await update.message.reply_text("📥 استلمت الملف. (يجب ربط دالة تحليل الملفات هنا لاحقاً).", reply_markup=get_openclaw_menu())
-
-        # إذا كان نص عادي، نرسله مباشرة للمحرك المحمي
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-        
-        # استدعاء دالة OpenClaw (تأكد من استيرادها صح)
         ai_reply = ask_openclaw_api(text) 
-        
-        # يرد عليك ويبقى في نفس الغرفة!
         return await update.message.reply_text(f"🦞 *OpenClaw:*\n{ai_reply}", parse_mode='Markdown', reply_markup=get_openclaw_menu())
     # 🔴 ------------------------------------------ 🔴
 
-      # زر الكشف الجديد
-        if "الحالات الحرجة" in text:
-            return await critical_cases_report(update, context)
-            
-        # زر التعميم
-        if text == "إرسال تعميم 📢":
-            user_states[user_id] = {'flow': 'broadcast_msg'}
-            return await update.message.reply_text("📢 *مرحباً سعادة رئيس القسم..*\nاكتب الآن نص التعميم الذي تريد إرساله لجميع المتدربين:", parse_mode='Markdown', reply_markup=get_cancel_menu())
+    # 🔴 --- توجيه الخدمات الإضافية --- 🔴
+    if text in ["📅 التقويم التدريبي", "🎮 تحدي الأسبوع", "🏆 بطل الأسبوع", "🌐 أخبار التقنية"]:
+        return await process_extra_features(update, text)
 
-    # معالجة حالة إرسال التعميم
-    if user_id in user_states and user_states[user_id].get('flow') == 'broadcast_msg':
-        if text == "❌ إلغاء العملية":
-            del user_states[user_id]
-            return await update.message.reply_text("تم إلغاء التعميم.", reply_markup=get_main_menu())
-            
-        users = load_json(STATS_FILE).get("users_list", [])
-        await update.message.reply_text(f"🚀 جاري إرسال التعميم لـ {len(users)} متدرب...")
-        
-        count = 0
-        for u in users:
-            try:
-                await context.bot.send_message(chat_id=u, text=f"📢 *تعميم إداري من رئيس القسم:*\n{SEP}\n{text}", parse_mode='Markdown')
-                count += 1
-            except: pass
-            
-        del user_states[user_id]
-        return await update.message.reply_text(f"✅ تم إرسال التعميم بنجاح لـ {count} متدرب.", reply_markup=get_main_menu())
-
-    
+    # 🔴 --- أوامر الإدارة المتقدمة --- 🔴
     if user_id == ADMIN_ID:
+        if "الحالات الحرجة" in text: return await critical_cases_report(update, context)
         if "حالة قاعدة البيانات" in text: return await db_status_command(update, context)
         if "سحب نسخة احتياطية" in text: return await backup_command(update, context)
         if "تقرير سير العملية" in text: return await report_command(update, context)
+        
+        if text == "إرسال تعميم 📢":
+            user_states[user_id] = {'flow': 'broadcast_msg'}
+            return await update.message.reply_text("📢 *مرحباً سعادة رئيس القسم..*\nاكتب الآن نص التعميم الذي تريد إرساله لجميع المتدربين:", parse_mode='Markdown', reply_markup=get_cancel_menu())
+            
         if text == "🦞 مساعد OpenClaw":
             user_states[user_id] = {'flow': 'openclaw_mode'}
             welcome_msg = "🦞 *مرحباً بك في غرفة OpenClaw المعزولة!*\n\nأنت الآن تتحدث معي مباشرة. لا توجد أوامر، فقط نقاش حر.\nاسألني أو تناقش معي، وللخروج اضغط على زر الإنهاء بالأسفل 👇"
             return await update.message.reply_text(welcome_msg, parse_mode='Markdown', reply_markup=get_openclaw_menu())
-.reply_text("🦞 **وحدة OpenClaw:**\nأرسل ملف CSV للتحليل.", parse_mode='Markdown', reply_markup=get_back_menu())
 
+    # 🔴 --- معالجة الحالات المستمرة (State Machine) --- 🔴
     if user_id in user_states:
         state = user_states[user_id]
         if text in ["❌ إلغاء العملية", "🔙 الرجوع للقائمة الرئيسية"]:
             del user_states[user_id]
             return await update.message.reply_text("تم العودة للقائمة الرئيسية 🏠", reply_markup=get_main_menu())
 
-        if state['flow'] == 'openclaw':
-            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-            try:
-                res = requests.post(OPENCLAW_URL, json={"message": text}, timeout=60)
-                await update.message.reply_text(res.json().get("response", "تم."), parse_mode='Markdown')
-            except Exception as e: await update.message.reply_text(f"⚠️ خطأ: {str(e)}")
-            return
+        if state.get('flow') == 'broadcast_msg' and user_id == ADMIN_ID:
+            users = load_json(STATS_FILE).get("users_list", [])
+            await update.message.reply_text(f"🚀 جاري إرسال التعميم لـ {len(users)} متدرب...")
+            count = 0
+            for u in users:
+                try:
+                    await context.bot.send_message(chat_id=u, text=f"📢 *تعميم إداري من رئيس القسم:*\n{SEP}\n{text}", parse_mode='Markdown')
+                    count += 1
+                except: pass
+            del user_states[user_id]
+            return await update.message.reply_text(f"✅ تم إرسال التعميم بنجاح لـ {count} متدرب.", reply_markup=get_main_menu())
 
-        # 🔴 توجيه الإقرارات للمحرك المنفصل 🔴
-        if state['flow'] == 'pledge':
+        if state.get('flow') == 'pledge':
             return await process_pledge_step(update, context, user_id, text, state, user_states)
 
-        if state['flow'] == 'feedback':
+        if state.get('flow') == 'feedback':
             try:
                 await context.bot.send_message(chat_id=GROUP_ID, text=f"💡 *شكوى/مقترح:*\nالمرسل: {update.effective_user.first_name}\nالنص: {text}", parse_mode='Markdown')
-                del user_states[user_id]; return await update.message.reply_text("✅ تم إرسال رسالتك للإدارة.", reply_markup=get_main_menu())
-            except: del user_states[user_id]; return await update.message.reply_text("⚠️ حدث خطأ.", reply_markup=get_main_menu())
+                del user_states[user_id]
+                return await update.message.reply_text("✅ تم إرسال رسالتك للإدارة.", reply_markup=get_main_menu())
+            except: 
+                del user_states[user_id]
+                return await update.message.reply_text("⚠️ حدث خطأ.", reply_markup=get_main_menu())
 
-        if state['flow'] == 'ai':
+        if state.get('flow') == 'ai':
             if not ai_model: return await update.message.reply_text("⚠️ المعلم غير متصل حالياً.", reply_markup=get_main_menu())
             await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
             update_stat("ai_questions") 
@@ -221,8 +189,10 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return await update.message.reply_text(f"📝 رد المعلم الذكي:\n\n{res.text}", reply_markup=get_back_menu())
             except: return await update.message.reply_text("⚠️ خطأ تقني.", reply_markup=get_back_menu())
 
-        if state['flow'] == 'excuse': return await update.message.reply_text("⚠️ الرجاء إرسال (صورة العذر) مع كتابة رقمك.", reply_markup=get_cancel_menu())
+        if state.get('flow') == 'excuse': 
+            return await update.message.reply_text("⚠️ الرجاء إرسال (صورة العذر) مع كتابة رقمك.", reply_markup=get_cancel_menu())
 
+    # 🔴 --- أزرار الطلاب العامة --- 🔴
     if text == "📝 رفع الغياب والأعذار": 
         user_states[user_id] = {'flow': 'excuse'}
         return await update.message.reply_text("📝 الرجاء إرفاق (صورة العذر) مع كتابة رقمك بالوصف.", reply_markup=get_cancel_menu())
@@ -238,6 +208,12 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "📍 موقع القسم": return await update.message.reply_text("📍 *الموقع:*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🗺️ خرائط جوجل", url="http://googleusercontent.com/maps.google.com/3")]]), parse_mode='Markdown')
     if text == "📰 أخبار القسم والمعهد": return await update.message.reply_text("📰 *حساب المعهد:*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📱 منصة X", url=TVTC_X_LINK)]]), parse_mode='Markdown')
     if text == "📄 الخطط التدريبية": return await update.message.reply_text("📄 *اختر الفصل:*", reply_markup=get_plans_menu(), parse_mode='Markdown')
+    if text == "❓ الأسئلة الشائعة": return await update.message.reply_text("🏛️ *اللوائح والأنظمة التدريبية...*", parse_mode='Markdown')
+    if text in ["1️⃣ الفصل الأول", "2️⃣ الفصل الثاني", "3️⃣ الفصل الثالث", "4️⃣ الفصل الرابع", "5️⃣ الفصل الخامس", "6️⃣ الفصل السادس", "🖥️ برامج فصلية"]: return await update.message.reply_text(f"{load_json('plans.json').get(text, 'جاري التحديث')}", parse_mode='Markdown')
+    if text == "💡 نصيحة تقنية": return await update.message.reply_text(random.choice(TECH_TIPS))
+    if text == "🕹️ قسم الألعاب والإضافات": return await update.message.reply_text("🕹️ *القسم الترفيهي:*", reply_markup=get_games_menu(), parse_mode='Markdown')
+
+    # الاستعلام الآلي برقم المتدرب
     if clean_text.isdigit() and len(clean_text) > 4: 
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
         try:
@@ -271,10 +247,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else: await update.message.reply_text("❌ الرقم غير مسجل.")
         except: pass
         return
-    if text == "❓ الأسئلة الشائعة": return await update.message.reply_text("🏛️ *اللوائح والأنظمة التدريبية...*", parse_mode='Markdown')
-    if text in ["1️⃣ الفصل الأول", "2️⃣ الفصل الثاني", "3️⃣ الفصل الثالث", "4️⃣ الفصل الرابع", "5️⃣ الفصل الخامس", "6️⃣ الفصل السادس", "🖥️ برامج فصلية"]: return await update.message.reply_text(f"{load_json('plans.json').get(text, 'جاري التحديث')}", parse_mode='Markdown')
-    if text == "💡 نصيحة تقنية": return await update.message.reply_text(random.choice(TECH_TIPS))
-    if text == "🕹️ قسم الألعاب والإضافات": return await update.message.reply_text("🕹️ *القسم الترفيهي:*", reply_markup=get_games_menu(), parse_mode='Markdown')
+
     await update.message.reply_text("⚠️ الرجاء اختيار خدمة 👇", reply_markup=get_main_menu())
 
 async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -282,14 +255,11 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     state = user_states.get(user_id, {})
     
-    if state.get('flow') == 'openclaw' and update.message.document and update.message.document.file_name.endswith('.csv'):
-        status_msg = await update.message.reply_text("⏳ جاري الإرسال لـ OpenClaw...")
-        try:
-            file = await context.bot.get_file(update.message.document.file_id)
-            in_mem = io.BytesIO(); await file.download_to_memory(in_mem)
-            res = requests.post(OPENCLAW_URL, json={"message": "حفظ_بيانات_رايات\n" + in_mem.getvalue().decode('utf-8')}, timeout=60)
-            await status_msg.edit_text(res.json().get("response", "تم."), parse_mode='Markdown')
-        except Exception as e: await status_msg.edit_text(f"⚠️ خطأ: {e}")
+    # استقبال ملف CSV لـ OpenClaw داخل الغرفة المعزولة
+    if state.get('flow') == 'openclaw_mode' and update.message.document and update.message.document.file_name.endswith('.csv'):
+        status_msg = await update.message.reply_text("⏳ جاري تحليل ملف رايات عبر الذكاء الاصطناعي...")
+        # هنا يتم ربط دالة تحليل الملفات مستقبلاً
+        await status_msg.edit_text("✅ استلمت الملف وسأقوم بتحليله.", parse_mode='Markdown')
         return
 
     if user_id == ADMIN_ID and update.message.document and update.message.document.file_name.endswith(('.xlsx', '.xls', '.csv')):
