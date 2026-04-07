@@ -53,13 +53,11 @@ def get_admin_menu():
         ["إرسال تعميم 📢", "كشف الحالات الحرجة ⚠️"],
         ["حالة قاعدة البيانات 📊", "تقرير سير العملية 📑"],
         ["سحب نسخة احتياطية 💾", "🦞 مساعد OpenClaw"],
+        ["🔄 تحويل الخطط للقالب الجديد"], # 🌟 تمت إضافة الزر الجديد هنا 🌟
         ["🔙 الرجوع للقائمة الرئيسية"]
     ], resize_keyboard=True)
     
 def get_openclaw_menu():
-    from telegram import ReplyKeyboardMarkup
     return ReplyKeyboardMarkup([
         ["❌ إنهاء محادثة الذكاء الاصطناعي"]
     ], resize_keyboard=True)
-
-
