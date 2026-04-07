@@ -1,4 +1,36 @@
 import requests
+import pandas as pd
+import os
+
+# أكيد عندك استدعاء لمكتبة جيميناي هنا مثل:
+# import google.generativeai as genai 
+
+# 1. الدالة اللي تسحب بيانات الخطة
+def load_curriculum_data():
+    # عدل المسار واسم الملف حسب مكان رفعك له
+    file_path = os.path.join(os.path.dirname(__file__), 'data', 'اسم_ملفك_هنا.xlsx') 
+    try:
+        df = pd.read_excel(file_path)
+        text_data = df.to_string(index=False)
+        return f"\nبيانات الخطة التدريبية (الإصدار الثالث):\n{text_data}"
+    except Exception as e:
+        print(f"خطأ في قراءة الخطة: {e}")
+        return ""
+
+# حفظ الخطة في متغير
+curriculum_context = load_curriculum_data()
+
+# 2. دمج الخطة في شخصية البوت
+SYSTEM_PROMPT = f"""
+أنت المساعد الذكي الرسمي لقسم الحاسب بالمعهد الصناعي الثانوي ببريدة.
+مهمتك مساعدة المتدربين والرد على استفساراتهم باحترافية.
+اعتمد بشكل أساسي على هذه الخطة التدريبية المعتمدة للإجابة على الأسئلة:
+{curriculum_context}
+"""
+
+# ... (وبعدها يكمل كودك العادي حق تجهيز الموديل)
+
+
 
 def ask_openclaw_api(user_message):
     # الرابط الصحيح والمغلق بعلامات التنصيص
