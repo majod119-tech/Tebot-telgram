@@ -18,8 +18,8 @@ from menus import get_main_menu, get_cancel_menu, get_back_menu, get_plans_menu,
 from bot_settings import *
 from student_excuses import process_pledge_step, process_excuse_document
 from extra_features import process_extra_features
-
-
+# أضف هذا السطر مع الاستدعاءات فوق
+from excel_manager import convert_plan_file
 
 
 # استدعاء محرك OpenClaw (تأكد من وجود الدالة في ملف ai_service.py)
@@ -41,6 +41,14 @@ try:
         db = client["computer_dept_db"] 
         print("✅ تم الاتصال بقاعدة البيانات بنجاح!")
 except Exception as e: print(f"❌ خطأ بقاعدة البيانات: {e}")
+
+# كود الزر في main.py بيصير كذا بس!
+@bot.message_handler(func=lambda message: message.text == "🔄 تحويل الخطط للقالب الجديد")
+def ask_for_old_plan(message):
+    bot.send_message(message.chat.id, "✅ ممتاز! أرسل لي الآن ملف الخطة (القديم) بصيغة Excel.")
+    # نوجه الملف للمصنع اللي سويناه، ونمرر معاه كائن bot عشان يقدر يرسل الرسايل
+    bot.register_next_step_handler(message, lambda msg: convert_plan_file(msg, bot))
+
 
 # --- إعداد المعلم الذكي ---
 ai_model = None
