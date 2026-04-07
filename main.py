@@ -9,7 +9,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-# 🔴 استدعاء قاعدة البيانات (السطر اللي كان ناقص) 🔴
+# 🔴 استدعاء قاعدة البيانات 🔴
 from pymongo import MongoClient
 
 # 🔴 استدعاء الملفات المنفصلة 🔴
@@ -18,11 +18,11 @@ from menus import get_main_menu, get_cancel_menu, get_back_menu, get_plans_menu,
 from bot_settings import *
 from student_excuses import process_pledge_step, process_excuse_document
 from extra_features import process_extra_features
-# أضف هذا السطر مع الاستدعاءات فوق
+
+# 🌟 استدعاء مصنع الإكسل 🌟
 from excel_manager import convert_plan_file
 
-
-# استدعاء محرك OpenClaw (تأكد من وجود الدالة في ملف ai_service.py)
+# استدعاء محرك OpenClaw 
 try:
     from ai_service import ask_openclaw_api
 except ImportError:
@@ -41,14 +41,6 @@ try:
         db = client["computer_dept_db"] 
         print("✅ تم الاتصال بقاعدة البيانات بنجاح!")
 except Exception as e: print(f"❌ خطأ بقاعدة البيانات: {e}")
-
-# كود الزر في main.py بيصير كذا بس!
-@bot.message_handler(func=lambda message: message.text == "🔄 تحويل الخطط للقالب الجديد")
-def ask_for_old_plan(message):
-    bot.send_message(message.chat.id, "✅ ممتاز! أرسل لي الآن ملف الخطة (القديم) بصيغة Excel.")
-    # نوجه الملف للمصنع اللي سويناه، ونمرر معاه كائن bot عشان يقدر يرسل الرسايل
-    bot.register_next_step_handler(message, lambda msg: convert_plan_file(msg, bot))
-
 
 # --- إعداد المعلم الذكي ---
 ai_model = None
@@ -111,6 +103,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_json(STATS_FILE, s)
     
     if user_id in user_states: del user_states[user_id]
+    context.user_data.clear() # تنظيف أي عمليات معلقة
     
     welcome = f"أهلاً بك يا {first_name} في المساعد الذكي لقسم الحاسب الآلي 💻✨\n{SEP}\n"
     try:
@@ -131,6 +124,12 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     clean_text = text.translate(str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')).strip()
     
+    # --- الإلغاء العام ---
+    if text in ["❌ إلغاء العملية", "🔙 الرجوع للقائمة الرئيسية"]:
+        if user_id in user_states: del user_states[user_id]
+        context.user_data.clear() # مسح حالة انتظار الملفات
+        return await update.message.reply_text("تم العودة للقائمة الرئيسية 🏠", reply_markup=get_main_menu())
+
     # 🔴 --- نظام الغرفة المعزولة (OpenClaw) --- 🔴
     if user_id in user_states and user_states[user_id].get('flow') == 'openclaw_mode':
         if text == "❌ إنهاء محادثة الذكاء الاصطناعي":
@@ -141,7 +140,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
         ai_reply = ask_openclaw_api(text) 
         return await update.message.reply_text(f"🦞 *OpenClaw:*\n{ai_reply}", parse_mode='Markdown', reply_markup=get_openclaw_menu())
-    # 🔴 ------------------------------------------ 🔴
 
     # 🔴 --- توجيه الخدمات الإضافية --- 🔴
     if text in ["📅 التقويم التدريبي", "🎮 تحدي الأسبوع", "🏆 بطل الأسبوع", "🌐 أخبار التقنية"]:
@@ -153,6 +151,11 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if "حالة قاعدة البيانات" in text: return await db_status_command(update, context)
         if "سحب نسخة احتياطية" in text: return await backup_command(update, context)
         if "تقرير سير العملية" in text: return await report_command(update, context)
+        
+        # 🌟 زر تحويل الخطط التدريبية 🌟
+        if text == "🔄 تحويل الخطط للقالب الجديد":
+            context.user_data['waiting_for_plan'] = True # تفعيل حالة انتظار ملف الخطة
+            return await update.message.reply_text("✅ ممتاز! أرسل لي الآن ملف الخطة (القديم) بصيغة Excel ليتم تحويله للقالب المعتمد.", reply_markup=get_cancel_menu())
         
         if text == "إرسال تعميم 📢":
             user_states[user_id] = {'flow': 'broadcast_msg'}
@@ -166,9 +169,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🔴 --- معالجة الحالات المستمرة (State Machine) --- 🔴
     if user_id in user_states:
         state = user_states[user_id]
-        if text in ["❌ إلغاء العملية", "🔙 الرجوع للقائمة الرئيسية"]:
-            del user_states[user_id]
-            return await update.message.reply_text("تم العودة للقائمة الرئيسية 🏠", reply_markup=get_main_menu())
 
         if state.get('flow') == 'broadcast_msg' and user_id == ADMIN_ID:
             users = load_json(STATS_FILE).get("users_list", [])
@@ -272,10 +272,14 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # استقبال ملف CSV لـ OpenClaw داخل الغرفة المعزولة
     if state.get('flow') == 'openclaw_mode' and update.message.document and update.message.document.file_name.endswith('.csv'):
         status_msg = await update.message.reply_text("⏳ جاري تحليل ملف رايات عبر الذكاء الاصطناعي...")
-        # هنا يتم ربط دالة تحليل الملفات مستقبلاً
         await status_msg.edit_text("✅ استلمت الملف وسأقوم بتحليله.", parse_mode='Markdown')
         return
 
+    # 🌟 توجيه ملف الخطة القديم لمصنع الإكسل إذا كان المدير ينتظر 🌟
+    if context.user_data.get('waiting_for_plan') and update.message.document:
+        return await convert_plan_file(update, context)
+
+    # استقبال ملفات تحديث بيانات الطلاب المعتادة
     if user_id == ADMIN_ID and update.message.document and update.message.document.file_name.endswith(('.xlsx', '.xls', '.csv')):
         return await process_admin_excel(update, context, db)
 
