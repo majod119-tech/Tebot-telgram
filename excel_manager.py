@@ -1,33 +1,35 @@
 import pandas as pd
 import openpyxl
 import os
+from telegram import Update
+from telegram.ext import ContextTypes
 
-def convert_plan_file(message, bot):
+async def convert_plan_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = update.message
+    
+    # التأكد من أن المرفق ملف
     if not message.document:
-        bot.send_message(message.chat.id, "⚠️ الرجاء إرسال ملف Excel صحيح.")
+        await message.reply_text("⚠️ الرجاء إرسال ملف Excel صحيح.")
         return
         
     try:
-        bot.send_message(message.chat.id, "⏳ جاري تحليل الخطة القديمة ونقل البيانات للقالب الجديد... يرجى الانتظار ثواني.")
+        await message.reply_text("⏳ جاري تحليل الخطة ونقل البيانات للقالب الجديد... ثواني بس.")
         
-        # --- تحميل الملف القديم ---
-        file_info = bot.get_file(message.document.file_id)
-        downloaded_file = bot.download_file(file_info.file_path)
+        # 1. تحميل الملف القديم من التيليجرام
+        file_info = await message.document.get_file()
         old_file_path = f"temp_old_{message.from_user.id}.xlsx"
-        
-        with open(old_file_path, 'wb') as new_file:
-            new_file.write(downloaded_file)
+        await file_info.download_to_drive(custom_path=old_file_path)
             
-        # --- قراءة البيانات القديمة ---
+        # 2. قراءة البيانات
         df_old = pd.read_excel(old_file_path)
         
-        # --- فتح القالب الجديد المعتمد ---
+        # 3. فتح قالب الجودة المعتمد (من مجلد data)
         template_path = os.path.join(os.path.dirname(__file__), 'data', 'Curriculum_Plan_v3.xlsx')
         wb_new = openpyxl.load_workbook(template_path)
         ws_new = wb_new.active 
         
-        # --- عملية النقل ---
-        start_row = 5 
+        # 4. النقل (تأكد من مطابقة أسماء الأعمدة لملفك القديم)
+        start_row = 5 # الصف اللي يبدأ منه الجدول في قالبك الجديد
         
         for index, row in df_old.iterrows():
             current_row = start_row + index
@@ -37,17 +39,20 @@ def convert_plan_file(message, bot):
             ws_new.cell(row=current_row, column=4).value = row.get("الأهداف التفصيلية", "")
             ws_new.cell(row=current_row, column=5).value = row.get("موضوعات التدريب", "")
 
-        # --- حفظ وإرسال الملف الجديد ---
+        # 5. حفظ وإرسال
         output_filename = f"الخطة_المحدثة_اصدار_3.xlsx"
         wb_new.save(output_filename)
         
         with open(output_filename, 'rb') as doc:
-            bot.send_document(message.chat.id, doc, caption="🎉 تم الانتهاء بنجاح!\nهذه الخطة المحدثة مطابقة لقالب وكالة الجودة بنسبة 100%.")
+            await message.reply_document(document=doc, caption="🎉 تم الانتهاء بنجاح!\nالخطة المحدثة جاهزة ومطابقة لقالب وكالة الجودة 100%.")
             
-        # تنظيف الملفات المؤقتة
+        # تنظيف السيرفر
         os.remove(old_file_path)
         os.remove(output_filename)
         
+        # إنهاء حالة انتظار الملف
+        context.user_data['waiting_for_plan'] = False
+        
     except Exception as e:
-        bot.send_message(message.chat.id, f"⚠️ حدث خطأ أثناء التحويل: {str(e)}")
-
+        await message.reply_text(f"⚠️ حدث خطأ: {str(e)}\nتأكد من اسم قالب الجودة وأسماء الأعمدة.")
+        context.user_data['waiting_for_plan'] = False
