@@ -19,7 +19,7 @@ async def convert_plan_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         old_file_path = f"temp_old_{message.from_user.id}.xlsx"
         await file_info.download_to_drive(custom_path=old_file_path)
             
-        # 2. قراءة البيانات
+        # 2. قراءة البيانات من الملف القديم
         df_old = pd.read_excel(old_file_path)
         
         # 3. فتح قالب الجودة المعتمد 
@@ -27,20 +27,21 @@ async def convert_plan_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         wb_new = openpyxl.load_workbook(template_path)
         ws_new = wb_new.active 
         
-        # 🌟 السحر الجديد: دالة الكتابة الآمنة لتخطي مشكلة الخلايا المدمجة 🌟
+        # 🌟 دالة الكتابة الآمنة لتخطي مشكلة الخلايا المدمجة جذرياً 🌟
         def write_safe(ws, r, c, val):
             cell = ws.cell(row=r, column=c)
-            if type(cell).__name__ == 'MergedCell':
-                # إذا الخلية مدمجة، نبحث عن الخلية الرئيسية في مجموعة الدمج ونكتب فيها
-                for merged_range in ws.merged_cells.ranges:
-                    if cell.coordinate in merged_range:
-                        ws.cell(row=merged_range.min_row, column=merged_range.min_col).value = val
-                        return
-            else:
-                cell.value = val
+            coord = cell.coordinate
+            # فحص إذا كانت الخلية ضمن نطاق مدمج
+            for merged_range in ws.merged_cells.ranges:
+                if coord in merged_range:
+                    # الكتابة في الخلية الرئيسية للنطاق المدمج
+                    ws.cell(row=merged_range.min_row, column=merged_range.min_col).value = val
+                    return
+            # إذا لم تكن مدمجة، اكتب بشكل طبيعي
+            cell.value = val
 
         # 4. عملية النقل
-        # ⚠️ تنبيه: تأكد أن 5 هو رقم أول صف فارغ للبيانات في قالبك. إذا العناوين ماخذة مساحة أكبر، خله 6 أو 7
+        # حدد رقم الصف الذي يبدأ منه الجدول في قالب الجودة (تأكد منه، غالباً 5 أو 6)
         start_row = 5 
         
         for index, row in df_old.iterrows():
@@ -63,7 +64,7 @@ async def convert_plan_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # تنظيف السيرفر من الملفات المؤقتة
         os.remove(old_file_path)
         os.remove(output_filename)
-        await status_msg.delete() # مسح رسالة "جاري التحليل" للترتيب
+        await status_msg.delete() 
         
         # إنهاء حالة البوت
         context.user_data['waiting_for_plan'] = False
