@@ -9,15 +9,14 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-# 🔴 استدعاء قاعدة البيانات 🔴
+# 🔴 استدعاء قاعدة البيانات ومستثنيات الأخطاء 🔴
 from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 
 # 🔴 استدعاء الملفات المنفصلة 🔴
 from admin_features import ADMIN_ID, admin_command, db_status_command, backup_command, broadcast_command, report_command, process_admin_excel, critical_cases_report
-from menus import get_main_menu, get_cancel_menu, get_back_menu, get_plans_menu, get_games_menu, get_pledge_step1_menu, get_openclaw_menu
+from menus import get_main_menu, get_cancel_menu, get_back_menu, get_plans_menu, get_openclaw_menu
 from bot_settings import *
-from student_excuses import process_pledge_step, process_excuse_document
-from extra_features import process_extra_features
 
 # 🌟 استدعاء مصنع الإكسل 🌟
 from excel_manager import convert_plan_file
@@ -33,14 +32,31 @@ try:
 except ImportError:
     TECH_TIPS = ["💡 نصيحة تقنية: احرص دائماً على أخذ نسخة احتياطية لملفاتك."]
 
-# --- الاتصال بقاعدة البيانات ---
+# --- الاتصال بقاعدة البيانات (محصن ضد أخطاء Timeout و Kube) ---
 db = None
-try:
-    if MONGO_URI:
-        client = MongoClient(MONGO_URI)
+client = None
+
+if MONGO_URI:
+    try:
+        client = MongoClient(
+            MONGO_URI,
+            serverSelectionTimeoutMS=5000,   # تقليل مهلة البحث عن السيرفر لـ 5 ثوان لتفادي تعليق البوت
+            connectTimeoutMS=10000,          # مهلة الاتصال الأولية 10 ثوان
+            socketTimeoutMS=20000,           # مهلة نقل البيانات 20 ثانية
+            maxPoolSize=50,                  # إدارة الاتصالات لتفادي استهلاك موارد الـ Kube Node
+            minPoolSize=5,
+            retryWrites=True,                # إعادة محاولة الكتابة تلقائياً عند تذبذب الشبكة
+            retryReads=True                  # إعادة محاولة القراءة تلقائياً
+        )
+        # اختبار الاتصال الفعلي بالخادم
+        client.admin.command('ping')
         db = client["computer_dept_db"] 
-        print("✅ تم الاتصال بقاعدة البيانات بنجاح!")
-except Exception as e: print(f"❌ خطأ بقاعدة البيانات: {e}")
+        print("✅ تم الاتصال بقاعدة البيانات بنجاح واستقرار!")
+    except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+        print(f"⚠️ تعذر الاتصال بـ MongoDB: {e}")
+        print("💡 جاري تشغيل البوت بنظام ذاكرة الجلسات لحين عودة الاتصال...")
+    except Exception as e:
+        print(f"❌ خطأ غير متوقع في قاعدة البيانات: {e}")
 
 # --- إعداد المعلم الذكي ---
 ai_model = None
@@ -72,19 +88,6 @@ def update_stat(cat):
     s[cat] = s.get(cat, 0) + 1
     save_json(STATS_FILE, s)
 
-def auto_reset_scores():
-    while True:
-        try:
-            now = datetime.now()
-            if now.weekday() == 6: 
-                s = load_json(STATS_FILE)
-                if s.get("last_reset_date") != now.strftime("%Y-%m-%d"):
-                    save_json(SCORES_FILE, {}) 
-                    s["last_reset_date"] = now.strftime("%Y-%m-%d") 
-                    save_json(STATS_FILE, s)
-        except: pass
-        time.sleep(3600)
-
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200); self.end_headers(); self.wfile.write(b"Bot Server Online.")
@@ -110,8 +113,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if db is not None:
             ex_user = db["trainees"].find_one({"telegram_id": user_id})
             if not ex_user:
-                db["trainees"].insert_one({"telegram_id": user_id, "name": first_name, "role": "student", "pledges_count": 0, "join_date": datetime.now()})
-            else: welcome = f"أهلاً بعودتك يا {first_name}! (سجلك يحتوي على {ex_user.get('pledges_count', 0)} تعهد).\n{SEP}\n"
+                db["trainees"].insert_one({"telegram_id": user_id, "name": first_name, "role": "student", "join_date": datetime.now()})
+            else: welcome = f"أهلاً بعودتك يا {first_name}!\n{SEP}\n"
     except: pass
 
     welcome += "أنا نظامك الرقمي المتكامل. 👇 الرجاء اختيار الخدمة المطلوبة:"
@@ -122,7 +125,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != 'private': return 
     text = update.message.text.strip()
     user_id = str(update.effective_user.id)
-    clean_text = text.translate(str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')).strip()
     
     # --- الإلغاء العام ---
     if text in ["❌ إلغاء العملية", "🔙 الرجوع للقائمة الرئيسية"]:
@@ -140,10 +142,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
         ai_reply = ask_openclaw_api(text) 
         return await update.message.reply_text(f"🦞 *OpenClaw:*\n{ai_reply}", parse_mode='Markdown', reply_markup=get_openclaw_menu())
-
-    # 🔴 --- توجيه الخدمات الإضافية --- 🔴
-    if text in ["📅 التقويم التدريبي", "🎮 تحدي الأسبوع", "🏆 بطل الأسبوع", "🌐 أخبار التقنية"]:
-        return await process_extra_features(update, text)
 
     # 🔴 --- أوامر الإدارة المتقدمة --- 🔴
     if user_id == ADMIN_ID:
@@ -166,7 +164,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             welcome_msg = "🦞 *مرحباً بك في غرفة OpenClaw المعزولة!*\n\nأنت الآن تتحدث معي مباشرة. لا توجد أوامر، فقط نقاش حر.\nاسألني أو تناقش معي، وللخروج اضغط على زر الإنهاء بالأسفل 👇"
             return await update.message.reply_text(welcome_msg, parse_mode='Markdown', reply_markup=get_openclaw_menu())
 
-    # 🔴 --- معالجة الحالات المستمرة (State Machine) --- 🔴
+    # 🔴 --- معالجة الحالات المستمرة --- 🔴
     if user_id in user_states:
         state = user_states[user_id]
 
@@ -182,18 +180,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del user_states[user_id]
             return await update.message.reply_text(f"✅ تم إرسال التعميم بنجاح لـ {count} متدرب.", reply_markup=get_main_menu())
 
-        if state.get('flow') == 'pledge':
-            return await process_pledge_step(update, context, user_id, text, state, user_states)
-
-        if state.get('flow') == 'feedback':
-            try:
-                await context.bot.send_message(chat_id=GROUP_ID, text=f"💡 *شكوى/مقترح:*\nالمرسل: {update.effective_user.first_name}\nالنص: {text}", parse_mode='Markdown')
-                del user_states[user_id]
-                return await update.message.reply_text("✅ تم إرسال رسالتك للإدارة.", reply_markup=get_main_menu())
-            except: 
-                del user_states[user_id]
-                return await update.message.reply_text("⚠️ حدث خطأ.", reply_markup=get_main_menu())
-
         if state.get('flow') == 'ai':
             if not ai_model: return await update.message.reply_text("⚠️ المعلم غير متصل حالياً.", reply_markup=get_main_menu())
             await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
@@ -203,64 +189,16 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return await update.message.reply_text(f"📝 رد المعلم الذكي:\n\n{res.text}", reply_markup=get_back_menu())
             except: return await update.message.reply_text("⚠️ خطأ تقني.", reply_markup=get_back_menu())
 
-        if state.get('flow') == 'excuse': 
-            return await update.message.reply_text("⚠️ الرجاء إرسال (صورة العذر) مع كتابة رقمك.", reply_markup=get_cancel_menu())
-
-    # 🔴 --- أزرار الطلاب العامة --- 🔴
-    if text == "📝 رفع الغياب والأعذار": 
-        user_states[user_id] = {'flow': 'excuse'}
-        return await update.message.reply_text("📝 الرجاء إرفاق (صورة العذر) مع كتابة رقمك بالوصف.", reply_markup=get_cancel_menu())
-    if text == "📬 الاقتراحات والشكاوى":
-        user_states[user_id] = {'flow': 'feedback'}
-        return await update.message.reply_text("📬 اكتب رسالتك بالتفصيل...", reply_markup=get_cancel_menu())
+    # 🔴 --- الأزرار الأساسية المخففة --- 🔴
     if text == "🤖 المعلم الذكي":
         user_states[user_id] = {'flow': 'ai'}
         return await update.message.reply_text("🤖 أنا جاهز، اكتب سؤالك...", reply_markup=get_back_menu())
-    if text == "📊 استعلام الغياب": return await update.message.reply_text("🔎 أرسل رقمك التدريبي (أرقام فقط)...")
     if text == "📚 الحقائب التدريبية": return await update.message.reply_text("📚 *رابط المقررات:*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📥 المستودع", url=DRIVE_LINK)]]), parse_mode='Markdown')
     if text == "🔗 المنصات الإلكترونية": return await update.message.reply_text("🌐 *المنصات:*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("رايات", url="https://rayat.tvtc.gov.sa")], [InlineKeyboardButton("تقني", url="https://tvtclms.edu.sa")]]), parse_mode='Markdown')
-    if text == "📍 موقع القسم": return await update.message.reply_text("📍 *الموقع:*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🗺️ خرائط جوجل", url="http://googleusercontent.com/maps.google.com/3")]]), parse_mode='Markdown')
     if text == "📰 أخبار القسم والمعهد": return await update.message.reply_text("📰 *حساب المعهد:*", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📱 منصة X", url=TVTC_X_LINK)]]), parse_mode='Markdown')
     if text == "📄 الخطط التدريبية": return await update.message.reply_text("📄 *اختر الفصل:*", reply_markup=get_plans_menu(), parse_mode='Markdown')
-    if text == "❓ الأسئلة الشائعة": return await update.message.reply_text("🏛️ *اللوائح والأنظمة التدريبية...*", parse_mode='Markdown')
     if text in ["1️⃣ الفصل الأول", "2️⃣ الفصل الثاني", "3️⃣ الفصل الثالث", "4️⃣ الفصل الرابع", "5️⃣ الفصل الخامس", "6️⃣ الفصل السادس", "🖥️ برامج فصلية"]: return await update.message.reply_text(f"{load_json('plans.json').get(text, 'جاري التحديث')}", parse_mode='Markdown')
     if text == "💡 نصيحة تقنية": return await update.message.reply_text(random.choice(TECH_TIPS))
-    if text == "🕹️ قسم الألعاب والإضافات": return await update.message.reply_text("🕹️ *القسم الترفيهي:*", reply_markup=get_games_menu(), parse_mode='Markdown')
-
-    # الاستعلام الآلي برقم المتدرب
-    if clean_text.isdigit() and len(clean_text) > 4: 
-        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-        try:
-            if not os.path.exists('data.xlsx'): return await update.message.reply_text("⚠️ القاعدة فارغة.")
-            df = pd.read_excel('data.xlsx', dtype=str)
-            df['stu_num'] = df['stu_num'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True) 
-            res = df[df['stu_num'] == clean_text]
-            if not res.empty:
-                stu_nam = res.iloc[0]['stu_nam']
-                m = f"🎓 *السجل الأكاديمي*\n👤 *المتدرب:* {stu_nam}\n🔢 *الرقم:* {clean_text}\n{SEP}\n"
-                sj_interrogate = None
-                comp = load_json(INTERROGATIONS_FILE).get(clean_text, [])
-                for _, r in res.iterrows():
-                    c_name = str(r.get('c_nam', '')).strip()
-                    val = str(r.get('parsnt', '0')).replace('%', '').strip()
-                    if val in ['ح', 'ط'] or 'حرمان' in val: d_val = f"*{val}* 🔴"
-                    else:
-                        try:
-                            v = float(val)
-                            if v >= 20: d_val = f"*{v}%* 🔴 حرمان"
-                            elif v >= 15: 
-                                d_val = f"*{v}%* ⚠️ إنذار"
-                                if c_name not in comp: sj_interrogate = c_name
-                            else: d_val = f"*{v}%* 🟢"
-                        except: d_val = f"*{val}* ⚠️"
-                    m += f"📖 *{c_name}*\n▫️ {d_val}\n\n"
-                await update.message.reply_text(m, parse_mode='Markdown')
-                if sj_interrogate:
-                    user_states[user_id] = {'flow': 'pledge', 'step': 1, 'stu_num': clean_text, 'stu_nam': stu_nam, 'subject': sj_interrogate}
-                    return await update.message.reply_text(f"⚠️ *تنبيه!*\nالغياب بمقرر: *{sj_interrogate}* وصل لمرحلة الخطر.\n🛑 *النظام مغلق حتى تُكمل الإقرار!*", parse_mode='Markdown', reply_markup=get_pledge_step1_menu())
-            else: await update.message.reply_text("❌ الرقم غير مسجل.")
-        except: pass
-        return
 
     await update.message.reply_text("⚠️ الرجاء اختيار خدمة 👇", reply_markup=get_main_menu())
 
@@ -279,19 +217,14 @@ async def handle_docs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get('waiting_for_plan') and update.message.document:
         return await convert_plan_file(update, context)
 
-    # استقبال ملفات تحديث بيانات الطلاب المعتادة
+    # استقبال ملفات تحديث بيانات الإدارة
     if user_id == ADMIN_ID and update.message.document and update.message.document.file_name.endswith(('.xlsx', '.xls', '.csv')):
         return await process_admin_excel(update, context, db)
-
-    # 🔴 توجيه صور ومستندات الطلاب (الأعذار) للمحرك المنفصل 🔴
-    if update.message.photo or update.message.document:
-        return await process_excuse_document(update, context, user_states)
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.answer()
 
 def main():
-    Thread(target=auto_reset_scores, daemon=True).start()
     Thread(target=run_web_server, daemon=True).start()
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
@@ -303,7 +236,7 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_logic))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, handle_docs))
     app.add_handler(CallbackQueryHandler(button_callback))
-    print("🚀 تشغيل النظام (النسخة المعمارية النظيفة)...")
+    print("🚀 تشغيل النظام (النسخة الخفيفة والسريعة)...")
     app.run_polling()
 
 if __name__ == '__main__': main()
