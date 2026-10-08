@@ -1,13 +1,12 @@
-Flask
+Flask==3.0.2
 python-telegram-bot
 google-api-python-client
 google-auth
 pandas
-openpyxl
+openpyxl>=3.1.2
 google-generativeai
 Pillow
 pymongo[srv]
 pyTelegramBotAPI
 requests
-Flask==3.0.2
 PyPDF2
