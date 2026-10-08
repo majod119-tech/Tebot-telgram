@@ -3,13 +3,13 @@ from telegram import ReplyKeyboardMarkup
 # --- 🌟 القوائم التفاعلية المخففة والمطورة 🌟 ---
 
 def get_main_menu():
-    # تم إخفاء الخدمات غير الأساسية وتخفيف القائمة
+    """القائمة الرئيسية المخففة"""
     return ReplyKeyboardMarkup([
         ["🤖 المعلم الذكي"], 
         ["📚 الحقائب التدريبية", "📄 الخطط التدريبية"],
         ["🔗 المنصات الإلكترونية", "📅 التقويم التدريبي"],
         ["📰 أخبار القسم والمعهد", "❓ الأسئلة الشائعة"]
-    ], resize_keyboard=True, is_persistent=True)
+    ], resize_keyboard=True)
 
 def get_cancel_menu(): 
     return ReplyKeyboardMarkup([["❌ إلغاء العملية"]], resize_keyboard=True)
