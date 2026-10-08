@@ -1,16 +1,14 @@
 from telegram import ReplyKeyboardMarkup
 
-# --- 🌟 القوائم التفاعلية 🌟 ---
+# --- 🌟 القوائم التفاعلية المخففة والمطورة 🌟 ---
 
 def get_main_menu():
+    # تم إخفاء الخدمات غير الأساسية وتخفيف القائمة
     return ReplyKeyboardMarkup([
         ["🤖 المعلم الذكي"], 
         ["📚 الحقائب التدريبية", "📄 الخطط التدريبية"],
-        ["📊 استعلام الغياب", "📝 رفع الغياب والأعذار"],
         ["🔗 المنصات الإلكترونية", "📅 التقويم التدريبي"],
-        ["📰 أخبار القسم والمعهد", "📍 موقع القسم"],
-        ["❓ الأسئلة الشائعة", "📘 دليل المتدرب"],
-        ["📬 الاقتراحات والشكاوى", "🕹️ قسم الألعاب والإضافات"]
+        ["📰 أخبار القسم والمعهد", "❓ الأسئلة الشائعة"]
     ], resize_keyboard=True, is_persistent=True)
 
 def get_cancel_menu(): 
@@ -27,11 +25,18 @@ def get_plans_menu():
         ["🖥️ برامج فصلية", "🔙 الرجوع للقائمة الرئيسية"]
     ], resize_keyboard=True)
 
-def get_games_menu(): 
+def get_admin_menu():
     return ReplyKeyboardMarkup([
-        ["🎮 تحدي الأسبوع", "🏆 بطل الأسبوع"], 
-        ["💡 نصيحة تقنية", "🌐 أخبار التقنية"], 
+        ["🔄 تحويل الخطط للقالب الجديد"],
+        ["إرسال تعميم 📢", "كشف الحالات الحرجة ⚠️"],
+        ["حالة قاعدة البيانات 📊", "تقرير سير العملية 📑"],
+        ["سحب نسخة احتياطية 💾", "🦞 مساعد OpenClaw"],
         ["🔙 الرجوع للقائمة الرئيسية"]
+    ], resize_keyboard=True)
+    
+def get_openclaw_menu():
+    return ReplyKeyboardMarkup([
+        ["❌ إنهاء محادثة الذكاء الاصطناعي"]
     ], resize_keyboard=True)
 
 def get_pledge_step1_menu(): 
@@ -46,18 +51,3 @@ def get_pledge_step2_menu():
 
 def get_pledge_step3_menu(): 
     return ReplyKeyboardMarkup([["✍️ أقر وأتعهد بالانضباط للحفاظ على مستقبلي التدريبي"]], resize_keyboard=True)
-
-# في ملف قائمة المدير menus.py
-def get_admin_menu():
-    return ReplyKeyboardMarkup([
-        ["إرسال تعميم 📢", "كشف الحالات الحرجة ⚠️"],
-        ["حالة قاعدة البيانات 📊", "تقرير سير العملية 📑"],
-        ["سحب نسخة احتياطية 💾", "🦞 مساعد OpenClaw"],
-        ["🔄 تحويل الخطط للقالب الجديد"], # 🌟 تمت إضافة الزر الجديد هنا 🌟
-        ["🔙 الرجوع للقائمة الرئيسية"]
-    ], resize_keyboard=True)
-    
-def get_openclaw_menu():
-    return ReplyKeyboardMarkup([
-        ["❌ إنهاء محادثة الذكاء الاصطناعي"]
-    ], resize_keyboard=True)
