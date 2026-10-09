@@ -1,61 +1,120 @@
-from telegram import ReplyKeyboardMarkup
+import os
+import threading
+from flask import Flask
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
 
-# --- 🌟 القوائم التفاعلية المخففة والمطورة 🌟 ---
+# استيراد القوائم التفاعلية من ملف menus.py
+from menus import (
+    get_main_menu,
+    get_plans_menu,
+    get_admin_menu,
+    get_cancel_menu,
+    get_back_menu,
+)
 
-def get_main_menu():
-    """القائمة الرئيسية المخففة"""
-    return ReplyKeyboardMarkup([
-        ["🤖 المعلم الذكي"], 
-        ["📚 الحقائب التدريبية", "📄 الخطط التدريبية"],
-        ["🔗 المنصات الإلكترونية", "📅 التقويم التدريبي"],
-        ["📰 أخبار القسم والمعهد", "❓ الأسئلة الشائعة"]
-    ], resize_keyboard=True)
+# ==========================================
+# 1. إعداد خادم الويب المصغر (Health Check)
+# ==========================================
+server = Flask(__name__)
 
-def get_cancel_menu(): 
-    """زر إلغاء العملية"""
-    return ReplyKeyboardMarkup([["❌ إلغاء العملية"]], resize_keyboard=True)
+@server.route('/')
+def health_check():
+    """الرد على فحوصات Koyeb الدورية بحالة 200 OK"""
+    return "Bot is healthy and running!", 200
 
-def get_back_menu(): 
-    """زر الرجوع للقائمة الرئيسية"""
-    return ReplyKeyboardMarkup([["🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    server.run(host="0.0.0.0", port=port)
 
-def get_plans_menu(): 
-    """قائمة الخطط التدريبية للفصول"""
-    return ReplyKeyboardMarkup([
-        ["1️⃣ الفصل الأول", "2️⃣ الفصل الثاني"], 
-        ["3️⃣ الفصل الثالث", "4️⃣ الفصل الرابع"], 
-        ["5️⃣ الفصل الخامس", "6️⃣ الفصل السادس"], 
-        ["🖥️ برامج فصلية", "🔙 الرجوع للقائمة الرئيسية"]
-    ], resize_keyboard=True)
+# ==========================================
+# 2. معالجات الأوامر والرسائل للبوت
+# ==========================================
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """الرد على أمر /start وإظهار القائمة المخففة الجديدة"""
+    welcome_text = (
+        "أهلاً بك في المساعد الذكي لقسم الحاسب الآلي ✨\n"
+        "الرجاء اختيار الخدمة المطلوبة من القائمة أدناه:"
+    )
+    await update.message.reply_text(welcome_text, reply_markup=get_main_menu())
 
-def get_admin_menu():
-    """قائمة لوحة تحكم المسؤول"""
-    return ReplyKeyboardMarkup([
-        ["🔄 تحويل الخطط للقالب الجديد"],
-        ["إرسال تعميم 📢", "كشف الحالات الحرجة ⚠️"],
-        ["حالة قاعدة البيانات 📊", "تقرير سير العملية 📑"],
-        ["سحب نسخة احتياطية 💾", "🦞 مساعد OpenClaw"],
-        ["🔙 الرجوع للقائمة الرئيسية"]
-    ], resize_keyboard=True)
-    
-def get_openclaw_menu():
-    """قائمة إنهاء محادثة الذكاء الاصطناعي"""
-    return ReplyKeyboardMarkup([
-        ["❌ إنهاء محادثة الذكاء الاصطناعي"]
-    ], resize_keyboard=True)
+async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة الضغط على أزرار القوائم"""
+    text = update.message.text
 
-def get_pledge_step1_menu(): 
-    """خطوة التعهد الأولى"""
-    return ReplyKeyboardMarkup([["✅ نعم، أطلعت على نسبة الغياب"]], resize_keyboard=True)
+    if text == "🤖 المعلم الذكي":
+        await update.message.reply_text(
+            "مرحباً بك! أنا مستشارك الذكي لقسم الحاسب. تفضل بطرح أي سؤال تخصصي أو استفسار.",
+            reply_markup=get_main_menu()
+        )
+    elif text == "📄 الخطط التدريبية":
+        await update.message.reply_text(
+            "اختر الفصل التدريبي لعرض الخطة:",
+            reply_markup=get_plans_menu()
+        )
+    elif text == "📚 الحقائب التدريبية":
+        await update.message.reply_text(
+            "يمكنك استعراض وتحميل الحقائب التدريبية المعتمدة للقسم.",
+            reply_markup=get_main_menu()
+        )
+    elif text == "📅 التقويم التدريبي":
+        await update.message.reply_text(
+            "التقويم التدريبي للفصل الحالي متاح للاطلاع ومتابعة المواعيد الهامة.",
+            reply_markup=get_main_menu()
+        )
+    elif text == "🔗 المنصات الإلكترونية":
+        await update.message.reply_text(
+            "منصات التدريب والرايات وبوابة المتدربين متاحة عبر الروابط الرسمية.",
+            reply_markup=get_main_menu()
+        )
+    elif text == "📰 أخبار القسم والمعهد":
+        await update.message.reply_text(
+            "تابع أحدث الإعلانات والأنشطة وورش العمل الخاصة بالقسم.",
+            reply_markup=get_main_menu()
+        )
+    elif text == "❓ الأسئلة الشائعة":
+        await update.message.reply_text(
+            "هنا تجد إجابات على أكثر الأسئلة تكراراً حول المقررات والتسجيل والاختبارات.",
+            reply_markup=get_main_menu()
+        )
+    elif text == "🔙 الرجوع للقائمة الرئيسية" or text == "❌ إلغاء العملية":
+        await update.message.reply_text(
+            "تمت العودة للقائمة الرئيسية.",
+            reply_markup=get_main_menu()
+        )
+    else:
+        await update.message.reply_text(
+            f"تم استلام طلبك: {text}",
+            reply_markup=get_main_menu()
+        )
 
-def get_pledge_step2_menu(): 
-    """خطوة اختيار سبب العذر"""
-    return ReplyKeyboardMarkup([
-        ["🏥 عذر طبي", "👨‍👩‍👧‍👦 ظروف عائلية طارئة"], 
-        ["🚗 مشكلة في المواصلات", "⚙️ أعطال تقنية/أخرى"], 
-        ["❌ إلغاء العملية"]
-    ], resize_keyboard=True)
+# ==========================================
+# 3. نقطة التشغيل الرئيسية
+# ==========================================
+def main():
+    token = os.environ.get("TOKEN")
+    if not token:
+        raise ValueError("خطأ: لم يتم العثور على متغير البيئة TOKEN في Koyeb!")
 
-def get_pledge_step3_menu(): 
-    """خطوة الإقرار والتعهد النهائية"""
-    return ReplyKeyboardMarkup([["✍️ أقر وأتعهد بالانضباط للحفاظ على مستقبلي التدريبي"]], resize_keyboard=True)
+    # تشغيل سيرفر الويب في خيط منفصل لتفادي توقف الحاوية
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+
+    # بناء وتشغيل تطبيق البوت
+    app = ApplicationBuilder().token(token).build()
+
+    # تسجيل المعالجات
+    app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_buttons))
+
+    # بدء الاستماع الدائم للتحديثات (Polling)
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
