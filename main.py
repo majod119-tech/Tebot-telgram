@@ -11,7 +11,7 @@ from telegram.ext import (
     filters,
 )
 
-# استيراد القوائم
+# استيراد القوائم التفاعلية
 from menus import (
     get_main_menu,
     get_plans_menu,
@@ -19,14 +19,18 @@ from menus import (
     get_back_menu,
 )
 
-# 1. إعداد خادم الويب الأساسي لإبقاء السيرفر حياً
+# ==========================================
+# 1. خادم الويب لفحص الصحة (Health Check)
+# ==========================================
 web_app = Flask(__name__)
 
 @web_app.route('/')
 def home():
     return "Service is Healthy and Running", 200
 
-# 2. معالجات التليجرام
+# ==========================================
+# 2. معالجات تليجرام
+# ==========================================
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
         "أهلاً بك في المساعد الذكي لقسم الحاسب الآلي ✨\n"
@@ -43,16 +47,18 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text in ["🔙 الرجوع للقائمة الرئيسية", "❌ إلغاء العملية"]:
         await update.message.reply_text("تمت العودة للقائمة الرئيسية.", reply_markup=get_main_menu())
     else:
-        await update.message.reply_text(f"تم اختيار: {text}", reply_markup=get_main_menu())
+        await update.message.reply_text(f"تم استلام طلبك: {text}", reply_markup=get_main_menu())
 
-# 3. دالة تشغيل البوت في خيط مستقل
-def start_bot():
+# ==========================================
+# 3. تشغيل البوت في خيط مستقل بأمان تام
+# ==========================================
+def start_bot_thread():
     token = os.environ.get("TOKEN")
     if not token:
         print("CRITICAL: TOKEN is missing!")
         return
 
-    # إنشاء حلقة أحداث مخصصة لتفادي تضارب المسارات
+    # إنشاء حلقة أحداث مخصصة للخيط
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
@@ -60,15 +66,17 @@ def start_bot():
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_buttons))
 
-    # تشغيل الاستماع
-    application.run_polling(close_loop=False)
+    # النقطة الجوهرية: stop_signals=None تمنع خطأ set_wakeup_fd نهائياً
+    application.run_polling(stop_signals=None, close_loop=False)
 
+# ==========================================
 # 4. نقطة الانطلاق
+# ==========================================
 if __name__ == "__main__":
-    # تشغيل البوت في الخلفية أولاً
-    bot_thread = threading.Thread(target=start_bot, daemon=True)
-    bot_thread.start()
+    # تشغيل البوت في الخلفية بدون اعتراض للإشارات
+    t = threading.Thread(target=start_bot_thread, daemon=True)
+    t.start()
 
-    # تشغيل سيرفر الويب في الواجهة الرئيسية لمنع خروج بايثون نهائياً
+    # تشغيل سيرفر الويب في الخيط الرئيسي
     port = int(os.environ.get("PORT", 10000))
     web_app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
