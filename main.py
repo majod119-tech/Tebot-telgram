@@ -1,282 +1,70 @@
-import os
-import threading
-from flask import Flask
-from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    ContextTypes,
-    filters,
-)
-
-# استيراد القوائم التفاعلية من menus.py
-from menus import (
-    get_main_menu,
-    get_plans_menu,
-    get_admin_menu,
-    get_cancel_menu,
-    get_back_menu,
-)
+from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 
 # ==========================================
-# 1. إعداد سيرفر الويب (Health Check لـ Koyeb)
+# 1. القائمة السفلية الرئيسية (Reply Keyboard)
+# متناسقة: 2 في كل صف، واضحة ومريحة للإبهام
 # ==========================================
-web_app = Flask(__name__)
+def get_main_menu():
+    keyboard = [
+        ["🤖 المعلم الذكي"],
+        ["📄 الخطط التدريبية", "📚 الحقائب التدريبية"],
+        ["🔗 المنصات والخدمات", "📅 التقويم التدريبي"],
+        ["📰 أخبار القسم", "❓ الأسئلة الشائعة"]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-@web_app.route('/')
-def home():
-    return "Service is Healthy and Running", 200
-
-def run_flask_server():
-    port = int(os.environ.get("PORT", 10000))
-    web_app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
-
-# ==========================================
-# 2. الخطة التدريبية المعتمدة الرسمية (نظام نصفي 1446هـ)
-# ==========================================
-PLANS_DATA = {
-    "الفصل الأول": (
-        "📘 *خطة الفصل التدريبي الأول (المعتمدة)*\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "• *ثقافة إسلامية - 1* (اسلم 001): 2 ساعة معتمدة\n"
-        "• *لغة إنجليزية (1)* (انجل 001): 3 ساعات معتمدة\n"
-        "• *رياضيات (1)* (رياض 001): 2 ساعة معتمدة\n"
-        "• *فيزياء* (فيزي 001): 3 ساعات معتمدة\n"
-        "• *التربية البدنية - 1* (بدني 001): 2 ساعة معتمدة\n"
-        "• *لغة عربية - 1* (عربي 001): 2 ساعة معتمدة\n"
-        "• *أساسيات الحاسب الآلي* (حاسب 001): 3 ساعات معتمدة (6 عملي)\n"
-        "• *مدخل إلى مهارات القرن 21* (ماهر 001): 2 ساعة معتمدة\n"
-        "• *السلامة والصحة المهنية* (مهني 002): 2 ساعة معتمدة\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "📊 *إجمالي الوحدات المعتمدة:* 21 وحدة | 30 ساعة اتصال أسبوعياً."
-    ),
-    "الفصل الثاني": (
-        "📘 *خطة الفصل التدريبي الثاني (المعتمدة)*\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "• *سلوك مهني* (اسلك 001): 2 ساعة معتمدة\n"
-        "• *لغة عربية - 2* (عربي 002): 2 ساعة معتمدة\n"
-        "• *لغة إنجليزية (2)* (انجل 002): 3 ساعات معتمدة\n"
-        "• *رياضيات (2)* (رياض 002): 2 ساعة معتمدة\n"
-        "• *التربية البدنية - 2* (بدني 002): 1 ساعة معتمدة\n"
-        "• *ثقافة إسلامية - 2* (اسلم 002): 2 ساعة معتمدة\n"
-        "• *تطبيقات الحاسب الآلي* (حاسب 002): 3 ساعات معتمدة (6 عملي)\n"
-        "• *مهارات التواصل والتعاون* (ماهر 002): 2 ساعة معتمدة\n"
-        "• *التفكير الناقد والإبداعي* (ماهر 003): 2 ساعة معتمدة\n"
-        "• *ورش تأسيسية* (مهني 001): 3 ساعات معتمدة (6 عملي)\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "📊 *إجمالي الوحدات المعتمدة:* 22 وحدة | 30 ساعة اتصال أسبوعياً."
-    ),
-    "الفصل الثالث": (
-        "📘 *خطة الفصل التدريبي الثالث (المعتمدة)*\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "• *ثقافة إسلامية - 3* (اسلم 003): 2 ساعة معتمدة\n"
-        "• *رياضيات (3)* (رياض 003): 2 ساعة معتمدة\n"
-        "• *لغة إنجليزية (3)* (انجل 003): 3 ساعات معتمدة\n"
-        "• *بحث ومصادر المعلومات* (ماهر 004): 2 ساعة معتمدة\n"
-        "• *الرسم الهندسي* (مهني 003): 2 ساعة معتمدة\n"
-        "• *أجهزة وقياس* (الكت 010): 2 ساعة معتمدة\n"
-        "• *أساسيات الكهرباء* (حاكر 012): 2 ساعة معتمدة\n"
-        "• *أساسيات الإلكترونيات* (حاكر 013): 2 ساعة معتمدة\n"
-        "• *تطبيقات مفتوحة المصدر* (حاسب 011): 2 ساعة معتمدة\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "📊 *إجمالي الوحدات المعتمدة:* 19 وحدة | 30 ساعة اتصال أسبوعياً."
-    ),
-    "الفصل الرابع": (
-        "📘 *خطة الفصل التدريبي الرابع (المعتمدة)*\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "• *مقدمة في ريادة الأعمال* (مهني 004): 2 ساعة معتمدة\n"
-        "• *تقنيات الإنترنت* (حاسب 012): 2 ساعة معتمدة\n"
-        "• *مكونات الحاسب - 1* (حاسب 021): 2 ساعة معتمدة\n"
-        "• *لغة برمجة - 1 (Python)* (حاسب 031): 2 ساعة معتمدة\n"
-        "• *أساسيات الشبكات* (حاسب 041): 2 ساعة معتمدة\n"
-        "• *رسم الشبكات بالحاسب* (حاسب 042): 2 ساعة معتمدة\n"
-        "• *أساسيات نظام لينكس* (حاسب 051): 2 ساعة معتمدة\n"
-        "• *أنشطة مهنية - 1* (نشاط 001): 0 ساعة معتمدة (ساعتان اتصال)\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "📊 *إجمالي الوحدات المعتمدة:* 14 وحدة | 30 ساعة اتصال أسبوعياً."
-    ),
-    "الفصل الخامس": (
-        "📘 *خطة الفصل التدريبي الخامس (المعتمدة)*\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "• *مكونات الحاسب - 2* (حاسب 022): 2 ساعة معتمدة\n"
-        "• *صيانة الأجهزة الكفية* (حاسب 023): 2 ساعة معتمدة\n"
-        "• *لغة برمجة - 2 (Python)* (حاسب 032): 2 ساعة معتمدة\n"
-        "• *تمديد الكيابل النحاسية* (حاسب 043): 2 ساعة معتمدة\n"
-        "• *شبكات الحاسب* (حاسب 044): 2 ساعة معتمدة\n"
-        "• *نظام تشغيل الشبكة - 1* (حاسب 052): 2 ساعة معتمدة\n"
-        "• *مشاريع إنتاجية* (حاسب 091): 2 ساعة معتمدة\n"
-        "• *أنشطة مهنية - 2* (نشاط 002): 0 ساعة معتمدة (ساعتان اتصال)\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "📊 *إجمالي الوحدات المعتمدة:* 14 وحدة | 30 ساعة اتصال أسبوعياً."
-    ),
-    "الفصل السادس": (
-        "📘 *خطة الفصل التدريبي السادس (المعتمدة)*\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "• *مبادئ قواعد البيانات* (حاسب 013): 2 ساعة معتمدة\n"
-        "• *طرفيات الحاسب* (حاسب 024): 2 ساعة معتمدة\n"
-        "• *مهارات صيانة الحاسب* (حاسب 025): 2 ساعة معتمدة\n"
-        "• *تمديد كيابل الألياف الضوئية* (حاسب 045): 2 ساعة معتمدة\n"
-        "• *نظام تشغيل الشبكة - 2* (حاسب 053): 2 ساعة معتمدة\n"
-        "• *تدريب إنتاجي* (حاسب 098): 3 ساعات معتمدة (6 عملي)\n"
-        "• *أنشطة مهنية - 3* (نشاط 003): 0 ساعة معتمدة (4 ساعات اتصال)\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "📊 *إجمالي الوحدات المعتمدة:* 13 وحدة | 30 ساعة اتصال أسبوعياً."
-    )
-}
+def get_back_menu():
+    return ReplyKeyboardMarkup([["🔙 العودة للقائمة الرئيسية"]], resize_keyboard=True)
 
 # ==========================================
-# 3. معالجات الرسائل والتفاعل
+# 2. القوائم المضمنة (Inline Keyboards)
+# تظهر تحت الرسالة وتوفر تجربة تفاعلية سلسة
 # ==========================================
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    welcome_text = (
-        "أهلاً بك في المساعد الذكي لقسم الحاسب الآلي ✨\n"
-        "الرجاء اختيار الخدمة المطلوبة من القائمة أدناه:"
-    )
-    await update.message.reply_text(welcome_text, reply_markup=get_main_menu())
 
-async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
+def get_plans_inline_menu():
+    """أزرار الفصول مرتبة هندسياً (2 في كل صف)"""
+    keyboard = [
+        [
+            InlineKeyboardButton("1️⃣ الفصل الأول", callback_data="plan_1"),
+            InlineKeyboardButton("2️⃣ الفصل الثاني", callback_data="plan_2")
+        ],
+        [
+            InlineKeyboardButton("3️⃣ الفصل الثالث", callback_data="plan_3"),
+            InlineKeyboardButton("4️⃣ الفصل الرابع", callback_data="plan_4")
+        ],
+        [
+            InlineKeyboardButton("5️⃣ الفصل الخامس", callback_data="plan_5"),
+            InlineKeyboardButton("6️⃣ الفصل السادس", callback_data="plan_6")
+        ],
+        [
+            InlineKeyboardButton("🖥️ البرامج الفصلية والتطويرية", callback_data="plan_extra")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
-    # --- 1. المعلم الذكي ---
-    if "المعلم الذكي" in text:
-        msg = (
-            "🤖 *مرحباً بك في خدمة المعلم الذكي لقسم الحاسب الآلي*\n\n"
-            "أنا جاهز لمساعدتك في استفسارات التخصص وفق المناهج المعتمدة:\n"
-            "• بايثون والبرمجة (لغة برمجة 1 و 2).\n"
-            "• صيانة وتجميع الحاسب وطرفياته ولينكس.\n"
-            "• الشبكات وتمديد الكيابل النحاسية والألياف الضوئية.\n"
-            "• إدارة الخوادم (Windows Server) وقواعد البيانات.\n\n"
-            "💬 *تفضل بكتابة سؤالك وسأجيبك فوراً!*"
-        )
-        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=get_main_menu())
+def get_platforms_inline_menu():
+    """أزرار فتح الروابط مباشرة بلمسة واحدة"""
+    keyboard = [
+        [
+            InlineKeyboardButton("🌐 بوابة متدربي رايات", url="https://rayat.tvtc.gov.sa"),
+            InlineKeyboardButton("📱 منصة تقني الإلكترونية", url="https://tech.tvtc.gov.sa")
+        ],
+        [
+            InlineKeyboardButton("💻 بلاك بورد التدريب الإلكتروني", url="https://lms.elearning.edu.sa"),
+            InlineKeyboardButton("🏛️ بوابة المؤسسة العامة", url="https://tvtc.gov.sa")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
-    # --- 2. الخطط التدريبية ---
-    elif "الخطط التدريبية" in text:
-        msg = (
-            "📄 *الخطط التدريبية المعتمدة — دبلوم المعاهد الصناعية (تخصص الحاسب الآلي)*\n\n"
-            "الرجاء اختيار الفصل التدريبي المطلوب من القائمة أدناه لاستعراض المقررات والساعات المعتمدة:"
-        )
-        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=get_plans_menu())
-
-    # --- 3. استعراض خطة فصل محدد ---
-    elif any(f in text for f in PLANS_DATA.keys()):
-        selected = next((k for k in PLANS_DATA if k in text), None)
-        response_text = PLANS_DATA[selected]
-        footer = (
-            "\n\n🔗 *روابط تحميل الحقائب والمقررات الرسمية:*\n"
-            "• البوابة الرسمية للمقررات: https://tvtc.gov.sa/ar/Departments/tvtcdepartments/cdd/Pages/packages.aspx\n"
-            "• منصة إيثاق للمناهج: https://eythaq.tvtc.gov.sa"
-        )
-        await update.message.reply_text(f"{response_text}{footer}", parse_mode="Markdown", reply_markup=get_plans_menu())
-
-    elif "برامج فصلية" in text:
-        msg = (
-            "🖥️ *البرامج التطويرية والمساندة لقسم الحاسب:*\n"
-            "━━━━━━━━━━━━━━━━━━━━━━\n"
-            "• دورات تمديد ولحام الألياف الضوئية وتجهيز كبائن الشبكة.\n"
-            "• ورش تجميع وترقية وصيانة الحاسب الشخصي والمحمول.\n"
-            "• مهارات إدارة خوادم Windows Server والأجهزة الافتراضية.\n"
-            "━━━━━━━━━━━━━━━━━━━━━━\n"
-            "📢 التسجيل يعلن عنه فصلياً داخل معامل القسم."
-        )
-        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=get_plans_menu())
-
-    # --- 4. الحقائب التدريبية ---
-    elif "الحقائب التدريبية" in text:
-        msg = (
-            "📚 *الحقائب والمناهج التدريبية المعتمدة:*\n\n"
-            "يمكنك استعراض وتحميل كافة حقائب تخصص الحاسب الآلي بصيغة PDF عبر المنصات الرسمية:\n\n"
-            "🔹 *الموقع الرسمي لمقررات وحقائب المؤسسة (CDD):*\n"
-            "🌐 https://tvtc.gov.sa/ar/Departments/tvtcdepartments/cdd/Pages/packages.aspx\n\n"
-            "🔹 *منصة إيثاق للمناهج والخطط التدريبية:*\n"
-            "🌐 https://eythaq.tvtc.gov.sa\n\n"
-            "🔹 *مستودع المناهج المباشر:*\n"
-            "🌐 https://cdd.tvtc.gov.sa/curricula"
-        )
-        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=get_main_menu())
-
-    # --- 5. المنصات الإلكترونية (مع إضافة منصة تقني) ---
-    elif "المنصات الإلكترونية" in text:
-        msg = (
-            "🔗 *أهم المنصات الإلكترونية للمتدرب:*\n\n"
-            "1️⃣ *منصة تقني (الخدمات الإلكترونية الشاملة):*\n"
-            "🌐 https://tech.tvtc.gov.sa\n\n"
-            "2️⃣ *بوابة رايات (شؤون المتدربين والجدول):*\n"
-            "🌐 https://rayat.tvtc.gov.sa\n\n"
-            "3️⃣ *منصة التدريب الإلكتروني (Blackboard):*\n"
-            "🌐 https://lms.elearning.edu.sa\n\n"
-            "4️⃣ *بوابة الحقائب والمناهج الرسمية:*\n"
-            "🌐 https://tvtc.gov.sa/ar/Departments/tvtcdepartments/cdd/Pages/packages.aspx\n\n"
-            "5️⃣ *منصة إيثاق للمناهج والخطط:*\n"
-            "🌐 https://eythaq.tvtc.gov.sa"
-        )
-        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=get_main_menu())
-
-    # --- 6. التقويم التدريبي ---
-    elif "التقويم التدريبي" in text:
-        msg = (
-            "📅 *التقويم التدريبي المعتمد للعام التدريبي:*\n\n"
-            "📌 *أهم المواعيد:*\n"
-            "• الأسبوع الأول: نهاية فترة تعديل الجداول في رايات.\n"
-            "• الأسبوع 7 و 8: الاختبارات النصفية التحريرية والعملية.\n"
-            "• الأسبوع 9: صدور الإنذار الأول للحرمان (15%).\n"
-            "• الأسبوع 11 إلى 13: الاختبارات العملية والنهائية.\n\n"
-            "⚠️ يُرجى متابعة نسب الحضور عبر رايات ومنصة تقني لتفادي الحرمان."
-        )
-        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=get_main_menu())
-
-    # --- 7. أخبار القسم والمعهد ---
-    elif "أخبار القسم" in text or "أخبار" in text:
-        msg = (
-            "📰 *أحدث أخبار قسم الحاسب والمعهد:*\n\n"
-            "📢 بدء التسجيل في الورش التخصصية والدعم الفني.\n"
-            "📢 مراجعة المرشد الأكاديمي لتثبيت الحالات التدريبية.\n"
-            "📢 يتم رصد الحضور والغياب بصورة دورية ومباشرة."
-        )
-        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=get_main_menu())
-
-    # --- 8. الأسئلة الشائعة ---
-    elif "الأسئلة الشائعة" in text:
-        msg = (
-            "❓ *الأسئلة الشائعة لقسم الحاسب الآلي:*\n\n"
-            "🔹 *س: متى يقع الحرمان في المقرر؟*\n"
-            "ج: عند بلوغ نسبة الغياب 20% فأكثر بدون عذر رسمي.\n\n"
-            "🔹 *س: كيف أقدم العذر الطبي؟*\n"
-            "ج: عبر منصة صحتي موثقاً وتقديمه لشؤون المتدربين خلال 3 أيام عمل من تاريخ الغياب.\n\n"
-            "🔹 *س: أين أجد خطتي ومقرراتي؟*\n"
-            "ج: عبر بوابة رايات ومنصة تقني وقسم الخطط بالبوت."
-        )
-        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=get_main_menu())
-
-    # --- 9. الرجوع للقائمة الرئيسية وإلغاء العمليات ---
-    elif "الرجوع" in text or "إلغاء" in text:
-        await update.message.reply_text("تمت العودة للقائمة الرئيسية بنجاح ✨", reply_markup=get_main_menu())
-
-    # --- 10. الرد الافتراضي ---
-    else:
-        await update.message.reply_text(
-            f"تم استلام رسالتك: {text}\nإذا كان لديك سؤال تخصصي تفضل باختيار '🤖 المعلم الذكي'.",
-            reply_markup=get_main_menu()
-        )
-
-# ==========================================
-# 4. نقطة الانطلاق الرئيسية
-# ==========================================
-if __name__ == "__main__":
-    token = os.environ.get("TOKEN")
-    if not token:
-        print("CRITICAL ERROR: TOKEN environment variable not found!")
-        exit(1)
-
-    # تشغيل خادم Flask في الخلفية لفحص صحة Koyeb
-    flask_thread = threading.Thread(target=run_flask_server, daemon=True)
-    flask_thread.start()
-
-    # تشغيل بوت التليجرام في الخيط الرئيسي
-    application = ApplicationBuilder().token(token).build()
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_buttons))
-
-    print("Telegram Bot is running in Main Thread with Official TVTC Plans...")
-    application.run_polling()
+def get_curricula_inline_menu():
+    """روابط تحميل الحقائب والمناهج"""
+    keyboard = [
+        [
+            InlineKeyboardButton("📚 بوابة الحقائب الرسمية (CDD)", url="https://tvtc.gov.sa/ar/Departments/tvtcdepartments/cdd/Pages/packages.aspx")
+        ],
+        [
+            InlineKeyboardButton("📑 منصة إيثاق للمناهج والخطط", url="https://eythaq.tvtc.gov.sa"),
+            InlineKeyboardButton("📦 المستودع الرقمي المباشر", url="https://cdd.tvtc.gov.sa/curricula")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
