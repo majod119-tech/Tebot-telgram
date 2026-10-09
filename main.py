@@ -11,7 +11,7 @@ from telegram.ext import (
     filters,
 )
 
-# استيراد القوائم التفاعلية
+# استيراد القوائم
 from menus import (
     get_main_menu,
     get_plans_menu,
@@ -19,18 +19,14 @@ from menus import (
     get_back_menu,
 )
 
-# ==========================================
-# 1. إعداد خادم الويب (Health Check)
-# ==========================================
-app = Flask(__name__)
+# 1. إعداد خادم الويب الأساسي لإبقاء السيرفر حياً
+web_app = Flask(__name__)
 
-@app.route('/')
-def health():
-    return "OK", 200
+@web_app.route('/')
+def home():
+    return "Service is Healthy and Running", 200
 
-# ==========================================
-# 2. معالجات تليجرام
-# ==========================================
+# 2. معالجات التليجرام
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
         "أهلاً بك في المساعد الذكي لقسم الحاسب الآلي ✨\n"
@@ -41,7 +37,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     if text == "🤖 المعلم الذكي":
-        await update.message.reply_text("مرحباً بك! أنا مستشارك الذكي لقسم الحاسب. تفضل بطرح أي سؤال تخصصي.", reply_markup=get_main_menu())
+        await update.message.reply_text("مرحباً بك في خدمة المعلم الذكي. تفضل بطرح استفسارك.", reply_markup=get_main_menu())
     elif text == "📄 الخطط التدريبية":
         await update.message.reply_text("اختر الفصل التدريبي لعرض الخطة:", reply_markup=get_plans_menu())
     elif text in ["🔙 الرجوع للقائمة الرئيسية", "❌ إلغاء العملية"]:
@@ -49,16 +45,14 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(f"تم اختيار: {text}", reply_markup=get_main_menu())
 
-# ==========================================
-# 3. تشغيل البوت في مسار منفصل
-# ==========================================
-def run_telegram_bot():
+# 3. دالة تشغيل البوت في خيط مستقل
+def start_bot():
     token = os.environ.get("TOKEN")
     if not token:
-        print("ERROR: TOKEN environment variable not found!")
+        print("CRITICAL: TOKEN is missing!")
         return
 
-    # إنشاء حلقة أحداث مخصصة لمسار البوت
+    # إنشاء حلقة أحداث مخصصة لتفادي تضارب المسارات
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
@@ -66,16 +60,15 @@ def run_telegram_bot():
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_buttons))
 
+    # تشغيل الاستماع
     application.run_polling(close_loop=False)
 
-# ==========================================
-# 4. نقطة الانطلاق الرئيسية
-# ==========================================
+# 4. نقطة الانطلاق
 if __name__ == "__main__":
-    # تشغيل البوت في الخلفية
-    bot_thread = threading.Thread(target=run_telegram_bot, daemon=True)
+    # تشغيل البوت في الخلفية أولاً
+    bot_thread = threading.Thread(target=start_bot, daemon=True)
     bot_thread.start()
 
-    # تشغيل Flask كعملية حابسة (Blocking) في الواجهة لمنع خروج بايثون
+    # تشغيل سيرفر الويب في الواجهة الرئيسية لمنع خروج بايثون نهائياً
     port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    web_app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
