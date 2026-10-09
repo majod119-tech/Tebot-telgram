@@ -12,12 +12,15 @@ def get_main_menu():
     ], resize_keyboard=True)
 
 def get_cancel_menu(): 
+    """زر إلغاء العملية"""
     return ReplyKeyboardMarkup([["❌ إلغاء العملية"]], resize_keyboard=True)
 
 def get_back_menu(): 
+    """زر الرجوع للقائمة الرئيسية"""
     return ReplyKeyboardMarkup([["🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
 
 def get_plans_menu(): 
+    """قائمة الخطط التدريبية للفصول"""
     return ReplyKeyboardMarkup([
         ["1️⃣ الفصل الأول", "2️⃣ الفصل الثاني"], 
         ["3️⃣ الفصل الثالث", "4️⃣ الفصل الرابع"], 
@@ -26,6 +29,7 @@ def get_plans_menu():
     ], resize_keyboard=True)
 
 def get_admin_menu():
+    """قائمة لوحة تحكم المسؤول"""
     return ReplyKeyboardMarkup([
         ["🔄 تحويل الخطط للقالب الجديد"],
         ["إرسال تعميم 📢", "كشف الحالات الحرجة ⚠️"],
@@ -35,14 +39,17 @@ def get_admin_menu():
     ], resize_keyboard=True)
     
 def get_openclaw_menu():
+    """قائمة إنهاء محادثة الذكاء الاصطناعي"""
     return ReplyKeyboardMarkup([
         ["❌ إنهاء محادثة الذكاء الاصطناعي"]
     ], resize_keyboard=True)
 
 def get_pledge_step1_menu(): 
+    """خطوة التعهد الأولى"""
     return ReplyKeyboardMarkup([["✅ نعم، أطلعت على نسبة الغياب"]], resize_keyboard=True)
 
 def get_pledge_step2_menu(): 
+    """خطوة اختيار سبب العذر"""
     return ReplyKeyboardMarkup([
         ["🏥 عذر طبي", "👨‍👩‍👧‍👦 ظروف عائلية طارئة"], 
         ["🚗 مشكلة في المواصلات", "⚙️ أعطال تقنية/أخرى"], 
@@ -50,4 +57,5 @@ def get_pledge_step2_menu():
     ], resize_keyboard=True)
 
 def get_pledge_step3_menu(): 
+    """خطوة الإقرار والتعهد النهائية"""
     return ReplyKeyboardMarkup([["✍️ أقر وأتعهد بالانضباط للحفاظ على مستقبلي التدريبي"]], resize_keyboard=True)
