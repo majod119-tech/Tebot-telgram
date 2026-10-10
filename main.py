@@ -84,10 +84,35 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=get_platforms_inline_menu())
 
-    elif "التقويم التدريبي" in text:
-        msg = (
-            "📅 *التقويم التدريبي المعتمد للفصل الحالي*\n"
+        elif "التقويم التدريبي" in text:
+        caption_msg = (
+            "📅 *التقويم التدريبي المعتمد*\n"
             "──────────────────────\n"
+            "مرفق لك نسخة PDF من التقويم التدريبي التفصيلي.\n"
+            "يحتوي على مواعيد الاختبارات، الإجازات، وبداية الفصول التدريبية."
+        )
+        
+        file_path = "calendar.pdf"
+        
+        # التأكد من وجود الملف في السيرفر وإرساله كملف PDF تفاعلي
+        if os.path.exists(file_path):
+            with open(file_path, 'rb') as pdf_file:
+                await update.message.reply_document(
+                    document=pdf_file,
+                    caption=caption_msg,
+                    parse_mode="Markdown",
+                    reply_markup=get_main_menu()
+                )
+        else:
+            # كخطة بديلة (Fallback) في حال لم يتم تحميل الملف، يرسل الرابط المباشر
+            pdf_url = "https://raw.githubusercontent.com/majod119-tech/Tebot-telgram/main/calendar.pdf"
+            fallback_msg = f"{caption_msg}\n\n🔗 [اضغط هنا لعرض وتحميل التقويم]({pdf_url})"
+            await update.message.reply_text(
+                fallback_msg, 
+                parse_mode="Markdown", 
+                reply_markup=get_main_menu()
+            )
+
             "📌 *أهم المحطات التدريبية:*\n"
             "• *الأسبوع الأول:* نهاية فترة تعديل الجداول في رايات.\n"
             "• *الأسبوع 7 و 8:* الاختبارات النصفية التحريرية والعملية.\n"
