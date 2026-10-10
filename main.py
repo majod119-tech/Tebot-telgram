@@ -1,3 +1,4 @@
+import os
 import threading
 from flask import Flask
 from telegram import Update
@@ -84,7 +85,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=get_platforms_inline_menu())
 
-        elif "التقويم التدريبي" in text:
+    elif "التقويم التدريبي" in text:
         caption_msg = (
             "📅 *التقويم التدريبي المعتمد*\n"
             "──────────────────────\n"
@@ -112,15 +113,6 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="Markdown", 
                 reply_markup=get_main_menu()
             )
-
-            "📌 *أهم المحطات التدريبية:*\n"
-            "• *الأسبوع الأول:* نهاية فترة تعديل الجداول في رايات.\n"
-            "• *الأسبوع 7 و 8:* الاختبارات النصفية التحريرية والعملية.\n"
-            "• *الأسبوع 9:* صدور الإنذار الأول للغياب (15%).\n"
-            "• *الأسبوع 11 - 13:* الاختبارات العملية والنهائية.\n\n"
-            "⚠️ يُرجى متابعة الحضور لتفادي الحرمان التلقائي."
-        )
-        await update.message.reply_text(msg, parse_mode="Markdown")
 
     elif "أخبار" in text:
         msg = (
