@@ -1,61 +1,67 @@
-from telegram import ReplyKeyboardMarkup
+from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 
-# --- 🌟 القوائم التفاعلية المخففة والمطورة 🌟 ---
-
+# ==========================================
+# 1. القائمة السفلية الرئيسية (Reply Keyboard)
+# ==========================================
 def get_main_menu():
-    """القائمة الرئيسية المخففة"""
-    return ReplyKeyboardMarkup([
-        ["🤖 المعلم الذكي"], 
-        ["📚 الحقائب التدريبية", "📄 الخطط التدريبية"],
-        ["🔗 المنصات الإلكترونية", "📅 التقويم التدريبي"],
-        ["📰 أخبار القسم والمعهد", "❓ الأسئلة الشائعة"]
-    ], resize_keyboard=True)
+    keyboard = [
+        ["🤖 المعلم الذكي"],
+        ["📄 الخطط التدريبية", "📚 الحقائب التدريبية"],
+        ["🔗 المنصات والخدمات", "📅 التقويم التدريبي"],
+        ["📰 أخبار القسم", "❓ الأسئلة الشائعة"]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-def get_cancel_menu(): 
-    """زر إلغاء العملية"""
-    return ReplyKeyboardMarkup([["❌ إلغاء العملية"]], resize_keyboard=True)
+def get_back_menu():
+    return ReplyKeyboardMarkup([["🔙 العودة للقائمة الرئيسية"]], resize_keyboard=True)
 
-def get_back_menu(): 
-    """زر الرجوع للقائمة الرئيسية"""
-    return ReplyKeyboardMarkup([["🔙 الرجوع للقائمة الرئيسية"]], resize_keyboard=True)
+# ==========================================
+# 2. القوائم المضمنة (Inline Keyboards)
+# ==========================================
+def get_plans_inline_menu():
+    """أزرار الفصول مرتبة هندسياً لسهولة اللمس"""
+    keyboard = [
+        [
+            InlineKeyboardButton("1️⃣ الفصل الأول", callback_data="plan_1"),
+            InlineKeyboardButton("2️⃣ الفصل الثاني", callback_data="plan_2")
+        ],
+        [
+            InlineKeyboardButton("3️⃣ الفصل الثالث", callback_data="plan_3"),
+            InlineKeyboardButton("4️⃣ الفصل الرابع", callback_data="plan_4")
+        ],
+        [
+            InlineKeyboardButton("5️⃣ الفصل الخامس", callback_data="plan_5"),
+            InlineKeyboardButton("6️⃣ الفصل السادس", callback_data="plan_6")
+        ],
+        [
+            InlineKeyboardButton("🖥️ البرامج الفصلية والتطويرية", callback_data="plan_extra")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
-def get_plans_menu(): 
-    """قائمة الخطط التدريبية للفصول"""
-    return ReplyKeyboardMarkup([
-        ["1️⃣ الفصل الأول", "2️⃣ الفصل الثاني"], 
-        ["3️⃣ الفصل الثالث", "4️⃣ الفصل الرابع"], 
-        ["5️⃣ الفصل الخامس", "6️⃣ الفصل السادس"], 
-        ["🖥️ برامج فصلية", "🔙 الرجوع للقائمة الرئيسية"]
-    ], resize_keyboard=True)
+def get_platforms_inline_menu():
+    """أزرار تفتح الروابط مباشرة"""
+    keyboard = [
+        [
+            InlineKeyboardButton("📱 منصة تقني الإلكترونية", url="https://tech.tvtc.gov.sa"),
+            InlineKeyboardButton("🌐 بوابة رايات للمتدربين", url="https://rayat.tvtc.gov.sa")
+        ],
+        [
+            InlineKeyboardButton("💻 بلاك بورد التدريب", url="https://lms.elearning.edu.sa"),
+            InlineKeyboardButton("🏛️ بوابة المؤسسة العامة", url="https://tvtc.gov.sa")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
-def get_admin_menu():
-    """قائمة لوحة تحكم المسؤول"""
-    return ReplyKeyboardMarkup([
-        ["🔄 تحويل الخطط للقالب الجديد"],
-        ["إرسال تعميم 📢", "كشف الحالات الحرجة ⚠️"],
-        ["حالة قاعدة البيانات 📊", "تقرير سير العملية 📑"],
-        ["سحب نسخة احتياطية 💾", "🦞 مساعد OpenClaw"],
-        ["🔙 الرجوع للقائمة الرئيسية"]
-    ], resize_keyboard=True)
-    
-def get_openclaw_menu():
-    """قائمة إنهاء محادثة الذكاء الاصطناعي"""
-    return ReplyKeyboardMarkup([
-        ["❌ إنهاء محادثة الذكاء الاصطناعي"]
-    ], resize_keyboard=True)
-
-def get_pledge_step1_menu(): 
-    """خطوة التعهد الأولى"""
-    return ReplyKeyboardMarkup([["✅ نعم، أطلعت على نسبة الغياب"]], resize_keyboard=True)
-
-def get_pledge_step2_menu(): 
-    """خطوة اختيار سبب العذر"""
-    return ReplyKeyboardMarkup([
-        ["🏥 عذر طبي", "👨‍👩‍👧‍👦 ظروف عائلية طارئة"], 
-        ["🚗 مشكلة في المواصلات", "⚙️ أعطال تقنية/أخرى"], 
-        ["❌ إلغاء العملية"]
-    ], resize_keyboard=True)
-
-def get_pledge_step3_menu(): 
-    """خطوة الإقرار والتعهد النهائية"""
-    return ReplyKeyboardMarkup([["✍️ أقر وأتعهد بالانضباط للحفاظ على مستقبلي التدريبي"]], resize_keyboard=True)
+def get_curricula_inline_menu():
+    """روابط الحقائب والمناهج المعتمدة"""
+    keyboard = [
+        [
+            InlineKeyboardButton("📚 بوابة المقررات الرسمية (CDD)", url="https://tvtc.gov.sa/ar/Departments/tvtcdepartments/cdd/Pages/packages.aspx")
+        ],
+        [
+            InlineKeyboardButton("📑 منصة إيثاق للمناهج", url="https://eythaq.tvtc.gov.sa"),
+            InlineKeyboardButton("📦 المستودع الرقمي", url="https://cdd.tvtc.gov.sa/curricula")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
