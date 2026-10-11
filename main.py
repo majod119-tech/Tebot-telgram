@@ -152,8 +152,8 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 1. إرسال رسالة انتظار للمتدرب
         waiting_msg = await update.message.reply_text("⏳ جاري تحليل استفسارك...", reply_markup=get_main_menu())
         
-        # 2. إرسال سؤال المتدرب إلى Gemini
-        ai_response = get_gemini_response(text)
+        # 2. إرسال سؤال المتدرب إلى Gemini (أضفنا كلمة await هنا)
+        ai_response = await get_gemini_response(text)
         
         # 3. تعديل رسالة الانتظار لتصبح الإجابة النهائية
         try:
@@ -161,6 +161,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             # إذا كان الرد من Gemini يحتوي على نصوص لا تدعم Markdown بشكل صحيح
             await waiting_msg.edit_text(ai_response)
+
 
 # ==========================================
 # 3. معالج الأزرار المضمنة (Inline Keyboard Callback)
