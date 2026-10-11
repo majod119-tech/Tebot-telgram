@@ -12,7 +12,7 @@ from telegram.ext import (
 )
 
 # استيراد الإعدادات والبيانات من ملف config
-from config import TOKEN, PORT, PLANS_DATA
+from config import TOKEN, PORT, PLANS_DATA, SEP
 
 # استيراد التصاميم والقوائم من ملف menus
 from menus import (
@@ -21,6 +21,9 @@ from menus import (
     get_platforms_inline_menu,
     get_curricula_inline_menu,
 )
+
+# استيراد المعلم الذكي من الملف الجديد
+from ai_teacher import get_gemini_response
 
 # ==========================================
 # 1. خادم الويب الأساسي (لضمان استقرار Koyeb)
@@ -46,10 +49,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "اختر الخدمة المطلوبة من القائمة أدناه 👇"
     )
     
-    # استخدام اسم الصورة الجديد الذي رفعته
-    file_path = "image_2.png" 
+    # استخدام الصورة الترحيبية الجديدة
+    file_path = "image_2.png"
     
-    # التحقق من وجود الصورة وإرسالها مع النص
     if os.path.exists(file_path):
         with open(file_path, 'rb') as photo_file:
             await update.message.reply_photo(
@@ -59,12 +61,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=get_main_menu()
             )
     else:
-        # كخطة بديلة (إذا لم تجد الصورة)، يرسل نصاً فقط
-        await update.message.reply_text(
-            welcome_text, 
-            parse_mode="Markdown", 
-            reply_markup=get_main_menu()
-        )
+        await update.message.reply_text(welcome_text, parse_mode="Markdown", reply_markup=get_main_menu())
 
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
@@ -72,7 +69,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if "المعلم الذكي" in text:
         msg = (
             "🤖 *مرحباً بك في خدمة المعلم الذكي*\n"
-            "──────────────────────\n"
+            f"{SEP}\n"
             "أنا جاهز للإجابة على استفساراتك التخصصية:\n"
             "• شروحات البرمجة (Python, SQL).\n"
             "• الشبكات، الألياف الضوئية، وصيانة الحاسب.\n"
@@ -91,7 +88,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif "الحقائب التدريبية" in text:
         msg = (
             "📚 *الحقائب والمناهج التدريبية الرسمية*\n"
-            "──────────────────────\n"
+            f"{SEP}\n"
             "يمكنك استعراض وتحميل كافة الحقائب المعتمدة بصيغة PDF عبر المنصات أدناه:"
         )
         await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=get_curricula_inline_menu())
@@ -99,7 +96,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif "المنصات" in text:
         msg = (
             "🔗 *المنصات والخدمات الإلكترونية للمتدرب*\n"
-            "──────────────────────\n"
+            f"{SEP}\n"
             "اضغط على المنصة للفتح المباشر:"
         )
         await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=get_platforms_inline_menu())
@@ -107,14 +104,11 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif "التقويم التدريبي" in text:
         caption_msg = (
             "📅 *التقويم التدريبي المعتمد*\n"
-            "──────────────────────\n"
+            f"{SEP}\n"
             "مرفق لك نسخة PDF من التقويم التدريبي التفصيلي.\n"
             "يحتوي على مواعيد الاختبارات، الإجازات، وبداية الفصول التدريبية."
         )
-        
         file_path = "calendar.pdf"
-        
-        # التأكد من وجود الملف في السيرفر وإرساله كملف PDF تفاعلي
         if os.path.exists(file_path):
             with open(file_path, 'rb') as pdf_file:
                 await update.message.reply_document(
@@ -124,19 +118,14 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     reply_markup=get_main_menu()
                 )
         else:
-            # كخطة بديلة (Fallback) في حال لم يتم تحميل الملف، يرسل الرابط المباشر
             pdf_url = "https://raw.githubusercontent.com/majod119-tech/Tebot-telgram/main/calendar.pdf"
             fallback_msg = f"{caption_msg}\n\n🔗 [اضغط هنا لعرض وتحميل التقويم]({pdf_url})"
-            await update.message.reply_text(
-                fallback_msg, 
-                parse_mode="Markdown", 
-                reply_markup=get_main_menu()
-            )
+            await update.message.reply_text(fallback_msg, parse_mode="Markdown", reply_markup=get_main_menu())
 
     elif "أخبار" in text:
         msg = (
             "📰 *لوحة إعلانات وأخبار قسم الحاسب والمعهد*\n"
-            "──────────────────────\n"
+            f"{SEP}\n"
             "📢 التسجيل في الأنشطة التقنية وورش الصيانة متاح حالياً.\n"
             "📢 مراجعة المرشد التدريبي لتثبيت الحالات التدريبية.\n"
             "📢 تسجيل الحضور يتم إلكترونياً وبصورة يومية."
@@ -146,7 +135,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif "الأسئلة الشائعة" in text:
         msg = (
             "❓ *الأسئلة الأكثر تكراراً (FAQ)*\n"
-            "──────────────────────\n"
+            f"{SEP}\n"
             "🔹 *س: متى يقع الحرمان من المقرر؟*\n"
             "ج: عند بلوغ نسبة الغياب 20% فأكثر بدون عذر رسمي.\n\n"
             "🔹 *س: كيف أقدم العذر الطبي؟*\n"
@@ -156,11 +145,22 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(msg, parse_mode="Markdown")
 
+    # ========================================================
+    # 💡 الجزء الجديد: استقبال الأسئلة الحرة وربطها بالذكاء الاصطناعي 💡
+    # ========================================================
     else:
-        await update.message.reply_text(
-            f"تم استلام رسالتك: {text}\nإذا كان لديك سؤال تخصصي تفضل باختيار '🤖 المعلم الذكي'.",
-            reply_markup=get_main_menu()
-        )
+        # 1. إرسال رسالة انتظار للمتدرب
+        waiting_msg = await update.message.reply_text("⏳ جاري تحليل استفسارك...", reply_markup=get_main_menu())
+        
+        # 2. إرسال سؤال المتدرب إلى Gemini
+        ai_response = get_gemini_response(text)
+        
+        # 3. تعديل رسالة الانتظار لتصبح الإجابة النهائية
+        try:
+            await waiting_msg.edit_text(ai_response, parse_mode="Markdown")
+        except Exception:
+            # إذا كان الرد من Gemini يحتوي على نصوص لا تدعم Markdown بشكل صحيح
+            await waiting_msg.edit_text(ai_response)
 
 # ==========================================
 # 3. معالج الأزرار المضمنة (Inline Keyboard Callback)
@@ -187,7 +187,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(3600)
     else:
-        print("Starting Telegram Bot with Clean Architecture...")
+        print("Starting Telegram Bot with AI Teacher...")
         application = ApplicationBuilder().token(TOKEN).build()
         application.add_handler(CommandHandler("start", start_command))
         application.add_handler(CallbackQueryHandler(handle_callback_query))
