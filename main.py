@@ -45,7 +45,26 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "خدماتك التدريبية والمقررات الرسمية متاحة بين يديك بتصميم منظم وسهل.\n"
         "اختر الخدمة المطلوبة من القائمة أدناه 👇"
     )
-    await update.message.reply_text(welcome_text, parse_mode="Markdown", reply_markup=get_main_menu())
+    
+    # استخدام اسم الصورة الجديد الذي رفعته
+    file_path = "image_2.png" 
+    
+    # التحقق من وجود الصورة وإرسالها مع النص
+    if os.path.exists(file_path):
+        with open(file_path, 'rb') as photo_file:
+            await update.message.reply_photo(
+                photo=photo_file,
+                caption=welcome_text,
+                parse_mode="Markdown",
+                reply_markup=get_main_menu()
+            )
+    else:
+        # كخطة بديلة (إذا لم تجد الصورة)، يرسل نصاً فقط
+        await update.message.reply_text(
+            welcome_text, 
+            parse_mode="Markdown", 
+            reply_markup=get_main_menu()
+        )
 
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
