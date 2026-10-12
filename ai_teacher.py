@@ -1,40 +1,41 @@
 import asyncio
-import google.generativeai as genai
+import requests
 from config import GEMINI_API_KEY, AI_KNOWLEDGE
 
-# إعداد مفتاح API
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-
-# دالة متزامنة مخفية للاتصال بجوجل (تعمل في الخلفية)
-def _fetch_gemini_sync(query):
-    model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
-        system_instruction=AI_KNOWLEDGE
-    )
-    return model.generate_content(query).text
-
-# الدالة الأساسية التي يكلمها البوت
 async def get_gemini_response(user_query):
     if not GEMINI_API_KEY:
-        return "⚠️ عذراً، مفتاح GEMINI_API_KEY غير موجود في إعدادات Koyeb."
+        return "⚠️ عذراً، مفتاح GEMINI_API_KEY غير مضاف في إعدادات السيرفر."
     
-    try:
-        # 💡 السر هنا: تشغيل الاتصال بجوجل في مسار (Thread) منفصل تماماً حتى لا يتجمد تليجرام
-        response_text = await asyncio.to_thread(_fetch_gemini_sync, user_query)
+    # دالة الاتصال المباشر بجوجل (بدون مكتبات معقدة)
+    def fetch_from_api():
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
         
-        if response_text:
-            return response_text[:4000]
-        else:
-            return "لم أتمكن من صياغة إجابة، يرجى إعادة المحاولة."
+        payload = {
+            "system_instruction": {
+                "parts": {"text": AI_KNOWLEDGE}
+            },
+            "contents": [
+                {"parts": [{"text": user_query}]}
+            ]
+        }
+        
+        # إرسال الطلب مع حد أقصى للوقت (15 ثانية)
+        response = requests.post(url, json=payload, timeout=15)
+        response.raise_for_status() # التأكد من نجاح الطلب
+        
+        # استخراج النص من الرد
+        return response.json()['candidates'][0]['content']['parts'][0]['text']
 
+    try:
+        # تشغيل الاتصال المباشر في مسار آمن
+        answer = await asyncio.to_thread(fetch_from_api)
+        return answer[:4000]
+        
+    except requests.exceptions.HTTPError as e:
+        # إذا كان المفتاح خاطئ سيخبرك هنا
+        if "400" in str(e) or "403" in str(e):
+            return "⚠️ خطأ: مفتاح الذكاء الاصطناعي (API Key) غير صالح. تأكد منه في Koyeb."
+        return f"⚠️ خطأ في السيرفر: {e}"
+        
     except Exception as e:
-        error_msg = str(e)
-        print(f"Gemini Error: {error_msg}")
-        
-        # إذا كان الخطأ بسبب المفتاح، سيخبرك البوت فوراً
-        if "API_KEY" in error_msg or "400" in error_msg or "403" in error_msg:
-            return "⚠️ خطأ: مفتاح الذكاء الاصطناعي (API Key) غير صالح أو منتهي. يرجى التحقق منه في Koyeb."
-        
-        # أي خطأ آخر سيظهر لك هنا ولن يعلق البوت
-        return f"⚠️ عطل فني في الذكاء الاصطناعي:\n{error_msg}"
+        return f"⚠️ خطأ في الاتصال: {e}"
