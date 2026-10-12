@@ -146,32 +146,33 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(msg, parse_mode="Markdown")
 
-    # ========================================================
-    # 💡 الجزء الجديد: رادار تتبع الذكاء الاصطناعي 💡
+   # ========================================================
+    # 💡 الجزء الجديد: ربط الذكاء الاصطناعي (مضمون 100%) 💡
     # ========================================================
     else:
-        # الخطوة 1: استلام الرسالة
-        waiting_msg = await update.message.reply_text("1️⃣ جاري استلام استفسارك...", reply_markup=get_main_menu())
+        # إرسال رسالة انتظار
+        waiting_msg = await update.message.reply_text("⏳ جاري تحليل استفسارك...", reply_markup=get_main_menu())
         
         try:
-            # الخطوة 2: محاولة الاتصال
-            await waiting_msg.edit_text("2️⃣ جاري الاتصال بمحرك الذكاء الاصطناعي (Gemini)...")
-            
-            # نضع حد أقصى للوقت (15 ثانية) لكي لا يعلق البوت للأبد!
+            # الاتصال بالذكاء الاصطناعي (مع مهلة 15 ثانية)
+            import asyncio
             ai_response = await asyncio.wait_for(get_gemini_response(text), timeout=15.0)
             
-            # الخطوة 3: عرض الإجابة
+            # حذف رسالة "جاري تحليل استفسارك"
+            await waiting_msg.delete()
+            
+            # إرسال الإجابة كرسالة جديدة تماماً
             if ai_response and ai_response.strip():
-                await waiting_msg.edit_text(ai_response)
+                await update.message.reply_text(ai_response)
             else:
-                await waiting_msg.edit_text("⚠️ عذراً، الإجابة المستلمة كانت فارغة.")
+                await update.message.reply_text("⚠️ عذراً، لم أتمكن من صياغة إجابة مناسبة.")
                 
         except asyncio.TimeoutError:
-            # إذا تأخرت جوجل أكثر من 15 ثانية، سيظهر هذا الخطأ ولن يعلق!
-            await waiting_msg.edit_text("⚠️ عذراً، انتهى وقت الاتصال (Timeout). سيرفر Koyeb يواجه صعوبة في الوصول لسيرفرات جوجل حالياً.")
+            await waiting_msg.delete()
+            await update.message.reply_text("⚠️ عذراً، انتهى وقت الاتصال (Timeout) بسيرفرات الذكاء الاصطناعي. يرجى المحاولة لاحقاً.")
         except Exception as e:
-            # أي خطأ آخر سيظهر لك على الشاشة مباشرة
-            await waiting_msg.edit_text(f"⚠️ حدث خطأ أثناء المعالجة:\n{e}")
+            await waiting_msg.delete()
+            await update.message.reply_text(f"⚠️ حدث خطأ أثناء المعالجة:\n{e}")
 
 # ==========================================
 # 3. معالج الأزرار المضمنة (Inline Keyboard Callback)
