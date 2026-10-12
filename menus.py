@@ -33,12 +33,15 @@ def get_plans_inline_menu():
     return InlineKeyboardMarkup(keyboard)
 
 def get_platforms_inline_menu():
+    """تم تحديث رابط منصة تقني والإبقاء على بلاك بورد"""
     keyboard = [
         [
-            InlineKeyboardButton("📱 منصة تقني الإلكترونية", url="https://tech.tvtc.gov.sa"),
+            # الرابط الجديد لمنصة تقني
+            InlineKeyboardButton("📱 منصة تقني الإلكترونية", url="https://tvtclms.edu.sa"),
             InlineKeyboardButton("🌐 بوابة رايات للمتدربين", url="https://rayat.tvtc.gov.sa")
         ],
         [
+            # الإبقاء على بلاك بورد
             InlineKeyboardButton("💻 بلاك بورد التدريب", url="https://lms.elearning.edu.sa"),
             InlineKeyboardButton("🏛️ بوابة المؤسسة العامة", url="https://tvtc.gov.sa")
         ]
@@ -46,9 +49,11 @@ def get_platforms_inline_menu():
     return InlineKeyboardMarkup(keyboard)
 
 def get_curricula_inline_menu():
+    """تم إضافة رابط ملفات المناهج الجديد على جوجل درايف"""
     keyboard = [
         [
-            InlineKeyboardButton("📚 بوابة المقررات الرسمية (CDD)", url="https://tvtc.gov.sa/ar/Departments/tvtcdepartments/cdd/Pages/packages.aspx")
+            # الرابط الجديد المباشر لملفات المناهج (Google Drive)
+            InlineKeyboardButton("📁 ملفات المناهج والحقائب (Google Drive)", url="https://drive.google.com/drive/folders/1ZLqgZ4OE3P9SrmzV9298uo8KxFqNU8wQ")
         ],
         [
             InlineKeyboardButton("📑 منصة إيثاق للمناهج", url="https://eythaq.tvtc.gov.sa"),
