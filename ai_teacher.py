@@ -1,6 +1,7 @@
 import google.generativeai as genai
 from config import GEMINI_API_KEY, AI_KNOWLEDGE
 
+# استخدام الاتصال الخفيف لمنع التجميد
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY, transport="rest")
 
@@ -9,13 +10,14 @@ async def get_gemini_response(user_query):
         return "⚠️ عذراً، مفتاح GEMINI_API_KEY غير مضاف في إعدادات السيرفر."
     
     try:
-        # 💡 التعديل هنا: استخدام الاسم المعتمد للنسخة الأحدث (latest)
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash-latest",
-            system_instruction=AI_KNOWLEDGE
-        )
+        # 💡 التعديل 1: استخدام النموذج المستقر والمتوفر لجميع المفاتيح (gemini-pro)
+        model = genai.GenerativeModel("gemini-pro")
         
-        response = await model.generate_content_async(user_query)
+        # 💡 التعديل 2: دمج شخصية المعلم مع السؤال برمجياً لضمان عملها على أي إصدار
+        full_prompt = f"{AI_KNOWLEDGE}\n\nسؤال المتدرب: {user_query}"
+        
+        # الاتصال السريع
+        response = await model.generate_content_async(full_prompt)
         
         if response and response.text:
             return response.text[:4000]
