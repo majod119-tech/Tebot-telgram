@@ -1,11 +1,8 @@
 from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 
-# ==========================================
-# 1. القائمة السفلية الرئيسية (Reply Keyboard)
-# ==========================================
 def get_main_menu():
     keyboard = [
-        ["🤖 المعلم الذكي"],
+        ["🤖 المعلم الذكي", "🛠️ تقني عابر"],
         ["📄 الخطط التدريبية", "📚 الحقائب التدريبية"],
         ["🔗 المنصات والخدمات", "📅 التقويم التدريبي"],
         ["📰 أخبار القسم", "❓ الأسئلة الشائعة"]
@@ -15,12 +12,7 @@ def get_main_menu():
 def get_back_menu():
     return ReplyKeyboardMarkup([["🔙 العودة للقائمة الرئيسية"]], resize_keyboard=True)
 
-# ==========================================
-# 2. القوائم المضمنة (Inline Keyboards)
-# ==========================================
-
 def get_plans_inline_menu():
-    """أزرار الفصول مرتبة هندسياً لسهولة اللمس"""
     keyboard = [
         [
             InlineKeyboardButton("1️⃣ الفصل الأول", callback_data="plan_1"),
@@ -41,7 +33,6 @@ def get_plans_inline_menu():
     return InlineKeyboardMarkup(keyboard)
 
 def get_platforms_inline_menu():
-    """أزرار تفتح الروابط المباشرة لخدمات المؤسسة مع البوت المساند"""
     keyboard = [
         [
             InlineKeyboardButton("📱 منصة تقني الإلكترونية", url="https://tech.tvtc.gov.sa"),
@@ -50,16 +41,11 @@ def get_platforms_inline_menu():
         [
             InlineKeyboardButton("💻 بلاك بورد التدريب", url="https://lms.elearning.edu.sa"),
             InlineKeyboardButton("🏛️ بوابة المؤسسة العامة", url="https://tvtc.gov.sa")
-        ],
-        [
-            # الزر الجديد الخاص بالبوت المساند لخدمات المتدربين
-            InlineKeyboardButton("🤖 خدمات المتدربين (بوت مساند)", url="https://t.me/Abr20k1bot")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
 
 def get_curricula_inline_menu():
-    """روابط الحقائب والمناهج المعتمدة (نصفي)"""
     keyboard = [
         [
             InlineKeyboardButton("📚 بوابة المقررات الرسمية (CDD)", url="https://tvtc.gov.sa/ar/Departments/tvtcdepartments/cdd/Pages/packages.aspx")
