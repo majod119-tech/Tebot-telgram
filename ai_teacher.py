@@ -1,34 +1,45 @@
-import google.generativeai as genai
+import asyncio
+import requests
 from config import GEMINI_API_KEY, AI_KNOWLEDGE
-
-# استخدام الاتصال الخفيف لمنع التجميد
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY, transport="rest")
 
 async def get_gemini_response(user_query):
     if not GEMINI_API_KEY:
         return "⚠️ عذراً، مفتاح GEMINI_API_KEY غير مضاف في إعدادات السيرفر."
     
-    try:
-        # 💡 التعديل 1: استخدام النموذج المستقر والمتوفر لجميع المفاتيح (gemini-pro)
-        model = genai.GenerativeModel("gemini-pro")
+    # دالة الاتصال المباشر والآمن (بدون استخدام مكتبة genai)
+    def fetch_from_api():
+        # الرابط الرسمي الصحيح والمباشر لنموذج Gemini 1.5 Flash
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
         
-        # 💡 التعديل 2: دمج شخصية المعلم مع السؤال برمجياً لضمان عملها على أي إصدار
-        full_prompt = f"{AI_KNOWLEDGE}\n\nسؤال المتدرب: {user_query}"
+        headers = {"Content-Type": "application/json"}
         
-        # الاتصال السريع
-        response = await model.generate_content_async(full_prompt)
+        payload = {
+            "system_instruction": {
+                "parts": {"text": AI_KNOWLEDGE}
+            },
+            "contents": [
+                {"parts": [{"text": user_query}]}
+            ]
+        }
         
-        if response and response.text:
-            return response.text[:4000]
-        else:
-            return "⚠️ عذراً، لم أتمكن من صياغة إجابة مناسبة."
+        # إرسال الطلب مع مهلة 20 ثانية لتجنب التعليق
+        response = requests.post(url, headers=headers, json=payload, timeout=20)
+        response.raise_for_status() # التحقق من عدم وجود أخطاء (مثل 404 أو 403)
+        
+        # استخراج النص من الرد مباشرة
+        data = response.json()
+        return data['candidates'][0]['content']['parts'][0]['text']
 
-    except Exception as e:
-        error_msg = str(e)
-        print(f"Gemini API Error: {error_msg}")
+    try:
+        # تشغيل الدالة في مسار آمن لكي لا يتجمد تليجرام
+        answer = await asyncio.to_thread(fetch_from_api)
+        return answer[:4000]
         
-        if "API_KEY" in error_msg or "400" in error_msg or "403" in error_msg:
-            return "⚠️ خطأ: مفتاح الذكاء الاصطناعي غير صالح. يرجى التحقق منه في Koyeb."
-            
-        return f"⚠️ عطل فني في الذكاء الاصطناعي:\n{error_msg}"
+    except requests.exceptions.HTTPError as e:
+        error_msg = str(e)
+        if "400" in error_msg or "403" in error_msg:
+            return "⚠️ خطأ: مفتاح الذكاء الاصطناعي (API Key) غير صالح. تأكد منه في إعدادات Koyeb."
+        return f"⚠️ خطأ في سيرفرات جوجل:\n{error_msg}"
+        
+    except Exception as e:
+        return f"⚠️ خطأ في الاتصال:\n{e}"
