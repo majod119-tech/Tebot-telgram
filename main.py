@@ -1,8 +1,7 @@
 import os
-import asyncio
 import threading
 from flask import Flask
-from telegram import Update
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -12,22 +11,17 @@ from telegram.ext import (
     filters,
 )
 
-# استيراد الإعدادات والبيانات من ملف config
 from config import TOKEN, PORT, PLANS_DATA, SEP
-
-# استيراد التصاميم والقوائم من ملف menus
 from menus import (
     get_main_menu,
     get_plans_inline_menu,
     get_platforms_inline_menu,
     get_curricula_inline_menu,
 )
-
-# استيراد المعلم الذكي من الملف الجديد
 from ai_teacher import get_gemini_response
 
 # ==========================================
-# 1. خادم الويب الأساسي (لضمان استقرار Koyeb)
+# 1. خادم الويب الأساسي 
 # ==========================================
 web_app = Flask(__name__)
 
@@ -41,7 +35,7 @@ def run_web_server():
 threading.Thread(target=run_web_server, daemon=True).start()
 
 # ==========================================
-# 2. تفاعل وأوامر البوت (Handlers)
+# 2. تفاعل وأوامر البوت
 # ==========================================
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
@@ -50,9 +44,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "اختر الخدمة المطلوبة من القائمة أدناه 👇"
     )
     
-    # استخدام الصورة الترحيبية الجديدة
     file_path = "image_2.png"
-    
     if os.path.exists(file_path):
         with open(file_path, 'rb') as photo_file:
             await update.message.reply_photo(
@@ -78,6 +70,15 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "💬 *اكتب سؤالك وسأجيبك فوراً!*"
         )
         await update.message.reply_text(msg, parse_mode="Markdown")
+
+    elif "تقني عابر" in text:
+        msg = (
+            "🛠️ *خدمات تقني عابر*\n"
+            f"{SEP}\n"
+            "اضغط على الزر أدناه للانتقال مباشرة إلى البوت المساند لخدمات المتدربين:"
+        )
+        keyboard = [[InlineKeyboardButton("🚀 الدخول لبوت تقني عابر", url="https://t.me/Abr20k1bot")]]
+        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif "الخطط التدريبية" in text:
         msg = (
@@ -146,36 +147,29 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(msg, parse_mode="Markdown")
 
-   # ========================================================
-    # 💡 الجزء الجديد: ربط الذكاء الاصطناعي (مضمون 100%) 💡
-    # ========================================================
     else:
         # إرسال رسالة انتظار
         waiting_msg = await update.message.reply_text("⏳ جاري تحليل استفسارك...", reply_markup=get_main_menu())
         
         try:
-            # الاتصال بالذكاء الاصطناعي (مع مهلة 15 ثانية)
-            import asyncio
-            ai_response = await asyncio.wait_for(get_gemini_response(text), timeout=15.0)
+            # الاتصال بالذكاء الاصطناعي
+            ai_response = await get_gemini_response(text)
             
-            # حذف رسالة "جاري تحليل استفسارك"
+            # حذف رسالة الانتظار
             await waiting_msg.delete()
             
-            # إرسال الإجابة كرسالة جديدة تماماً
+            # إرسال الإجابة كرسالة جديدة
             if ai_response and ai_response.strip():
                 await update.message.reply_text(ai_response)
             else:
                 await update.message.reply_text("⚠️ عذراً، لم أتمكن من صياغة إجابة مناسبة.")
                 
-        except asyncio.TimeoutError:
-            await waiting_msg.delete()
-            await update.message.reply_text("⚠️ عذراً، انتهى وقت الاتصال (Timeout) بسيرفرات الذكاء الاصطناعي. يرجى المحاولة لاحقاً.")
         except Exception as e:
             await waiting_msg.delete()
             await update.message.reply_text(f"⚠️ حدث خطأ أثناء المعالجة:\n{e}")
 
 # ==========================================
-# 3. معالج الأزرار المضمنة (Inline Keyboard Callback)
+# 3. معالج الأزرار المضمنة
 # ==========================================
 async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -194,7 +188,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
 # ==========================================
 if __name__ == "__main__":
     if not TOKEN:
-        print("WARNING: TOKEN is not set! Web server will keep container alive.")
+        print("WARNING: TOKEN is not set!")
         import time
         while True:
             time.sleep(3600)
