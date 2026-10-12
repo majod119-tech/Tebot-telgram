@@ -1,7 +1,6 @@
 import google.generativeai as genai
 from config import GEMINI_API_KEY, AI_KNOWLEDGE
 
-# 💡 السر هنا: إجبار المكتبة على استخدام "rest" بدلاً من البروتوكول المعقد لمنع التجميد
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY, transport="rest")
 
@@ -10,12 +9,12 @@ async def get_gemini_response(user_query):
         return "⚠️ عذراً، مفتاح GEMINI_API_KEY غير مضاف في إعدادات السيرفر."
     
     try:
+        # 💡 التعديل هنا: استخدام الاسم المعتمد للنسخة الأحدث (latest)
         model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
+            model_name="gemini-1.5-flash-latest",
             system_instruction=AI_KNOWLEDGE
         )
         
-        # الاتصال السريع والآمن
         response = await model.generate_content_async(user_query)
         
         if response and response.text:
