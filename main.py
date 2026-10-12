@@ -1,4 +1,5 @@
 import os
+import asyncio
 import threading
 from flask import Flask
 from telegram import Update
@@ -146,22 +147,31 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg, parse_mode="Markdown")
 
     # ========================================================
-    # 💡 الجزء الجديد: استقبال الأسئلة الحرة وربطها بالذكاء الاصطناعي 💡
+    # 💡 الجزء الجديد: رادار تتبع الذكاء الاصطناعي 💡
     # ========================================================
     else:
-        # 1. إرسال رسالة انتظار للمتدرب
-        waiting_msg = await update.message.reply_text("⏳ جاري تحليل استفسارك...", reply_markup=get_main_menu())
+        # الخطوة 1: استلام الرسالة
+        waiting_msg = await update.message.reply_text("1️⃣ جاري استلام استفسارك...", reply_markup=get_main_menu())
         
-        # 2. إرسال سؤال المتدرب إلى Gemini (أضفنا كلمة await هنا)
-        ai_response = await get_gemini_response(text)
-        
-        # 3. تعديل رسالة الانتظار لتصبح الإجابة النهائية
         try:
-            await waiting_msg.edit_text(ai_response, parse_mode="Markdown")
-        except Exception:
-            # إذا كان الرد من Gemini يحتوي على نصوص لا تدعم Markdown بشكل صحيح
-            await waiting_msg.edit_text(ai_response)
-
+            # الخطوة 2: محاولة الاتصال
+            await waiting_msg.edit_text("2️⃣ جاري الاتصال بمحرك الذكاء الاصطناعي (Gemini)...")
+            
+            # نضع حد أقصى للوقت (15 ثانية) لكي لا يعلق البوت للأبد!
+            ai_response = await asyncio.wait_for(get_gemini_response(text), timeout=15.0)
+            
+            # الخطوة 3: عرض الإجابة
+            if ai_response and ai_response.strip():
+                await waiting_msg.edit_text(ai_response)
+            else:
+                await waiting_msg.edit_text("⚠️ عذراً، الإجابة المستلمة كانت فارغة.")
+                
+        except asyncio.TimeoutError:
+            # إذا تأخرت جوجل أكثر من 15 ثانية، سيظهر هذا الخطأ ولن يعلق!
+            await waiting_msg.edit_text("⚠️ عذراً، انتهى وقت الاتصال (Timeout). سيرفر Koyeb يواجه صعوبة في الوصول لسيرفرات جوجل حالياً.")
+        except Exception as e:
+            # أي خطأ آخر سيظهر لك على الشاشة مباشرة
+            await waiting_msg.edit_text(f"⚠️ حدث خطأ أثناء المعالجة:\n{e}")
 
 # ==========================================
 # 3. معالج الأزرار المضمنة (Inline Keyboard Callback)
@@ -188,7 +198,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(3600)
     else:
-        print("Starting Telegram Bot with AI Teacher...")
+        print("Starting Telegram Bot with Clean Architecture...")
         application = ApplicationBuilder().token(TOKEN).build()
         application.add_handler(CommandHandler("start", start_command))
         application.add_handler(CallbackQueryHandler(handle_callback_query))
