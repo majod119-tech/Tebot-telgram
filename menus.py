@@ -2,7 +2,7 @@ from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardBu
 
 def get_main_menu():
     keyboard = [
-        ["🤖 المعلم الذكي", "🛠️ تقني عابر"],
+        ["🤖 المعلم الذكي", "🛠️ منصة تقني "],
         ["📄 الخطط التدريبية", "📚 الحقائب التدريبية"],
         ["🔗 المنصات والخدمات", "📅 التقويم التدريبي"],
         ["📰 أخبار القسم", "❓ الأسئلة الشائعة"]
