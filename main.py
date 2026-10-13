@@ -77,7 +77,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"{SEP}\n"
             "اضغط على الزر أدناه للانتقال مباشرة إلى البوت المساند لخدمات المتدربين:"
         )
-        keyboard = [[InlineKeyboardButton("🚀 الدخول لبوت تقني عابر", url="https://t.me/Abr20k1bot")]]
+        keyboard = [[InlineKeyboardButton("🚀 الدخول لبوت منصة تقني ", url="https://t.me/Abr20k1bot")]]
         await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif "الخطط التدريبية" in text:
