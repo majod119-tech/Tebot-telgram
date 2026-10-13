@@ -44,7 +44,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "اختر الخدمة المطلوبة من القائمة أدناه 👇"
     )
     
-    file_path = "image_2.png"
+    # استخدام الصورة الترحيبية الجديدة
+    file_path = "welcome_image.jpeg"
     if os.path.exists(file_path):
         with open(file_path, 'rb') as photo_file:
             await update.message.reply_photo(
