@@ -2,12 +2,14 @@ from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardBu
 
 def get_main_menu():
     keyboard = [
-        ["🤖 المعلم الذكي", "🛠️ منصة تقني "],
+        ["🤖 المعلم الذكي", "🛠️ منصة تقني"], # تم تغيير الاسم هنا
         ["📄 الخطط التدريبية", "📚 الحقائب التدريبية"],
         ["🔗 المنصات والخدمات", "📅 التقويم التدريبي"],
         ["📰 أخبار القسم", "❓ الأسئلة الشائعة"]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+
 
 def get_back_menu():
     return ReplyKeyboardMarkup([["🔙 العودة للقائمة الرئيسية"]], resize_keyboard=True)
