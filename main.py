@@ -71,9 +71,9 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(msg, parse_mode="Markdown")
 
-    elif "تقني عابر" in text:
+    elif "منصة تقني " in text:
         msg = (
-            "🛠️ *خدمات تقني عابر*\n"
+            "🛠️ *خدمات منصة تقني *\n"
             f"{SEP}\n"
             "اضغط على الزر أدناه للانتقال مباشرة إلى البوت المساند لخدمات المتدربين:"
         )
